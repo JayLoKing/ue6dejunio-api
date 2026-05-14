@@ -35,3 +35,14 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Secrets ###
+.env
+.env.local
+.env.*.local
+src/main/resources/keys/private.pem
+src/main/resources/keys/*.key
+src/test/resources/keys/private.pem
+
+### Claude worktrees ###
+.claude/worktrees/

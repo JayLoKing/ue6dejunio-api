@@ -1,0 +1,74 @@
+package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mail;
+
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+
+@Service
+public class EmailServiceAdapter implements IEmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailServiceAdapter.class);
+
+    private final JavaMailSender mailSender;
+    private final String from;
+    private final String fromName;
+
+    public EmailServiceAdapter(
+        JavaMailSender mailSender,
+        @Value("${app.mail.from}") String from,
+        @Value("${app.mail.from-name}") String fromName
+    ) {
+        this.mailSender = mailSender;
+        this.from = from;
+        this.fromName = fromName;
+    }
+
+    @Override
+    @Async
+    public void sendWelcomeCredentials(String toEmail, String fullName, String username, String temporaryPassword) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(from, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("Bienvenido(a) al Sistema UE 6 de Junio - Credenciales de acceso");
+            helper.setText(buildBody(fullName, username, toEmail, temporaryPassword), true);
+            mailSender.send(message);
+            log.info("Email de credenciales enviado a {}", toEmail);
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("Error enviando email a {}: {}", toEmail, e.getMessage(), e);
+            throw new IllegalStateException("No se pudo enviar el correo de bienvenida", e);
+        }
+    }
+
+    private String buildBody(String fullName, String username, String email, String password) {
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+              <h2 style="color: #1f4e79;">Unidad Educativa 6 de Junio</h2>
+              <p>Hola <b>%s</b>,</p>
+              <p>Se creó tu cuenta en el sistema. Tus credenciales son:</p>
+              <table style="border-collapse: collapse; margin: 16px 0;">
+                <tr><td style="padding:8px;border:1px solid #ddd;"><b>Usuario</b></td><td style="padding:8px;border:1px solid #ddd;">%s</td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;"><b>Email</b></td><td style="padding:8px;border:1px solid #ddd;">%s</td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;"><b>Contraseña temporal</b></td><td style="padding:8px;border:1px solid #ddd;"><code>%s</code></td></tr>
+              </table>
+              <p style="color:#b00;"><b>Importante:</b> debes cambiar tu contraseña al iniciar sesión por primera vez.</p>
+              <p>Si no esperabas este correo, ignóralo.</p>
+              <hr>
+              <p style="font-size:12px;color:#666;">Mensaje automático, no responder.</p>
+            </body>
+            </html>
+            """.formatted(fullName, username, email, password);
+    }
+}
