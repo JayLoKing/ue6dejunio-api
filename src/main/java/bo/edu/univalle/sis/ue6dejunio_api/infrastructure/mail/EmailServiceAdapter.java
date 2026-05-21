@@ -35,14 +35,14 @@ public class EmailServiceAdapter implements IEmailService {
 
     @Override
     @Async
-    public void sendWelcomeCredentials(String toEmail, String fullName, String username, String temporaryPassword) {
+    public void sendWelcomeCredentials(String toEmail, String fullName, String temporaryPassword) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(from, fromName);
             helper.setTo(toEmail);
             helper.setSubject("Bienvenido(a) al Sistema UE 6 de Junio - Credenciales de acceso");
-            helper.setText(buildBody(fullName, username, toEmail, temporaryPassword), true);
+            helper.setText(buildBody(fullName, toEmail, temporaryPassword), true);
             mailSender.send(message);
             log.info("Email de credenciales enviado a {}", toEmail);
         } catch (MessagingException | UnsupportedEncodingException e) {
@@ -51,24 +51,22 @@ public class EmailServiceAdapter implements IEmailService {
         }
     }
 
-    private String buildBody(String fullName, String username, String email, String password) {
+    private String buildBody(String fullName, String email, String password) {
         return """
             <html>
             <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
               <h2 style="color: #1f4e79;">Unidad Educativa 6 de Junio</h2>
               <p>Hola <b>%s</b>,</p>
-              <p>Se creó tu cuenta en el sistema. Tus credenciales son:</p>
+              <p>Se cre&oacute; tu cuenta en el sistema. Inicia sesi&oacute;n con tu correo:</p>
               <table style="border-collapse: collapse; margin: 16px 0;">
-                <tr><td style="padding:8px;border:1px solid #ddd;"><b>Usuario</b></td><td style="padding:8px;border:1px solid #ddd;">%s</td></tr>
                 <tr><td style="padding:8px;border:1px solid #ddd;"><b>Email</b></td><td style="padding:8px;border:1px solid #ddd;">%s</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;"><b>Contraseña temporal</b></td><td style="padding:8px;border:1px solid #ddd;"><code>%s</code></td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;"><b>Contrase&ntilde;a temporal</b></td><td style="padding:8px;border:1px solid #ddd;"><code>%s</code></td></tr>
               </table>
-              <p style="color:#b00;"><b>Importante:</b> debes cambiar tu contraseña al iniciar sesión por primera vez.</p>
-              <p>Si no esperabas este correo, ignóralo.</p>
+              <p style="color:#b00;"><b>Importante:</b> debes cambiar tu contrase&ntilde;a al iniciar sesi&oacute;n por primera vez.</p>
               <hr>
-              <p style="font-size:12px;color:#666;">Mensaje automático, no responder.</p>
+              <p style="font-size:12px;color:#666;">Mensaje autom&aacute;tico, no responder.</p>
             </body>
             </html>
-            """.formatted(fullName, username, email, password);
+            """.formatted(fullName, email, password);
     }
 }

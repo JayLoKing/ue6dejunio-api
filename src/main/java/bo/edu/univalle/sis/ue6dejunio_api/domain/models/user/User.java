@@ -17,7 +17,6 @@ public class User {
     private String lastNames;
     private String phone;
     private String email;
-    private String username;
     @JsonIgnore
     private String password;
     private boolean mustChangePassword;

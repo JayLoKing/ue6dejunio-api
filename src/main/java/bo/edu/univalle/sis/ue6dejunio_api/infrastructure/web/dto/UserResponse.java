@@ -12,7 +12,6 @@ public record UserResponse(
     String lastNames,
     String phone,
     String email,
-    String username,
     String role,
     boolean active,
     boolean mustChangePassword,
@@ -21,7 +20,7 @@ public record UserResponse(
     public static UserResponse from(User u) {
         return new UserResponse(
             u.getId(), u.getCi(), u.getNames(), u.getLastNames(),
-            u.getPhone(), u.getEmail(), u.getUsername(),
+            u.getPhone(), u.getEmail(),
             u.getRole() != null ? u.getRole().name() : null,
             u.isActive(), u.isMustChangePassword(), u.getCreatedAt()
         );

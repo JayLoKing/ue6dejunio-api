@@ -57,11 +57,6 @@ public class UserRepositoryAdapter implements IUserDomain {
     }
 
     @Override
-    public boolean existsByUsername(String username) {
-        return repo.existsByUsername(username);
-    }
-
-    @Override
     @Transactional
     public User save(User user) {
         UserEntity entity = mapper.toEntity(user);

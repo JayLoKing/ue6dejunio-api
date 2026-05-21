@@ -23,6 +23,7 @@ public class RoleEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_role")
     private Integer id;
 
     @Column(name = "name", nullable = false, unique = true, length = 20)

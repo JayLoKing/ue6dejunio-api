@@ -27,20 +27,17 @@ public class UserService implements IUserService {
     private final IUserDomain userDomain;
     private final IRoleDomain roleDomain;
     private final PasswordEncoder passwordEncoder;
-    private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
     private final IEmailService emailService;
 
     public UserService(IUserDomain userDomain,
                        IRoleDomain roleDomain,
                        PasswordEncoder passwordEncoder,
-                       UsernameGenerator usernameGenerator,
                        PasswordGenerator passwordGenerator,
                        IEmailService emailService) {
         this.userDomain = userDomain;
         this.roleDomain = roleDomain;
         this.passwordEncoder = passwordEncoder;
-        this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.emailService = emailService;
     }
@@ -56,7 +53,6 @@ public class UserService implements IUserService {
         Role role = roleDomain.findById(command.roleId())
             .orElseThrow(() -> new ResourceNotFoundException("Rol", command.roleId()));
 
-        String username = usernameGenerator.generateUnique(command.names(), command.lastNames());
         String temporaryPassword = passwordGenerator.generate();
 
         User user = User.builder()
@@ -65,7 +61,6 @@ public class UserService implements IUserService {
             .lastNames(command.lastNames())
             .phone(command.phone())
             .email(command.email())
-            .username(username)
             .password(passwordEncoder.encode(temporaryPassword))
             .mustChangePassword(true)
             .role(role)
@@ -73,7 +68,7 @@ public class UserService implements IUserService {
             .build();
 
         User saved = userDomain.save(user);
-        emailService.sendWelcomeCredentials(saved.getEmail(), saved.fullName(), saved.getUsername(), temporaryPassword);
+        emailService.sendWelcomeCredentials(saved.getEmail(), saved.fullName(), temporaryPassword);
         return saved;
     }
 

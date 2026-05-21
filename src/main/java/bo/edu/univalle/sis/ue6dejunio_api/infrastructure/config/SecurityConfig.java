@@ -40,8 +40,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(PUBLIC_PATHS).permitAll()
                 .requestMatchers("/api/users/**").hasRole("Director")
-                .requestMatchers("/api/pdc/**").hasAnyRole("Director", "Docente")
-                .requestMatchers("/api/students/search/**").hasAnyRole("Director", "Secretario", "Docente")
+                .requestMatchers("/api/students/**").hasAnyRole("Director", "Teacher")
+                .requestMatchers("/api/pdc/**").hasAnyRole("Director", "Teacher")
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwtAuthConverter)));

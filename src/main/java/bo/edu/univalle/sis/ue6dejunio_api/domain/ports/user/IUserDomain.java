@@ -15,7 +15,6 @@ public interface IUserDomain {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
     boolean existsByCi(String ci);
-    boolean existsByUsername(String username);
     User save(User user);
     void deactivate(UUID id);
 }

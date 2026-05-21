@@ -57,7 +57,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("secret123", "$hashed$")).thenReturn(true);
         AuthenticatedUser expected = new AuthenticatedUser(
             activeUser.getId(), activeUser.getEmail(), activeUser.fullName(),
-            "DIRECTOR", "jwt", Instant.now(), Instant.now().plusSeconds(900)
+            "DIRECTOR", "jwt", Instant.now(), Instant.now().plusSeconds(900), false
         );
         when(jwtService.issueToken(any(User.class))).thenReturn(expected);
 

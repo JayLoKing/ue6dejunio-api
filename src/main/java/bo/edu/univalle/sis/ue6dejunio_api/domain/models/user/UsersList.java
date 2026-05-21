@@ -9,7 +9,6 @@ public record UsersList(
     String lastNames,
     String phone,
     String email,
-    String username,
     String role,
     boolean active
 ) {}

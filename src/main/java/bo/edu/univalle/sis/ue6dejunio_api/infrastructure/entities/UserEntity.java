@@ -34,6 +34,7 @@ public class UserEntity {
 
     @Id
     @UuidGenerator
+    @Column(name = "id_user", updatable = false, nullable = false)
     private UUID id;
 
     @Column(name = "ci", nullable = false, unique = true, length = 15)
@@ -54,14 +55,11 @@ public class UserEntity {
     @Column(name = "password", nullable = false)
     private String password;
 
-    @Column(name = "username", nullable = false, length = 30)
-    private String username;
-
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "role_id", nullable = false)
+    @JoinColumn(name = "id_role", nullable = false)
     private RoleEntity role;
 
     @Column(name = "is_active", nullable = false)

@@ -18,8 +18,6 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByCi(String ci);
 
-    boolean existsByUsername(String username);
-
     @Query("""
         SELECT u FROM UserEntity u
         WHERE (:q IS NULL OR LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
