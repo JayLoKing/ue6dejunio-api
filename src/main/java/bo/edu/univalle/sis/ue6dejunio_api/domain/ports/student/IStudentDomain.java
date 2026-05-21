@@ -8,6 +8,8 @@ import java.util.UUID;
 public interface IStudentDomain {
     Student save(Student student);
     Optional<Student> findById(UUID id);
+    Optional<Student> findByRudeCode(String rudeCode);
+    Optional<Student> findByIdentityCard(String identityCard);
     boolean existsByRudeCode(String rudeCode);
     boolean existsByIdentityCard(String identityCard);
 }

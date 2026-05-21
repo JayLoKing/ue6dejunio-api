@@ -11,5 +11,7 @@ public record AuthenticatedUser(
     String accessToken,
     Instant issuedAt,
     Instant expiresAt,
-    boolean mustChangePassword
+    boolean mustChangePassword,
+    String gradeName,
+    String parallelName
 ) {}

@@ -36,6 +36,16 @@ public class StudentRepositoryAdapter implements IStudentDomain {
     }
 
     @Override
+    public java.util.Optional<Student> findByRudeCode(String rudeCode) {
+        return repo.findByRudeCode(rudeCode).map(mapper::toDomain);
+    }
+
+    @Override
+    public java.util.Optional<Student> findByIdentityCard(String identityCard) {
+        return repo.findByIdentityCard(identityCard).map(mapper::toDomain);
+    }
+
+    @Override
     public boolean existsByRudeCode(String rudeCode) {
         return repo.existsByRudeCode(rudeCode);
     }

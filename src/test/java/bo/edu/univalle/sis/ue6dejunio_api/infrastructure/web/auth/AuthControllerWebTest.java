@@ -9,7 +9,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.JwtAuthConvert
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -30,12 +31,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Import(AuthControllerWebTest.MockBeans.class)
 class AuthControllerWebTest {
 
     @Autowired private MockMvc mvc;
-    @Autowired private ObjectMapper json;
+    private final ObjectMapper json = new ObjectMapper();
     @MockitoBean private IAuthService authService;
 
     @TestConfiguration
@@ -49,7 +51,7 @@ class AuthControllerWebTest {
         UUID id = UUID.randomUUID();
         when(authService.login(any(LoginCommand.class))).thenReturn(new AuthenticatedUser(
             id, "director@ue6.bo", "Juan Ortuño", "DIRECTOR",
-            "jwt-token", Instant.now(), Instant.now().plusSeconds(900), false
+            "jwt-token", Instant.now(), Instant.now().plusSeconds(900), false, null, null
         ));
 
         mvc.perform(post("/api/auth/login")

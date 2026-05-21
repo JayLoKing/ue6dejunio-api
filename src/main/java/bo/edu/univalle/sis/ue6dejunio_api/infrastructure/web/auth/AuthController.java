@@ -25,7 +25,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "Auth", description = "Autenticación y sesión")
+@Tag(name = "Auth", description = "Autenticacion y sesion")
 public class AuthController {
 
     private final IAuthService authService;
@@ -35,7 +35,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Iniciar sesión", security = {})
+    @Operation(summary = "Iniciar sesion", security = {})
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthenticatedUser authenticated = authService.login(
             new LoginCommand(request.email(), request.password())
@@ -48,17 +48,21 @@ public class AuthController {
     public ResponseEntity<MeResponse> me(JwtAuthenticationToken token) {
         Jwt jwt = token.getToken();
         Boolean mustChange = jwt.getClaim("mustChangePassword");
+        String gradeName = jwt.getClaimAsString("gradeName");
+        String parallelName = jwt.getClaimAsString("parallelName");
         return ResponseEntity.ok(new MeResponse(
             UUID.fromString(jwt.getSubject()),
             jwt.getClaimAsString("email"),
             jwt.getClaimAsString("name"),
             jwt.getClaimAsString("role"),
-            mustChange != null && mustChange
+            mustChange != null && mustChange,
+            gradeName != null && !gradeName.isBlank() ? gradeName : null,
+            parallelName != null && !parallelName.isBlank() ? parallelName : null
         ));
     }
 
     @PostMapping("/change-password")
-    @Operation(summary = "Cambiar contraseña del usuario autenticado",
+    @Operation(summary = "Cambiar contrasena del usuario autenticado",
                security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Void> changePassword(
         @Valid @RequestBody ChangePasswordRequest request,

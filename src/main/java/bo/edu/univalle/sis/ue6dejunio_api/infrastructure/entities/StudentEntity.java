@@ -9,7 +9,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -44,6 +46,7 @@ public class StudentEntity {
     @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "gender", length = 1)
     private String gender;
 

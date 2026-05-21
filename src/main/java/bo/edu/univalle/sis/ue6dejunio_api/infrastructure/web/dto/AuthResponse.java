@@ -13,12 +13,15 @@ public record AuthResponse(
     String accessToken,
     String tokenType,
     Instant expiresAt,
-    boolean mustChangePassword
+    boolean mustChangePassword,
+    String gradeName,
+    String parallelName
 ) {
     public static AuthResponse from(AuthenticatedUser u) {
         return new AuthResponse(
             u.userId(), u.email(), u.fullName(), u.role(),
-            u.accessToken(), "Bearer", u.expiresAt(), u.mustChangePassword()
+            u.accessToken(), "Bearer", u.expiresAt(), u.mustChangePassword(),
+            u.gradeName(), u.parallelName()
         );
     }
 }
