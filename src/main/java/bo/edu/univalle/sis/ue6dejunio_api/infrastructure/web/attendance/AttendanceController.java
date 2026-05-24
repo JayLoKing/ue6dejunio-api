@@ -2,10 +2,14 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.attendance;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.AttendanceBatchResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyAttendanceCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyAttendanceResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.RegisterAttendanceCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AttendanceBatchRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AttendanceResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.DailyAttendanceRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.DailyAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RegisterAttendanceRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -35,7 +39,7 @@ public class AttendanceController {
     }
 
     @PostMapping
-    @Operation(summary = "Registrar/actualizar asistencia de una inscripcion en una fecha")
+    @Operation(summary = "Registrar/actualizar asistencia de una inscripcion en una fecha (por enrollment)")
     public ResponseEntity<AttendanceResponse> register(@Valid @RequestBody RegisterAttendanceRequest request) {
         Attendance saved = attendanceService.register(new RegisterAttendanceCommand(
             request.enrollmentId(), request.date(), request.status()));
@@ -43,12 +47,23 @@ public class AttendanceController {
     }
 
     @PostMapping("/batch")
-    @Operation(summary = "Registrar asistencia de todo el curso en una fecha")
+    @Operation(summary = "Registrar asistencia por enrollment (varios) en una fecha")
     public ResponseEntity<AttendanceBatchResult> registerBatch(@Valid @RequestBody AttendanceBatchRequest request) {
         List<RegisterAttendanceCommand> commands = request.records().stream()
             .map(r -> new RegisterAttendanceCommand(r.enrollmentId(), request.date(), r.status()))
             .toList();
         return ResponseEntity.ok(attendanceService.registerBatch(commands));
+    }
+
+    @PostMapping("/daily")
+    @Operation(summary = "Asistencia general del dia por grado+paralelo. Replica el estado a TODAS las materias (ACID)")
+    public ResponseEntity<DailyAttendanceResponse> registerDaily(@Valid @RequestBody DailyAttendanceRequest request) {
+        List<DailyAttendanceCommand.StudentMark> marks = request.records().stream()
+            .map(r -> new DailyAttendanceCommand.StudentMark(r.studentId(), r.status()))
+            .toList();
+        DailyAttendanceResult result = attendanceService.registerDaily(
+            new DailyAttendanceCommand(request.gradeId(), request.parallelId(), request.date(), marks));
+        return ResponseEntity.ok(DailyAttendanceResponse.from(result));
     }
 
     @GetMapping("/enrollment/{enrollmentId}")

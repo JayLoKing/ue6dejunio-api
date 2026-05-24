@@ -1,8 +1,10 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.score;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.AcademicScore;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.RegisterScoreByStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.RegisterScoreCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RegisterScoreByStudentRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RegisterScoreRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ScoreResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,12 +36,24 @@ public class ScoreController {
     }
 
     @PostMapping
-    @Operation(summary = "Registrar/actualizar notas de una inscripcion por trimestre (total auto)")
+    @Operation(summary = "Registrar/actualizar notas por enrollment + trimestre")
     public ResponseEntity<ScoreResponse> register(@Valid @RequestBody RegisterScoreRequest request,
                                                   JwtAuthenticationToken token) {
         UUID createdBy = UUID.fromString(token.getToken().getSubject());
         AcademicScore saved = scoreService.register(new RegisterScoreCommand(
             request.enrollmentId(), request.trimester(),
+            request.scoreBeing(), request.scoreKnowing(), request.scoreDoing(), request.scoreDeciding(),
+            createdBy));
+        return ResponseEntity.ok(ScoreResponse.from(saved));
+    }
+
+    @PostMapping("/by-student")
+    @Operation(summary = "Registrar nota por (studentId + classGroupId + trimestre). Resuelve enrollment internamente")
+    public ResponseEntity<ScoreResponse> registerByStudent(@Valid @RequestBody RegisterScoreByStudentRequest request,
+                                                           JwtAuthenticationToken token) {
+        UUID createdBy = UUID.fromString(token.getToken().getSubject());
+        AcademicScore saved = scoreService.registerByStudent(new RegisterScoreByStudentCommand(
+            request.studentId(), request.classGroupId(), request.trimester(),
             request.scoreBeing(), request.scoreKnowing(), request.scoreDoing(), request.scoreDeciding(),
             createdBy));
         return ResponseEntity.ok(ScoreResponse.from(saved));

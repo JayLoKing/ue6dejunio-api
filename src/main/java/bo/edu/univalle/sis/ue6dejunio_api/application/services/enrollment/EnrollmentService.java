@@ -74,6 +74,13 @@ public class EnrollmentService implements IEnrollmentService {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<Student> studentsOfTeacher(UUID teacherId) {
+        Integer yearId = classGroupDomain.currentAcademicYearId();
+        return enrollmentDomain.studentsByTeacher(teacherId, yearId);
+    }
+
     private Student findExisting(CreateStudentCommand sc) {
         Optional<Student> byRude = studentDomain.findByRudeCode(sc.rudeCode());
         if (byRude.isPresent()) {
