@@ -4,8 +4,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.EnrollCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.TeacherStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.enrollment.IEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.enrollment.IEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
@@ -76,9 +79,9 @@ public class EnrollmentService implements IEnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Student> studentsOfTeacher(UUID teacherId) {
+    public Page<TeacherStudent> studentsOfTeacher(UUID teacherId, Pageable pageable) {
         Integer yearId = classGroupDomain.currentAcademicYearId();
-        return enrollmentDomain.studentsByTeacher(teacherId, yearId);
+        return enrollmentDomain.studentsByTeacher(teacherId, yearId, pageable);
     }
 
     private Student findExisting(CreateStudentCommand sc) {

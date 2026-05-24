@@ -1,17 +1,21 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.teacher;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.TeacherStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.enrollment.IEnrollmentService;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.TeacherStudentResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -27,10 +31,12 @@ public class TeacherController {
     }
 
     @GetMapping("/{userId}/students")
-    @Operation(summary = "Lista distinta de estudiantes del docente (todos sus class_groups del anio actual)")
-    public ResponseEntity<List<StudentResponse>> students(@PathVariable UUID userId) {
-        List<StudentResponse> body = enrollmentService.studentsOfTeacher(userId).stream()
-            .map(StudentResponse::from).toList();
-        return ResponseEntity.ok(body);
+    @Operation(summary = "Lista paginada de estudiantes del docente con sus enrollments por materia")
+    public ResponseEntity<PagedResponse<TeacherStudentResponse>> students(
+        @PathVariable UUID userId,
+        @ParameterObject Pageable pageable
+    ) {
+        Page<TeacherStudent> page = enrollmentService.studentsOfTeacher(userId, pageable);
+        return ResponseEntity.ok(PagedResponse.of(page.map(TeacherStudentResponse::from)));
     }
 }
