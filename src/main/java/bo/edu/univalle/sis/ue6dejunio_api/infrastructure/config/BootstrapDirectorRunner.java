@@ -13,7 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!test")
+@Profile("!test & !it")
 public class BootstrapDirectorRunner implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(BootstrapDirectorRunner.class);
