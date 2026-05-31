@@ -19,18 +19,17 @@ public interface JpaEnrollmentRepository extends JpaRepository<EnrollmentEntity,
 
     Optional<EnrollmentEntity> findByStudent_IdAndClassGroup_Id(UUID studentId, UUID classGroupId);
 
-    @Query(
-        value = """
-            SELECT DISTINCT s FROM EnrollmentEntity e JOIN e.student s
-            WHERE e.classGroup.teacher.id = :teacherId
+    Page<EnrollmentEntity> findByClassGroup_Id(UUID classGroupId, Pageable pageable);
+
+    @Query("""
+        SELECT s FROM StudentEntity s
+        WHERE EXISTS (
+            SELECT 1 FROM EnrollmentEntity e
+            WHERE e.student = s
+                  AND e.classGroup.teacher.id = :teacherId
                   AND e.classGroup.academicYear.id = :yearId
-            """,
-        countQuery = """
-            SELECT COUNT(DISTINCT e.student) FROM EnrollmentEntity e
-            WHERE e.classGroup.teacher.id = :teacherId
-                  AND e.classGroup.academicYear.id = :yearId
-            """
-    )
+        )
+        """)
     Page<StudentEntity> findDistinctStudentsByTeacherPaged(
         @Param("teacherId") UUID teacherId,
         @Param("yearId") Integer yearId,

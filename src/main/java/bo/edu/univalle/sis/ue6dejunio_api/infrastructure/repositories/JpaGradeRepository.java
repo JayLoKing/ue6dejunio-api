@@ -4,4 +4,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.GradeEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaGradeRepository extends JpaRepository<GradeEntity, Integer> {
+    boolean existsByLevel_Id(Integer levelId);
+    boolean existsByNameAndLevel_Id(String name, Integer levelId);
 }

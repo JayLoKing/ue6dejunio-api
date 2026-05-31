@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.EnrollmentRef;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.TeacherStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.enrollment.IEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ClassGroupEntity;
@@ -69,6 +70,15 @@ public class EnrollmentRepositoryAdapter implements IEnrollmentDomain {
             : enrollmentRepo.findEnrollmentsByStudentsAndTeacher(ids, teacherId, yearId).stream()
                 .collect(Collectors.groupingBy(e -> e.getStudent().getId()));
         return studentsPage.map(s -> toTeacherStudent(s, byStudent.getOrDefault(s.getId(), List.of())));
+    }
+
+    @Override
+    public Page<EnrollmentRef> enrollmentsByClassGroup(UUID classGroupId, Pageable pageable) {
+        return enrollmentRepo.findByClassGroup_Id(classGroupId, pageable)
+            .map(e -> new EnrollmentRef(
+                e.getId(),
+                e.getStudent().getId(),
+                e.getStudent().getNames() + " " + e.getStudent().getLastNames()));
     }
 
     private TeacherStudent toTeacherStudent(StudentEntity s, List<EnrollmentEntity> enrolls) {

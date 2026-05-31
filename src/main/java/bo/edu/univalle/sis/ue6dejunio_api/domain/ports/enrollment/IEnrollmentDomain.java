@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.enrollment;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.EnrollmentRef;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.enrollment.TeacherStudent;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,4 +13,5 @@ public interface IEnrollmentDomain {
     void saveEnrollment(UUID studentId, UUID classGroupId);
     Optional<UUID> findEnrollmentId(UUID studentId, UUID classGroupId);
     Page<TeacherStudent> studentsByTeacher(UUID teacherId, Integer yearId, Pageable pageable);
+    Page<EnrollmentRef> enrollmentsByClassGroup(UUID classGroupId, Pageable pageable);
 }

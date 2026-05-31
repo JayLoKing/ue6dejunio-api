@@ -10,6 +10,10 @@ import java.util.UUID;
 
 public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity, UUID> {
 
+    boolean existsByGrade_Id(Integer gradeId);
+    boolean existsByParallel_Id(Integer parallelId);
+    boolean existsBySubject_Id(java.util.UUID subjectId);
+
     boolean existsBySubject_IdAndGrade_IdAndParallel_IdAndAcademicYear_Id(
         UUID subjectId, Integer gradeId, Integer parallelId, Integer academicYearId);
 
