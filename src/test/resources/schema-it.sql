@@ -101,6 +101,8 @@ CREATE TABLE curriculum_plans (
     criteria_knowing TEXT,
     criteria_doing TEXT,
     criteria_deciding TEXT,
+    created_by UUID REFERENCES users(id_user) ON DELETE SET NULL,
+    updated_by UUID REFERENCES users(id_user) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

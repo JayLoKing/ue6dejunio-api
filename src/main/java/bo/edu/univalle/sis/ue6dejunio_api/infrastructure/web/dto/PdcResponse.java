@@ -11,6 +11,9 @@ public record PdcResponse(
     UUID classGroupId,
     String subjectName,
     String teacherName,
+    UUID createdById,
+    UUID updatedById,
+    String updatedByName,
     Integer trimester,
     String status,
     String reviewObservations,
@@ -35,6 +38,7 @@ public record PdcResponse(
     public static PdcResponse from(Pdc p) {
         return new PdcResponse(
             p.getId(), p.getClassGroupId(), p.getSubjectName(), p.getTeacherName(),
+            p.getCreatedById(), p.getUpdatedById(), p.getUpdatedByName(),
             p.getTrimester(), p.getStatus(), p.getReviewObservations(), p.getTitle(),
             p.getHolisticObjective(), p.getLearningObjective(), p.getContents(),
             p.getPracticeActivities(), p.getTheoryActivities(), p.getValuationActivities(),

@@ -84,6 +84,14 @@ public class CurriculumPlanEntity {
     @Column(name = "criteria_deciding")
     private String criteriaDeciding;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "created_by")
+    private UserEntity createdBy;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "updated_by")
+    private UserEntity updatedBy;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

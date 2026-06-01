@@ -5,8 +5,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ClassGroupEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlanEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
@@ -22,11 +24,14 @@ public class PdcRepositoryAdapter implements IPdcDomain {
 
     private final JpaCurriculumPlanRepository pdcRepo;
     private final JpaClassGroupRepository classGroupRepo;
+    private final JpaUserRepository userRepo;
 
     public PdcRepositoryAdapter(JpaCurriculumPlanRepository pdcRepo,
-                                JpaClassGroupRepository classGroupRepo) {
+                                JpaClassGroupRepository classGroupRepo,
+                                JpaUserRepository userRepo) {
         this.pdcRepo = pdcRepo;
         this.classGroupRepo = classGroupRepo;
+        this.userRepo = userRepo;
     }
 
     @Override
@@ -43,6 +48,9 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             e.setClassGroup(cg);
             e.setTrimester(pdc.getTrimester());
             e.setCreatedAt(LocalDateTime.now());
+            if (pdc.getCreatedById() != null) {
+                e.setCreatedBy(userRepo.getReferenceById(pdc.getCreatedById()));
+            }
         }
         e.setStatus(pdc.getStatus());
         e.setReviewObservations(pdc.getReviewObservations());
@@ -61,6 +69,9 @@ public class PdcRepositoryAdapter implements IPdcDomain {
         e.setCriteriaKnowing(pdc.getCriteriaKnowing());
         e.setCriteriaDoing(pdc.getCriteriaDoing());
         e.setCriteriaDeciding(pdc.getCriteriaDeciding());
+        if (pdc.getUpdatedById() != null) {
+            e.setUpdatedBy(userRepo.getReferenceById(pdc.getUpdatedById()));
+        }
         e.setUpdatedAt(LocalDateTime.now());
         return toDomain(pdcRepo.save(e));
     }
@@ -106,6 +117,10 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             .subjectName(cg != null && cg.getSubject() != null ? cg.getSubject().getName() : null)
             .teacherName(cg != null && cg.getTeacher() != null
                 ? cg.getTeacher().getNames() + " " + cg.getTeacher().getLastNames() : null)
+            .createdById(e.getCreatedBy() != null ? e.getCreatedBy().getId() : null)
+            .updatedById(e.getUpdatedBy() != null ? e.getUpdatedBy().getId() : null)
+            .updatedByName(e.getUpdatedBy() != null
+                ? e.getUpdatedBy().getNames() + " " + e.getUpdatedBy().getLastNames() : null)
             .trimester(e.getTrimester())
             .status(e.getStatus())
             .reviewObservations(e.getReviewObservations())

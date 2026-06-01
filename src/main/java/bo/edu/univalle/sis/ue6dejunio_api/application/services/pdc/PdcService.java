@@ -42,6 +42,8 @@ public class PdcService implements IPdcService {
             .classGroupId(c.classGroupId())
             .trimester(c.trimester())
             .status(PdcStatus.DRAFT)
+            .createdById(currentUserId)
+            .updatedById(currentUserId)
             .title(c.title())
             .holisticObjective(c.holisticObjective())
             .learningObjective(c.learningObjective())
@@ -83,6 +85,7 @@ public class PdcService implements IPdcService {
         if (c.criteriaKnowing() != null) pdc.setCriteriaKnowing(c.criteriaKnowing());
         if (c.criteriaDoing() != null) pdc.setCriteriaDoing(c.criteriaDoing());
         if (c.criteriaDeciding() != null) pdc.setCriteriaDeciding(c.criteriaDeciding());
+        pdc.setUpdatedById(currentUserId);
         return pdcDomain.save(pdc);
     }
 
@@ -108,6 +111,7 @@ public class PdcService implements IPdcService {
         }
         pdc.setStatus(PdcStatus.PUBLISHED);
         pdc.setReviewObservations(null);
+        pdc.setUpdatedById(currentUserId);
         return pdcDomain.save(pdc);
     }
 
