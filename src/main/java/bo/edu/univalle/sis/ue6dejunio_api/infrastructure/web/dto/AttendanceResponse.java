@@ -7,11 +7,12 @@ import java.util.UUID;
 
 public record AttendanceResponse(
     UUID id,
-    UUID enrollmentId,
+    UUID courseEnrollmentId,
+    UUID classGroupId,
     LocalDate date,
     String status
 ) {
     public static AttendanceResponse from(Attendance a) {
-        return new AttendanceResponse(a.id(), a.enrollmentId(), a.date(), a.status());
+        return new AttendanceResponse(a.id(), a.courseEnrollmentId(), a.classGroupId(), a.date(), a.status());
     }
 }

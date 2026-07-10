@@ -8,8 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ISubjectDomain {
-    Subject create(String name, String area);
-    Subject update(UUID id, String name, String area, Boolean active);
+    Subject create(String name, boolean technical);
+    Subject update(UUID id, String name, Boolean technical, Boolean active);
     Optional<Subject> findById(UUID id);
     boolean usedInClassGroups(UUID id);
     Page<Subject> list(Pageable pageable);

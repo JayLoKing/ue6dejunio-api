@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.UUID;
 
 public record CourseAttendanceRow(
+    UUID courseEnrollmentId,
     UUID studentId,
     String fullName,
-    UUID enrollmentId,
     List<Attendance> attendances
 ) {}

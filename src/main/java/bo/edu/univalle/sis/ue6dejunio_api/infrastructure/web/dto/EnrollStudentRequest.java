@@ -4,8 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.UUID;
+
 public record EnrollStudentRequest(
-    @NotNull @JsonProperty("id_grade") Integer gradeId,
-    @NotNull @JsonProperty("id_parallel") Integer parallelId,
+    @NotNull @JsonProperty("id_course") UUID courseId,
     @NotNull @Valid CreateStudentRequest student
 ) {}

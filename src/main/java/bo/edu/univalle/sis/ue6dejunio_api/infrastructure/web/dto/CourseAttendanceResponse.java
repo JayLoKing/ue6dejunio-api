@@ -7,17 +7,16 @@ import java.util.List;
 import java.util.UUID;
 
 public record CourseAttendanceResponse(
+    UUID courseEnrollmentId,
     UUID studentId,
     String fullName,
-    UUID enrollmentId,
     List<Item> attendances
 ) {
     public record Item(UUID id, LocalDate date, String status) {}
 
     public static CourseAttendanceResponse from(CourseAttendanceRow r) {
         List<Item> items = r.attendances().stream()
-            .map(a -> new Item(a.id(), a.date(), a.status()))
-            .toList();
-        return new CourseAttendanceResponse(r.studentId(), r.fullName(), r.enrollmentId(), items);
+            .map(a -> new Item(a.id(), a.date(), a.status())).toList();
+        return new CourseAttendanceResponse(r.courseEnrollmentId(), r.studentId(), r.fullName(), items);
     }
 }

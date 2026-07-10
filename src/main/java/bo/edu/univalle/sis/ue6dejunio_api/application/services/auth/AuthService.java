@@ -6,11 +6,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveExceptio
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.TeacherHomeroom;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,14 +26,14 @@ public class AuthService implements IAuthService {
     private final IUserDomain userDomain;
     private final PasswordEncoder passwordEncoder;
     private final IJwtService jwtService;
-    private final IClassGroupDomain classGroupDomain;
+    private final ICourseDomain courseDomain;
 
     public AuthService(IUserDomain userDomain, PasswordEncoder passwordEncoder,
-                       IJwtService jwtService, IClassGroupDomain classGroupDomain) {
+                       IJwtService jwtService, ICourseDomain courseDomain) {
         this.userDomain = userDomain;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.classGroupDomain = classGroupDomain;
+        this.courseDomain = courseDomain;
     }
 
     @Override
@@ -50,14 +50,16 @@ public class AuthService implements IAuthService {
 
         String gradeName = null;
         String parallelName = null;
+        java.util.UUID courseId = null;
         if (user.getRole() != null && TEACHER_ROLE.equals(user.getRole().name())) {
-            Optional<TeacherHomeroom> homeroom = classGroupDomain.resolveTeacherHomeroom(user.getId());
+            Optional<Course> homeroom = courseDomain.homeroomCourseOf(user.getId());
             if (homeroom.isPresent()) {
                 gradeName = homeroom.get().gradeName();
                 parallelName = homeroom.get().parallelName();
+                courseId = homeroom.get().id();
             }
         }
-        return jwtService.issueToken(user, gradeName, parallelName);
+        return jwtService.issueToken(user, gradeName, parallelName, courseId);
     }
 
     @Override

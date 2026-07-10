@@ -18,28 +18,24 @@ import java.util.UUID;
 @Getter
 @Setter
 public class ClassGroupEntity {
+
     @Id
     @UuidGenerator
     @Column(name = "id_class_group", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_course", nullable = false)
+    private CourseEntity course;
+
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "id_subject", nullable = false)
     private SubjectEntity subject;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_teacher")
     private UserEntity teacher;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_grade", nullable = false)
-    private GradeEntity grade;
-
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_parallel", nullable = false)
-    private ParallelEntity parallel;
-
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_academic_year", nullable = false)
-    private AcademicYearEntity academicYear;
+    @Column(name = "is_active", nullable = false)
+    private boolean active;
 }

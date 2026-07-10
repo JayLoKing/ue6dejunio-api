@@ -5,5 +5,5 @@ import jakarta.validation.constraints.Size;
 
 public record CreateSubjectRequest(
     @NotBlank @Size(max = 100) String name,
-    @Size(max = 100) String area
+    Boolean technical
 ) {}

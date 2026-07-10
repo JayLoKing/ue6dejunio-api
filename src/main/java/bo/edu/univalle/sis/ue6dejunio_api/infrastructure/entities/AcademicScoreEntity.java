@@ -28,11 +28,15 @@ public class AcademicScoreEntity {
     @Column(name = "id_academic_score", updatable = false, nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_enrollment", nullable = false)
-    private EnrollmentEntity enrollment;
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_course_enrollment", nullable = false)
+    private CourseEnrollmentEntity courseEnrollment;
 
-    @Column(name = "trimester", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_class_group", nullable = false)
+    private ClassGroupEntity classGroup;
+
+    @Column(name = "trimester")
     private Integer trimester;
 
     @Column(name = "score_being")
@@ -47,15 +51,15 @@ public class AcademicScoreEntity {
     @Column(name = "score_deciding")
     private BigDecimal scoreDeciding;
 
+    @Generated(event = {EventType.INSERT, EventType.UPDATE})
+    @Column(name = "total_score", insertable = false, updatable = false)
+    private BigDecimal totalScore;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
     @Column(name = "digital_signature_hash")
     private String digitalSignatureHash;
-
-    @Generated(event = {EventType.INSERT, EventType.UPDATE})
-    @Column(name = "total_score", insertable = false, updatable = false)
-    private BigDecimal totalScore;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

@@ -1,13 +1,16 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.AcademicScore;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.RegisterScoreCommand;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface IScoreDomain {
-    boolean enrollmentExists(UUID enrollmentId);
-    AcademicScore upsert(RegisterScoreCommand command);
-    List<AcademicScore> findByEnrollment(UUID enrollmentId);
+    UUID ensureAcademicScore(UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID createdBy);
+    void setDimensions(UUID academicScoreId, BigDecimal being, BigDecimal knowing,
+                       BigDecimal doing, BigDecimal deciding);
+    List<AcademicScore> findByCourseEnrollment(UUID courseEnrollmentId);
+    Optional<AcademicScore> find(UUID courseEnrollmentId, UUID classGroupId, Integer trimester);
 }

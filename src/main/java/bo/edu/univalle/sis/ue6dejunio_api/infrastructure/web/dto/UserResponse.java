@@ -13,6 +13,7 @@ public record UserResponse(
     String phone,
     String email,
     String role,
+    boolean technical,
     boolean active,
     boolean mustChangePassword,
     LocalDateTime createdAt
@@ -22,7 +23,6 @@ public record UserResponse(
             u.getId(), u.getCi(), u.getNames(), u.getLastNames(),
             u.getPhone(), u.getEmail(),
             u.getRole() != null ? u.getRole().name() : null,
-            u.isActive(), u.isMustChangePassword(), u.getCreatedAt()
-        );
+            u.isTechnical(), u.isActive(), u.isMustChangePassword(), u.getCreatedAt());
     }
 }

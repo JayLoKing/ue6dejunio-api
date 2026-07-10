@@ -6,22 +6,18 @@ import java.util.UUID;
 
 public record ClassGroupResponse(
     UUID id,
+    UUID courseId,
+    String gradeName,
+    String parallelName,
     UUID subjectId,
     String subjectName,
     UUID teacherId,
     String teacherName,
-    Integer gradeId,
-    String gradeName,
-    Integer parallelId,
-    String parallelName,
-    Integer academicYearId,
-    Integer year
+    boolean active
 ) {
     public static ClassGroupResponse from(ClassGroup c) {
         return new ClassGroupResponse(
-            c.id(), c.subjectId(), c.subjectName(), c.teacherId(), c.teacherName(),
-            c.gradeId(), c.gradeName(), c.parallelId(), c.parallelName(),
-            c.academicYearId(), c.year()
-        );
+            c.id(), c.courseId(), c.gradeName(), c.parallelName(),
+            c.subjectId(), c.subjectName(), c.teacherId(), c.teacherName(), c.active());
     }
 }

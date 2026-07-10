@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface IUserDomain {
-    Page<UsersList> getUsers(Pageable pageable, @Nullable String search);
+    Page<UsersList> getUsers(Pageable pageable, @Nullable String search, java.util.UUID excludeUserId);
     Optional<User> findById(UUID id);
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);

@@ -21,29 +21,28 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
     private final JpaSubjectRepository subjectRepo;
     private final JpaClassGroupRepository classGroupRepo;
 
-    public SubjectRepositoryAdapter(JpaSubjectRepository subjectRepo,
-                                    JpaClassGroupRepository classGroupRepo) {
+    public SubjectRepositoryAdapter(JpaSubjectRepository subjectRepo, JpaClassGroupRepository classGroupRepo) {
         this.subjectRepo = subjectRepo;
         this.classGroupRepo = classGroupRepo;
     }
 
     @Override
     @Transactional
-    public Subject create(String name, String area) {
+    public Subject create(String name, boolean technical) {
         SubjectEntity e = new SubjectEntity();
         e.setName(name);
-        e.setArea(area);
+        e.setTechnical(technical);
         e.setActive(true);
         return toDomain(subjectRepo.save(e));
     }
 
     @Override
     @Transactional
-    public Subject update(UUID id, String name, String area, Boolean active) {
+    public Subject update(UUID id, String name, Boolean technical, Boolean active) {
         SubjectEntity e = subjectRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Subject", id));
         if (name != null) e.setName(name);
-        if (area != null) e.setArea(area);
+        if (technical != null) e.setTechnical(technical);
         if (active != null) e.setActive(active);
         return toDomain(subjectRepo.save(e));
     }
@@ -73,6 +72,6 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
     }
 
     private Subject toDomain(SubjectEntity e) {
-        return new Subject(e.getId(), e.getName(), e.getArea(), e.isActive());
+        return new Subject(e.getId(), e.getName(), e.isTechnical(), e.isActive());
     }
 }

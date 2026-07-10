@@ -50,6 +50,7 @@ public class AuthController {
         Boolean mustChange = jwt.getClaim("mustChangePassword");
         String gradeName = jwt.getClaimAsString("gradeName");
         String parallelName = jwt.getClaimAsString("parallelName");
+        String courseId = jwt.getClaimAsString("courseId");
         return ResponseEntity.ok(new MeResponse(
             UUID.fromString(jwt.getSubject()),
             jwt.getClaimAsString("email"),
@@ -57,7 +58,8 @@ public class AuthController {
             jwt.getClaimAsString("role"),
             mustChange != null && mustChange,
             gradeName != null && !gradeName.isBlank() ? gradeName : null,
-            parallelName != null && !parallelName.isBlank() ? parallelName : null
+            parallelName != null && !parallelName.isBlank() ? parallelName : null,
+            courseId != null && !courseId.isBlank() ? UUID.fromString(courseId) : null
         ));
     }
 

@@ -8,6 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaAcademicScoreRepository extends JpaRepository<AcademicScoreEntity, UUID> {
-    Optional<AcademicScoreEntity> findByEnrollment_IdAndTrimester(UUID enrollmentId, Integer trimester);
-    List<AcademicScoreEntity> findByEnrollment_IdOrderByTrimester(UUID enrollmentId);
+    Optional<AcademicScoreEntity> findByCourseEnrollment_IdAndClassGroup_IdAndTrimester(
+        UUID courseEnrollmentId, UUID classGroupId, Integer trimester);
+    List<AcademicScoreEntity> findByCourseEnrollment_IdOrderByClassGroup_Subject_NameAscTrimesterAsc(
+        UUID courseEnrollmentId);
 }

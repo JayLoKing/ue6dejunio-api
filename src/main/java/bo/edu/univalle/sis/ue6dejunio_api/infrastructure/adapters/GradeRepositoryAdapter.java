@@ -5,7 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade.IGradeDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.GradeEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.LevelEntity;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaLevelRepository;
 import org.springframework.data.domain.Page;
@@ -21,14 +21,14 @@ public class GradeRepositoryAdapter implements IGradeDomain {
 
     private final JpaGradeRepository gradeRepo;
     private final JpaLevelRepository levelRepo;
-    private final JpaClassGroupRepository classGroupRepo;
+    private final JpaCourseRepository courseRepo;
 
     public GradeRepositoryAdapter(JpaGradeRepository gradeRepo,
                                   JpaLevelRepository levelRepo,
-                                  JpaClassGroupRepository classGroupRepo) {
+                                  JpaCourseRepository courseRepo) {
         this.gradeRepo = gradeRepo;
         this.levelRepo = levelRepo;
-        this.classGroupRepo = classGroupRepo;
+        this.courseRepo = courseRepo;
     }
 
     @Override
@@ -71,7 +71,7 @@ public class GradeRepositoryAdapter implements IGradeDomain {
 
     @Override
     public boolean hasClassGroups(Integer gradeId) {
-        return classGroupRepo.existsByGrade_Id(gradeId);
+        return courseRepo.existsByGrade_Id(gradeId);
     }
 
     @Override

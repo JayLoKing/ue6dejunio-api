@@ -5,7 +5,8 @@ import java.util.UUID;
 
 public record Attendance(
     UUID id,
-    UUID enrollmentId,
+    UUID courseEnrollmentId,
+    UUID classGroupId,
     LocalDate date,
     String status
 ) {}

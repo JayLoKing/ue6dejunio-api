@@ -26,10 +26,8 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     private final JpaParallelRepository parallelRepo;
     private final JpaUserRepository userRepo;
 
-    public CatalogRepositoryAdapter(JpaSubjectRepository subjectRepo,
-                                    JpaGradeRepository gradeRepo,
-                                    JpaParallelRepository parallelRepo,
-                                    JpaUserRepository userRepo) {
+    public CatalogRepositoryAdapter(JpaSubjectRepository subjectRepo, JpaGradeRepository gradeRepo,
+                                    JpaParallelRepository parallelRepo, JpaUserRepository userRepo) {
         this.subjectRepo = subjectRepo;
         this.gradeRepo = gradeRepo;
         this.parallelRepo = parallelRepo;
@@ -39,7 +37,7 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     @Override
     public List<SubjectItem> subjects() {
         return subjectRepo.findByActiveTrueOrderByName().stream()
-            .map(s -> new SubjectItem(s.getId(), s.getName(), s.getArea()))
+            .map(s -> new SubjectItem(s.getId(), s.getName(), s.isTechnical()))
             .toList();
     }
 
@@ -59,9 +57,12 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     }
 
     @Override
-    public List<TeacherItem> teachers() {
-        return userRepo.findByRole_NameAndActiveTrueOrderByLastNames(TEACHER_ROLE).stream()
-            .map(u -> new TeacherItem(u.getId(), u.getNames() + " " + u.getLastNames(), u.getEmail()))
+    public List<TeacherItem> teachers(Boolean technical) {
+        var list = technical == null
+            ? userRepo.findByRole_NameAndActiveTrueOrderByLastNames(TEACHER_ROLE)
+            : userRepo.findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(TEACHER_ROLE, technical);
+        return list.stream()
+            .map(u -> new TeacherItem(u.getId(), u.getNames() + " " + u.getLastNames(), u.getEmail(), u.isTechnical()))
             .toList();
     }
 }

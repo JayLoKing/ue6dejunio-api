@@ -4,6 +4,6 @@ import jakarta.validation.constraints.Size;
 
 public record UpdateSubjectRequest(
     @Size(max = 100) String name,
-    @Size(max = 100) String area,
+    Boolean technical,
     Boolean active
 ) {}

@@ -9,22 +9,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity, UUID> {
+    boolean existsBySubject_Id(UUID subjectId);
+    boolean existsByCourse_IdAndSubject_Id(UUID courseId, UUID subjectId);
+    List<ClassGroupEntity> findByCourse_IdOrderBySubject_Name(UUID courseId);
+    List<ClassGroupEntity> findByTeacher_IdOrderBySubject_Name(UUID teacherId);
 
-    boolean existsByGrade_Id(Integer gradeId);
-    boolean existsByParallel_Id(Integer parallelId);
-    boolean existsBySubject_Id(java.util.UUID subjectId);
-
-    boolean existsBySubject_IdAndGrade_IdAndParallel_IdAndAcademicYear_Id(
-        UUID subjectId, Integer gradeId, Integer parallelId, Integer academicYearId);
-
-    List<ClassGroupEntity> findByTeacher_IdAndAcademicYear_Id(UUID teacherId, Integer academicYearId);
-
-    @Query("""
-        SELECT cg.id FROM ClassGroupEntity cg
-        WHERE cg.grade.id = :gradeId AND cg.parallel.id = :parallelId
-              AND cg.academicYear.id = :academicYearId
-        """)
-    List<UUID> findIdsByCourse(@Param("gradeId") Integer gradeId,
-                               @Param("parallelId") Integer parallelId,
-                               @Param("academicYearId") Integer academicYearId);
+    @Query("SELECT c.id FROM ClassGroupEntity c WHERE c.course.id = :courseId")
+    List<UUID> findIdsByCourse(@Param("courseId") UUID courseId);
 }

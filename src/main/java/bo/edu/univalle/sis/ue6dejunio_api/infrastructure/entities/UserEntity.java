@@ -58,6 +58,9 @@ public class UserEntity {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword;
 
+    @Column(name = "is_technical")
+    private boolean technical;
+
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "id_role", nullable = false)
     private RoleEntity role;

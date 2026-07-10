@@ -48,7 +48,7 @@ public class SubjectController {
     @PostMapping
     @Operation(summary = "Crear materia")
     public ResponseEntity<SubjectResponse> create(@Valid @RequestBody CreateSubjectRequest r) {
-        Subject s = subjectService.create(new CreateSubjectCommand(r.name(), r.area()));
+        Subject s = subjectService.create(new CreateSubjectCommand(r.name(), r.technical()));
         return ResponseEntity.ok(SubjectResponse.from(s));
     }
 
@@ -59,7 +59,7 @@ public class SubjectController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar materias. offset=pagina (1-indexed), limit=cantidad")
+    @Operation(summary = "Listar materias activas. offset=pagina, limit=cantidad")
     public ResponseEntity<PagedResponse<SubjectResponse>> list(
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
@@ -71,15 +71,15 @@ public class SubjectController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar materia (nombre, area, active)")
+    @Operation(summary = "Actualizar materia")
     public ResponseEntity<SubjectResponse> update(@PathVariable UUID id,
                                                   @Valid @RequestBody UpdateSubjectRequest r) {
-        Subject s = subjectService.update(id, new UpdateSubjectCommand(r.name(), r.area(), r.active()));
+        Subject s = subjectService.update(id, new UpdateSubjectCommand(r.name(), r.technical(), r.active()));
         return ResponseEntity.ok(SubjectResponse.from(s));
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Soft delete (set is_active=false)")
+    @Operation(summary = "Soft delete (is_active=false)")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         subjectService.delete(id);
         return ResponseEntity.noContent().build();

@@ -3,7 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.Parallel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.parallel.IParallelDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ParallelEntity;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,12 +17,12 @@ import java.util.Optional;
 public class ParallelRepositoryAdapter implements IParallelDomain {
 
     private final JpaParallelRepository parallelRepo;
-    private final JpaClassGroupRepository classGroupRepo;
+    private final JpaCourseRepository courseRepo;
 
     public ParallelRepositoryAdapter(JpaParallelRepository parallelRepo,
-                                     JpaClassGroupRepository classGroupRepo) {
+                                     JpaCourseRepository courseRepo) {
         this.parallelRepo = parallelRepo;
-        this.classGroupRepo = classGroupRepo;
+        this.courseRepo = courseRepo;
     }
 
     @Override
@@ -48,7 +48,7 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
 
     @Override
     public boolean hasClassGroups(Integer parallelId) {
-        return classGroupRepo.existsByParallel_Id(parallelId);
+        return courseRepo.existsByParallel_Id(parallelId);
     }
 
     @Override

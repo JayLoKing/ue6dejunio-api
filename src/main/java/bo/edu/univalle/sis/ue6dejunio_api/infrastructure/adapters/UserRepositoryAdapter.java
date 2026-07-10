@@ -29,11 +29,10 @@ public class UserRepositoryAdapter implements IUserDomain {
     }
 
     @Override
-    public Page<UsersList> getUsers(Pageable pageable, @Nullable String search) {
-        if (search == null || search.isBlank()) {
-            return repo.findAll(pageable).map(mapper::toListItem);
-        }
-        return repo.search(search, pageable).map(mapper::toListItem);
+    public Page<UsersList> getUsers(Pageable pageable, @Nullable String search,
+                                    java.util.UUID excludeUserId) {
+        String q = (search == null || search.isBlank()) ? null : search;
+        return repo.search(q, excludeUserId, pageable).map(mapper::toListItem);
     }
 
     @Override

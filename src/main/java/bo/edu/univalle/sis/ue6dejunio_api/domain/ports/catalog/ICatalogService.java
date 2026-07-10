@@ -11,5 +11,5 @@ public interface ICatalogService {
     List<SubjectItem> subjects();
     List<GradeItem> grades();
     List<ParallelItem> parallels();
-    List<TeacherItem> teachers();
+    List<TeacherItem> teachers(Boolean technical);
 }

@@ -13,5 +13,6 @@ public record AuthenticatedUser(
     Instant expiresAt,
     boolean mustChangePassword,
     String gradeName,
-    String parallelName
+    String parallelName,
+    UUID courseId
 ) {}

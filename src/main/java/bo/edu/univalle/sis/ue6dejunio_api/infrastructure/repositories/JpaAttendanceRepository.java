@@ -9,6 +9,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity, UUID> {
-    Optional<AttendanceEntity> findByEnrollment_IdAndDate(UUID enrollmentId, LocalDate date);
-    List<AttendanceEntity> findByEnrollment_IdOrderByDate(UUID enrollmentId);
+    Optional<AttendanceEntity> findByCourseEnrollment_IdAndDateAndClassGroupIsNull(UUID courseEnrollmentId, LocalDate date);
+    Optional<AttendanceEntity> findByCourseEnrollment_IdAndClassGroup_IdAndDate(UUID courseEnrollmentId, UUID classGroupId, LocalDate date);
+    List<AttendanceEntity> findByCourseEnrollment_IdOrderByDate(UUID courseEnrollmentId);
+    List<AttendanceEntity> findByCourseEnrollment_IdAndClassGroupIsNullOrderByDate(UUID courseEnrollmentId);
 }

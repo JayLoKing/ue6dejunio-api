@@ -2,155 +2,197 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE roles (
     id_role SERIAL PRIMARY KEY,
-    name VARCHAR(20) UNIQUE NOT NULL
+    name varchar(20) NOT NULL UNIQUE
 );
 
 CREATE TABLE users (
-    id_user UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ci VARCHAR(15) UNIQUE NOT NULL,
-    names VARCHAR(100) NOT NULL,
-    last_names VARCHAR(100) NOT NULL,
-    phone VARCHAR(20),
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    id_role INT REFERENCES roles(id_role) ON DELETE RESTRICT,
-    is_active BOOLEAN DEFAULT TRUE,
-    must_change_password BOOLEAN DEFAULT TRUE,
-    created_by UUID REFERENCES users(id_user) ON DELETE SET NULL,
-    updated_by UUID REFERENCES users(id_user) ON DELETE SET NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_user uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ci varchar(15) NOT NULL UNIQUE,
+    names varchar(100) NOT NULL,
+    last_names varchar(100) NOT NULL,
+    phone varchar(20),
+    email varchar(100) NOT NULL UNIQUE,
+    password text NOT NULL,
+    id_role integer REFERENCES roles(id_role) ON DELETE RESTRICT,
+    is_technical boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    must_change_password boolean DEFAULT true,
+    created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE academic_years (
-    id_academic_year SERIAL PRIMARY KEY,
-    year INT UNIQUE NOT NULL
-);
-
-CREATE TABLE levels (
-    id_level SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL
-);
-
+CREATE TABLE academic_years (id_academic_year SERIAL PRIMARY KEY, year integer NOT NULL UNIQUE);
+CREATE TABLE levels (id_level SERIAL PRIMARY KEY, name varchar(100) NOT NULL UNIQUE);
 CREATE TABLE grades (
     id_grade SERIAL PRIMARY KEY,
-    id_level INT REFERENCES levels(id_level) ON DELETE RESTRICT,
-    name VARCHAR(50) NOT NULL
+    id_level integer NOT NULL REFERENCES levels(id_level) ON DELETE RESTRICT,
+    name varchar(50) NOT NULL,
+    CONSTRAINT uq_grade_per_level UNIQUE (id_level, name)
 );
-
-CREATE TABLE parallels (
-    id_parallel SERIAL PRIMARY KEY,
-    name CHAR(1) NOT NULL
-);
-
+CREATE TABLE parallels (id_parallel SERIAL PRIMARY KEY, name char(1) NOT NULL UNIQUE);
 CREATE TABLE subjects (
-    id_subject UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
-    area VARCHAR(100),
-    is_active BOOLEAN DEFAULT TRUE
+    id_subject uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name varchar(100) NOT NULL,
+    is_technical boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    CONSTRAINT uq_subject_name UNIQUE (name)
 );
 
 CREATE TABLE students (
-    id_student UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    rude_code VARCHAR(20) UNIQUE NOT NULL,
-    identity_card VARCHAR(15) UNIQUE NOT NULL,
-    names VARCHAR(100) NOT NULL,
-    last_names VARCHAR(100) NOT NULL,
-    birth_date DATE NOT NULL,
-    gender CHAR(1) CHECK (gender IN ('M', 'F')),
-    status VARCHAR(20) DEFAULT 'Effective' CHECK (status IN ('Effective', 'Withdrawn', 'Transferred')),
-    status_reason TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_student uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    rude_code varchar(20) NOT NULL UNIQUE,
+    identity_card varchar(15) NOT NULL UNIQUE,
+    names varchar(100) NOT NULL,
+    last_names varchar(100) NOT NULL,
+    birth_date date NOT NULL,
+    gender char(1),
+    status varchar(20) DEFAULT 'Effective',
+    status_reason text,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE courses (
+    id_course uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_grade integer NOT NULL REFERENCES grades(id_grade) ON DELETE RESTRICT,
+    id_parallel integer NOT NULL REFERENCES parallels(id_parallel) ON DELETE RESTRICT,
+    id_academic_year integer NOT NULL REFERENCES academic_years(id_academic_year) ON DELETE RESTRICT,
+    id_homeroom_teacher uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    is_active boolean DEFAULT true,
+    CONSTRAINT uq_course UNIQUE (id_grade, id_parallel, id_academic_year)
+);
+
+CREATE TABLE course_enrollments (
+    id_course_enrollment uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE RESTRICT,
+    id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE RESTRICT,
+    enrollment_date date DEFAULT CURRENT_DATE,
+    status varchar(20) DEFAULT 'Effective',
+    CONSTRAINT uq_course_enrollment UNIQUE (id_student, id_course)
 );
 
 CREATE TABLE class_groups (
-    id_class_group UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_subject UUID REFERENCES subjects(id_subject) ON DELETE CASCADE,
-    id_teacher UUID REFERENCES users(id_user) ON DELETE SET NULL,
-    id_grade INT REFERENCES grades(id_grade) ON DELETE RESTRICT,
-    id_parallel INT REFERENCES parallels(id_parallel) ON DELETE RESTRICT,
-    id_academic_year INT REFERENCES academic_years(id_academic_year) ON DELETE RESTRICT
-);
-
-CREATE TABLE enrollments (
-    id_enrollment UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_student UUID REFERENCES students(id_student) ON DELETE CASCADE,
-    id_class_group UUID REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
-    enrollment_date DATE DEFAULT CURRENT_DATE
+    id_class_group uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE RESTRICT,
+    id_subject uuid NOT NULL REFERENCES subjects(id_subject) ON DELETE RESTRICT,
+    id_teacher uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    is_active boolean DEFAULT true,
+    CONSTRAINT uq_class_group UNIQUE (id_course, id_subject)
 );
 
 CREATE TABLE curriculum_plans (
-    id_curriculum_plan UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_class_group UUID REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
-    trimester INT CHECK (trimester BETWEEN 1 AND 3),
-    status VARCHAR(30) DEFAULT 'Draft'
-        CHECK (status IN ('Draft', 'Published', 'Under Review', 'Approved', 'With Observations')),
-    review_observations TEXT,
-    title VARCHAR(200) NOT NULL,
-    holistic_objective TEXT,
-    learning_objective TEXT,
-    contents TEXT,
-    practice_activities TEXT,
-    theory_activities TEXT,
-    valuation_activities TEXT,
-    production_activities TEXT,
-    resources TEXT,
-    start_date DATE,
-    end_date DATE,
-    criteria_being TEXT,
-    criteria_knowing TEXT,
-    criteria_doing TEXT,
-    criteria_deciding TEXT,
-    created_by UUID REFERENCES users(id_user) ON DELETE SET NULL,
-    updated_by UUID REFERENCES users(id_user) ON DELETE SET NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_curriculum_plan uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_class_group uuid REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
+    trimester integer CHECK (trimester BETWEEN 1 AND 3),
+    status varchar(30) DEFAULT 'Draft',
+    review_observations text,
+    title varchar(200) NOT NULL,
+    holistic_objective text, learning_objective text, contents text,
+    practice_activities text, theory_activities text, valuation_activities text, production_activities text,
+    resources text, start_date date, end_date date,
+    criteria_being text, criteria_knowing text, criteria_doing text, criteria_deciding text,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL
+);
+
+CREATE TABLE curriculum_plan_progress (
+    id_progress uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
+    progress_date date NOT NULL DEFAULT CURRENT_DATE,
+    advanced_content text,
+    percentage numeric(5,2) CHECK (percentage BETWEEN 0 AND 100),
+    observations text,
+    created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE curriculum_adaptations (
+    id_curriculum_adaptation uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
+    id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE CASCADE,
+    adapted_contents text, adapted_methodology text, adapted_criteria text,
+    created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE evaluation_criteria (
+    id_criterion uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
+    trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
+    dimension varchar(20) NOT NULL CHECK (dimension IN ('Being','Knowing','Doing','Deciding')),
+    name varchar(150) NOT NULL,
+    max_weight numeric(5,2) NOT NULL,
+    id_curriculum_plan uuid REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE SET NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_criterion UNIQUE (id_class_group, trimester, dimension, name)
+);
+
+CREATE TABLE assessment_events (
+    id_assessment_event uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_criterion uuid NOT NULL REFERENCES evaluation_criteria(id_criterion) ON DELETE CASCADE,
+    title varchar(150) NOT NULL,
+    description text,
+    max_score numeric(5,2) NOT NULL DEFAULT 100,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE assessment_scores (
+    id_assessment_score uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE CASCADE,
+    id_assessment_event uuid NOT NULL REFERENCES assessment_events(id_assessment_event) ON DELETE CASCADE,
+    score numeric(5,2) NOT NULL DEFAULT 0,
+    digital_signature_hash text,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_assessment_score UNIQUE (id_course_enrollment, id_assessment_event)
 );
 
 CREATE TABLE academic_scores (
-    id_academic_score UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_enrollment UUID REFERENCES enrollments(id_enrollment) ON DELETE CASCADE,
-    trimester INT CHECK (trimester BETWEEN 1 AND 3),
-    score_being NUMERIC(5,2) DEFAULT 0 CHECK (score_being <= 10),
-    score_knowing NUMERIC(5,2) DEFAULT 0 CHECK (score_knowing <= 45),
-    score_doing NUMERIC(5,2) DEFAULT 0 CHECK (score_doing <= 40),
-    score_deciding NUMERIC(5,2) DEFAULT 0 CHECK (score_deciding <= 5),
-    created_by UUID REFERENCES users(id_user) ON DELETE RESTRICT,
-    digital_signature_hash TEXT,
-    total_score NUMERIC(5,2) GENERATED ALWAYS AS (score_being + score_knowing + score_doing + score_deciding) STORED,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_academic_score uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE RESTRICT,
+    id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE RESTRICT,
+    trimester integer CHECK (trimester BETWEEN 1 AND 3),
+    score_being numeric(5,2) DEFAULT 0 CHECK (score_being <= 10),
+    score_knowing numeric(5,2) DEFAULT 0 CHECK (score_knowing <= 45),
+    score_doing numeric(5,2) DEFAULT 0 CHECK (score_doing <= 40),
+    score_deciding numeric(5,2) DEFAULT 0 CHECK (score_deciding <= 5),
+    total_score numeric(5,2) GENERATED ALWAYS AS (score_being + score_knowing + score_doing + score_deciding) STORED,
+    created_by uuid REFERENCES users(id_user) ON DELETE RESTRICT,
+    digital_signature_hash text,
+    updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_academic_score UNIQUE (id_course_enrollment, id_class_group, trimester)
 );
 
 CREATE TABLE attendance (
-    id_attendance UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_enrollment UUID REFERENCES enrollments(id_enrollment) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    status VARCHAR(15) CHECK (status IN ('Present', 'Absent', 'Excused', 'Late'))
+    id_attendance uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE CASCADE,
+    id_class_group uuid REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
+    date date NOT NULL,
+    status varchar(15) NOT NULL CHECK (status IN ('Present','Absent','Excused','Late'))
 );
+CREATE UNIQUE INDEX uq_att_daily ON attendance (id_course_enrollment, date) WHERE id_class_group IS NULL;
+CREATE UNIQUE INDEX uq_att_session ON attendance (id_course_enrollment, date, id_class_group) WHERE id_class_group IS NOT NULL;
 
 CREATE TABLE risk_predictions (
-    id_risk_prediction UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_student UUID REFERENCES students(id_student) ON DELETE CASCADE,
-    trimester INT,
-    risk_level VARCHAR(20) CHECK (risk_level IN ('Green', 'Yellow', 'Orange', 'Red')),
-    probability_score NUMERIC(5,4),
-    is_attended BOOLEAN DEFAULT FALSE,
-    features_analyzed JSONB,
-    predicted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_risk_prediction uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_student uuid REFERENCES students(id_student) ON DELETE CASCADE,
+    trimester integer, risk_level varchar(20), probability_score numeric(5,4),
+    is_attended boolean DEFAULT false, features_analyzed jsonb, predicted_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_risk_pred UNIQUE (id_student, trimester)
 );
 
 CREATE TABLE notifications (
-    id_notification UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sender_id UUID REFERENCES users(id_user) ON DELETE CASCADE,
-    receiver_id UUID REFERENCES users(id_user) ON DELETE CASCADE,
-    message TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_notification uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    sender_id uuid REFERENCES users(id_user) ON DELETE CASCADE,
+    receiver_id uuid REFERENCES users(id_user) ON DELETE CASCADE,
+    message text NOT NULL, is_read boolean DEFAULT false, created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
 INSERT INTO roles (name) VALUES ('Director'), ('Secretary'), ('Teacher');
 INSERT INTO levels (name) VALUES ('Primaria Comunitaria Vocacional');
-INSERT INTO grades (id_level, name) VALUES (1, '1ro');
-INSERT INTO parallels (name) VALUES ('A');
+INSERT INTO grades (id_level, name) VALUES (1, 'Primero');
+INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C');
 INSERT INTO academic_years (year) VALUES (2026);
-INSERT INTO subjects (name, area) VALUES ('Matematicas', 'Ciencias Exactas'), ('Lenguaje', 'Comunicacion');
+INSERT INTO subjects (name) VALUES ('Matematicas'), ('Lenguaje');

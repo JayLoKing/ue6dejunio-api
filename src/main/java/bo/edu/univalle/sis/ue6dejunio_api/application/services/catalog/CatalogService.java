@@ -35,7 +35,8 @@ public class CatalogService implements ICatalogService {
     }
 
     @Override
-    public List<TeacherItem> teachers() {
-        return catalogDomain.teachers();
+    public List<TeacherItem> teachers(Boolean technical) {
+        return catalogDomain.teachers(technical);
     }
+
 }

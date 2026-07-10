@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -46,8 +47,9 @@ public class CatalogController {
     }
 
     @GetMapping("/teachers")
-    @Operation(summary = "Listar docentes activos")
-    public ResponseEntity<List<TeacherItem>> teachers() {
-        return ResponseEntity.ok(catalogService.teachers());
+    @Operation(summary = "Listar docentes activos. technical opcional: true=tecnicos, false=no tecnicos")
+    public ResponseEntity<List<TeacherItem>> teachers(
+        @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean technical) {
+        return ResponseEntity.ok(catalogService.teachers(technical));
     }
 }

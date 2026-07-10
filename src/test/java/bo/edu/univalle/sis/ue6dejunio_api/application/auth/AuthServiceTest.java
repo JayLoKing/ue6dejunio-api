@@ -8,7 +8,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ class AuthServiceTest {
     @Mock private IUserDomain userDomain;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private IJwtService jwtService;
-    @Mock private IClassGroupDomain classGroupDomain;
+    @Mock private ICourseDomain courseDomain;
 
     @InjectMocks private AuthService authService;
 
@@ -59,9 +59,9 @@ class AuthServiceTest {
         when(passwordEncoder.matches("secret123", "$hashed$")).thenReturn(true);
         AuthenticatedUser expected = new AuthenticatedUser(
             activeUser.getId(), activeUser.getEmail(), activeUser.fullName(),
-            "DIRECTOR", "jwt", Instant.now(), Instant.now().plusSeconds(900), false, null, null
+            "DIRECTOR", "jwt", Instant.now(), Instant.now().plusSeconds(900), false, null, null, null
         );
-        when(jwtService.issueToken(any(User.class), any(), any())).thenReturn(expected);
+        when(jwtService.issueToken(any(User.class), any(), any(), any())).thenReturn(expected);
 
         AuthenticatedUser result = authService.login(new LoginCommand("director@ue6.bo", "secret123"));
 

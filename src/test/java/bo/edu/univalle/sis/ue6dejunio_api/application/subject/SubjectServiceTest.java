@@ -26,18 +26,28 @@ class SubjectServiceTest {
     @InjectMocks private SubjectService subjectService;
 
     @Test
-    void create_success_setsActive() {
+    void create_defaultsNonTechnical() {
         UUID id = UUID.randomUUID();
-        when(subjectDomain.create("Matematicas", "Exactas"))
-            .thenReturn(new Subject(id, "Matematicas", "Exactas", true));
-        Subject r = subjectService.create(new CreateSubjectCommand("Matematicas", "Exactas"));
+        when(subjectDomain.create("Matematicas", false))
+            .thenReturn(new Subject(id, "Matematicas", false, true));
+        Subject r = subjectService.create(new CreateSubjectCommand("Matematicas", null));
+        assertThat(r.technical()).isFalse();
         assertThat(r.active()).isTrue();
+    }
+
+    @Test
+    void create_technicalTrue() {
+        UUID id = UUID.randomUUID();
+        when(subjectDomain.create("Musica", true))
+            .thenReturn(new Subject(id, "Musica", true, true));
+        Subject r = subjectService.create(new CreateSubjectCommand("Musica", true));
+        assertThat(r.technical()).isTrue();
     }
 
     @Test
     void delete_softDeactivates() {
         UUID id = UUID.randomUUID();
-        when(subjectDomain.findById(id)).thenReturn(Optional.of(new Subject(id, "X", "Y", true)));
+        when(subjectDomain.findById(id)).thenReturn(Optional.of(new Subject(id, "X", false, true)));
         subjectService.delete(id);
         verify(subjectDomain).deactivate(id);
     }

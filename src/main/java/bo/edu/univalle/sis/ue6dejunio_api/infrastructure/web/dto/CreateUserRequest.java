@@ -13,5 +13,6 @@ public record CreateUserRequest(
     @NotBlank @Size(max = 100) String lastNames,
     @Size(max = 20) @Pattern(regexp = "^[-0-9+ ]*$") String phone,
     @NotBlank @Email @Size(max = 100) String email,
-    @NotNull @Positive Integer roleId
+    @NotNull @Positive Integer roleId,
+    Boolean technical
 ) {}

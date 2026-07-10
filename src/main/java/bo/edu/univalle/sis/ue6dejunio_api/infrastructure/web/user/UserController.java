@@ -18,6 +18,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -54,7 +55,7 @@ public class UserController {
                                                UriComponentsBuilder uriBuilder) {
         User created = userService.create(new CreateUserCommand(
             request.ci(), request.names(), request.lastNames(),
-            request.phone(), request.email(), request.roleId()
+            request.phone(), request.email(), request.roleId(), request.technical()
         ));
         URI location = uriBuilder.path("/api/users/{id}").buildAndExpand(created.getId()).toUri();
         return ResponseEntity.created(location).body(UserResponse.from(created));
@@ -72,11 +73,13 @@ public class UserController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
         @RequestParam(required = false) String search,
-        @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort
+        @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort,
+        JwtAuthenticationToken token
     ) {
         Sort.Direction dir = "desc".equalsIgnoreCase(sort) ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageRequest.of(offset - 1, limit, Sort.by(dir, "lastNames", "names"));
-        return ResponseEntity.ok(PagedResponse.of(userService.list(pageable, search)));
+        UUID currentUserId = UUID.fromString(token.getToken().getSubject());
+        return ResponseEntity.ok(PagedResponse.of(userService.list(pageable, search, currentUserId)));
     }
 
     @PutMapping("/{id}")

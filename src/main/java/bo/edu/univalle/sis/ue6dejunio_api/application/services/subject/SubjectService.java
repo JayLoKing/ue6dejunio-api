@@ -25,14 +25,14 @@ public class SubjectService implements ISubjectService {
     @Override
     @Transactional
     public Subject create(CreateSubjectCommand c) {
-        return subjectDomain.create(c.name(), c.area());
+        return subjectDomain.create(c.name(), c.technical() != null && c.technical());
     }
 
     @Override
     @Transactional
     public Subject update(UUID id, UpdateSubjectCommand c) {
         getById(id);
-        return subjectDomain.update(id, c.name(), c.area(), c.active());
+        return subjectDomain.update(id, c.name(), c.technical(), c.active());
     }
 
     @Override
@@ -52,7 +52,6 @@ public class SubjectService implements ISubjectService {
     @Transactional
     public void delete(UUID id) {
         getById(id);
-        // soft delete: set active=false. Hard delete bloqueado por FK class_groups si usada
         subjectDomain.deactivate(id);
     }
 }

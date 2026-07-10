@@ -3,11 +3,15 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.CreateProgressCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.progress.IProgressService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreatePdcRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ObservePdcRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateProgressRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PdcResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ProgressResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdatePdcRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -42,9 +47,11 @@ import java.util.UUID;
 public class PdcController {
 
     private final IPdcService pdcService;
+    private final IProgressService progressService;
 
-    public PdcController(IPdcService pdcService) {
+    public PdcController(IPdcService pdcService, IProgressService progressService) {
         this.pdcService = pdcService;
+        this.progressService = progressService;
     }
 
     @PostMapping
@@ -131,5 +138,21 @@ public class PdcController {
         UUID userId = UUID.fromString(token.getToken().getSubject());
         pdcService.delete(id, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/progress")
+    @Operation(summary = "Registrar avance del PDC (PROG AV)", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ProgressResponse> addProgress(@PathVariable UUID id,
+                                                       @Valid @RequestBody CreateProgressRequest r,
+                                                       JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getToken().getSubject());
+        return ResponseEntity.ok(ProgressResponse.from(progressService.create(new CreateProgressCommand(
+            id, r.progressDate(), r.advancedContent(), r.percentage(), r.observations(), userId))));
+    }
+
+    @GetMapping("/{id}/progress")
+    @Operation(summary = "Listar avances del PDC", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<List<ProgressResponse>> progress(@PathVariable UUID id) {
+        return ResponseEntity.ok(progressService.listByPlan(id).stream().map(ProgressResponse::from).toList());
     }
 }

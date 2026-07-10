@@ -4,8 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreateClassGroupCommand(
-    Integer gradeId,
-    Integer parallelId,
+    UUID courseId,
     List<Assignment> assignments
 ) {
     public record Assignment(UUID subjectId, UUID teacherId) {}

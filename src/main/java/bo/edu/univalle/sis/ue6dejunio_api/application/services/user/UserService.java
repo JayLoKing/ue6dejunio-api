@@ -63,6 +63,7 @@ public class UserService implements IUserService {
             .email(command.email())
             .password(passwordEncoder.encode(temporaryPassword))
             .mustChangePassword(true)
+            .technical(command.technical() != null && command.technical())
             .role(role)
             .active(true)
             .build();
@@ -98,8 +99,8 @@ public class UserService implements IUserService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<UsersList> list(Pageable pageable, @Nullable String search) {
-        return userDomain.getUsers(pageable, search);
+    public Page<UsersList> list(Pageable pageable, @Nullable String search, java.util.UUID excludeUserId) {
+        return userDomain.getUsers(pageable, search, excludeUserId);
     }
 
     @Override

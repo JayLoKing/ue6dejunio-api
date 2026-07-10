@@ -9,5 +9,6 @@ public record MeResponse(
     String role,
     boolean mustChangePassword,
     String gradeName,
-    String parallelName
+    String parallelName,
+    UUID courseId
 ) {}

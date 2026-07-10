@@ -6,5 +6,6 @@ public record CreateUserCommand(
     String lastNames,
     String phone,
     String email,
-    Integer roleId
+    Integer roleId,
+    Boolean technical
 ) {}

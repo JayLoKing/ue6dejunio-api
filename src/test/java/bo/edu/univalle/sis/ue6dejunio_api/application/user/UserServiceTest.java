@@ -38,7 +38,7 @@ class UserServiceTest {
 
     private CreateUserCommand validCommand() {
         return new CreateUserCommand("1234567", "Ana", "Quispe", "70000000",
-            "ana@ue6.bo", 3);
+            "ana@ue6.bo", 3, false);
     }
 
     @Test

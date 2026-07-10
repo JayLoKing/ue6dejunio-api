@@ -4,14 +4,12 @@ import java.util.UUID;
 
 public record ClassGroup(
     UUID id,
+    UUID courseId,
+    String gradeName,
+    String parallelName,
     UUID subjectId,
     String subjectName,
     UUID teacherId,
     String teacherName,
-    Integer gradeId,
-    String gradeName,
-    Integer parallelId,
-    String parallelName,
-    Integer academicYearId,
-    Integer year
+    boolean active
 ) {}

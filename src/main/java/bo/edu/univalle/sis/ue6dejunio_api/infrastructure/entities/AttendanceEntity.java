@@ -26,12 +26,16 @@ public class AttendanceEntity {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_enrollment", nullable = false)
-    private EnrollmentEntity enrollment;
+    @JoinColumn(name = "id_course_enrollment", nullable = false)
+    private CourseEnrollmentEntity courseEnrollment;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_class_group")
+    private ClassGroupEntity classGroup;
 
     @Column(name = "date", nullable = false)
     private LocalDate date;
 
-    @Column(name = "status", length = 15)
+    @Column(name = "status", nullable = false, length = 15)
     private String status;
 }

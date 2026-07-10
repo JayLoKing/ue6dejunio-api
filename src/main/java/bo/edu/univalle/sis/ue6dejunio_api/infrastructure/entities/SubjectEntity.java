@@ -23,8 +23,8 @@ public class SubjectEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "area", length = 100)
-    private String area;
+    @Column(name = "is_technical")
+    private boolean technical;
 
     @Column(name = "is_active")
     private boolean active;

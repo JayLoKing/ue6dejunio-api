@@ -14,6 +14,6 @@ public interface IUserService {
     User create(CreateUserCommand command);
     User update(UUID id, UpdateUserCommand command);
     User getById(UUID id);
-    Page<UsersList> list(Pageable pageable, @Nullable String search);
+    Page<UsersList> list(Pageable pageable, @Nullable String search, java.util.UUID excludeUserId);
     void deactivate(UUID id);
 }

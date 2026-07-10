@@ -20,6 +20,7 @@ public class User {
     @JsonIgnore
     private String password;
     private boolean mustChangePassword;
+    private boolean technical;
     private Role role;
     private boolean active;
     private LocalDateTime createdAt;

@@ -7,9 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.UUID;
 
 public record EnrollCourseRequest(
-    @NotNull @JsonProperty("id_grade") Integer gradeId,
-    @NotNull @JsonProperty("id_parallel") Integer parallelId,
+    @NotNull @JsonProperty("id_course") UUID courseId,
     @NotEmpty @Size(max = 500) @Valid List<CreateStudentRequest> students
 ) {}

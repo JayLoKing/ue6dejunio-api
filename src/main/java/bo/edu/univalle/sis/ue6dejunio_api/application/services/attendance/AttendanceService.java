@@ -2,96 +2,65 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.attendance;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.AttendanceBatchResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyAttendanceCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyAttendanceResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.RegisterAttendanceCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyBatchResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.enrollment.IEnrollmentDomain;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class AttendanceService implements IAttendanceService {
 
     private final IAttendanceDomain attendanceDomain;
-    private final IClassGroupDomain classGroupDomain;
-    private final IEnrollmentDomain enrollmentDomain;
 
-    public AttendanceService(IAttendanceDomain attendanceDomain,
-                             IClassGroupDomain classGroupDomain,
-                             IEnrollmentDomain enrollmentDomain) {
+    public AttendanceService(IAttendanceDomain attendanceDomain) {
         this.attendanceDomain = attendanceDomain;
-        this.classGroupDomain = classGroupDomain;
-        this.enrollmentDomain = enrollmentDomain;
     }
 
     @Override
     @Transactional
-    public Attendance register(RegisterAttendanceCommand command) {
-        if (!attendanceDomain.enrollmentExists(command.enrollmentId())) {
-            throw new ResourceNotFoundException("Enrollment", command.enrollmentId());
+    public Attendance registerDaily(UUID courseEnrollmentId, LocalDate date, String status) {
+        if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
+            throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }
-        return attendanceDomain.upsert(command);
+        return attendanceDomain.upsertDaily(courseEnrollmentId, date, status);
     }
 
     @Override
     @Transactional
-    public AttendanceBatchResult registerBatch(List<RegisterAttendanceCommand> commands) {
+    public DailyBatchResult registerDailyBatch(LocalDate date, List<DailyMark> marks) {
         int saved = 0;
-        for (RegisterAttendanceCommand c : commands) {
-            if (!attendanceDomain.enrollmentExists(c.enrollmentId())) {
-                throw new ResourceNotFoundException("Enrollment", c.enrollmentId());
+        for (DailyMark m : marks) {
+            if (!attendanceDomain.courseEnrollmentExists(m.courseEnrollmentId())) {
+                throw new ResourceNotFoundException("CourseEnrollment", m.courseEnrollmentId());
             }
-            attendanceDomain.upsert(c);
+            attendanceDomain.upsertDaily(m.courseEnrollmentId(), date, m.status());
             saved++;
         }
-        return new AttendanceBatchResult(commands.size(), saved);
+        return new DailyBatchResult(marks.size(), saved);
     }
 
     @Override
     @Transactional
-    public DailyAttendanceResult registerDaily(DailyAttendanceCommand command) {
-        Integer yearId = classGroupDomain.currentAcademicYearId();
-        List<UUID> classGroupIds = classGroupDomain.classGroupIdsByCourse(
-            command.gradeId(), command.parallelId(), yearId);
-        if (classGroupIds.isEmpty()) {
-            throw new ResourceNotFoundException("Curso sin materias asignadas (class_groups)",
-                "grado=" + command.gradeId() + " paralelo=" + command.parallelId());
+    public Attendance registerSession(UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
+        if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
+            throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }
-
-        int saved = 0;
-        List<UUID> notEnrolled = new ArrayList<>();
-        for (DailyAttendanceCommand.StudentMark mark : command.records()) {
-            boolean any = false;
-            for (UUID cgId : classGroupIds) {
-                Optional<UUID> enrollmentId = enrollmentDomain.findEnrollmentId(mark.studentId(), cgId);
-                if (enrollmentId.isEmpty()) {
-                    continue;
-                }
-                attendanceDomain.upsert(new RegisterAttendanceCommand(
-                    enrollmentId.get(), command.date(), mark.status()));
-                saved++;
-                any = true;
-            }
-            if (!any) {
-                notEnrolled.add(mark.studentId());
-            }
+        UUID ceCourse = attendanceDomain.courseOfCourseEnrollment(courseEnrollmentId);
+        UUID cgCourse = attendanceDomain.courseOfClassGroup(classGroupId);
+        if (!ceCourse.equals(cgCourse)) {
+            throw new IllegalArgumentException("El estudiante no pertenece al curso de la materia");
         }
-        return new DailyAttendanceResult(
-            command.records().size(), classGroupIds.size(), saved, notEnrolled);
+        return attendanceDomain.upsertSession(courseEnrollmentId, classGroupId, date, status);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Attendance> byEnrollment(UUID enrollmentId) {
-        return attendanceDomain.findByEnrollment(enrollmentId);
+    public List<Attendance> byCourseEnrollment(UUID courseEnrollmentId) {
+        return attendanceDomain.byCourseEnrollment(courseEnrollmentId);
     }
 }
