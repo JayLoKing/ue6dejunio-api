@@ -10,5 +10,6 @@ import java.util.UUID;
 
 public interface JpaSubjectRepository extends JpaRepository<SubjectEntity, UUID> {
     List<SubjectEntity> findByActiveTrueOrderByName();
+    List<SubjectEntity> findByActiveTrueAndTechnicalOrderByName(boolean technical);
     Page<SubjectEntity> findByActiveTrue(Pageable pageable);
 }

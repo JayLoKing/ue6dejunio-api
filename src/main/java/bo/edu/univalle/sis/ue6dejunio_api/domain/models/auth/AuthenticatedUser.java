@@ -14,5 +14,6 @@ public record AuthenticatedUser(
     boolean mustChangePassword,
     String gradeName,
     String parallelName,
-    UUID courseId
+    UUID courseId,
+    Boolean technical
 ) {}

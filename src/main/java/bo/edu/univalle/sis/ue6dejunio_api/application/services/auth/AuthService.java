@@ -51,7 +51,9 @@ public class AuthService implements IAuthService {
         String gradeName = null;
         String parallelName = null;
         java.util.UUID courseId = null;
+        Boolean technical = null;
         if (user.getRole() != null && TEACHER_ROLE.equals(user.getRole().name())) {
+            technical = user.isTechnical();
             Optional<Course> homeroom = courseDomain.homeroomCourseOf(user.getId());
             if (homeroom.isPresent()) {
                 gradeName = homeroom.get().gradeName();
@@ -59,7 +61,7 @@ public class AuthService implements IAuthService {
                 courseId = homeroom.get().id();
             }
         }
-        return jwtService.issueToken(user, gradeName, parallelName, courseId);
+        return jwtService.issueToken(user, gradeName, parallelName, courseId, technical);
     }
 
     @Override

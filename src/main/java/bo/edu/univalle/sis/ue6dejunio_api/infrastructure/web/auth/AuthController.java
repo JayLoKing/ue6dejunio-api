@@ -51,6 +51,7 @@ public class AuthController {
         String gradeName = jwt.getClaimAsString("gradeName");
         String parallelName = jwt.getClaimAsString("parallelName");
         String courseId = jwt.getClaimAsString("courseId");
+        String technical = jwt.getClaimAsString("technical");
         return ResponseEntity.ok(new MeResponse(
             UUID.fromString(jwt.getSubject()),
             jwt.getClaimAsString("email"),
@@ -59,7 +60,8 @@ public class AuthController {
             mustChange != null && mustChange,
             gradeName != null && !gradeName.isBlank() ? gradeName : null,
             parallelName != null && !parallelName.isBlank() ? parallelName : null,
-            courseId != null && !courseId.isBlank() ? UUID.fromString(courseId) : null
+            courseId != null && !courseId.isBlank() ? UUID.fromString(courseId) : null,
+            technical != null && !technical.isBlank() ? Boolean.valueOf(technical) : null
         ));
     }
 

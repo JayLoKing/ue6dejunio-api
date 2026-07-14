@@ -29,9 +29,10 @@ public class CatalogController {
     }
 
     @GetMapping("/subjects")
-    @Operation(summary = "Listar materias activas")
-    public ResponseEntity<List<SubjectItem>> subjects() {
-        return ResponseEntity.ok(catalogService.subjects());
+    @Operation(summary = "Listar materias activas. technical opcional: true=tecnicas, false=no tecnicas")
+    public ResponseEntity<List<SubjectItem>> subjects(
+        @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean technical) {
+        return ResponseEntity.ok(catalogService.subjects(technical));
     }
 
     @GetMapping("/grades")

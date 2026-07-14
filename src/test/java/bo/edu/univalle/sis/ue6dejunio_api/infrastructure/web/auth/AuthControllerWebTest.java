@@ -51,7 +51,7 @@ class AuthControllerWebTest {
         UUID id = UUID.randomUUID();
         when(authService.login(any(LoginCommand.class))).thenReturn(new AuthenticatedUser(
             id, "director@ue6.bo", "Juan Ortuño", "DIRECTOR",
-            "jwt-token", Instant.now(), Instant.now().plusSeconds(900), false, null, null, null
+            "jwt-token", Instant.now(), Instant.now().plusSeconds(900), false, null, null, null, null
         ));
 
         mvc.perform(post("/api/auth/login")

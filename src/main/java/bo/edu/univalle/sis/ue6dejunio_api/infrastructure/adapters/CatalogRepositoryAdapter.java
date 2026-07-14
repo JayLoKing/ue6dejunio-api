@@ -35,8 +35,11 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     }
 
     @Override
-    public List<SubjectItem> subjects() {
-        return subjectRepo.findByActiveTrueOrderByName().stream()
+    public List<SubjectItem> subjects(Boolean technical) {
+        var list = technical == null
+            ? subjectRepo.findByActiveTrueOrderByName()
+            : subjectRepo.findByActiveTrueAndTechnicalOrderByName(technical);
+        return list.stream()
             .map(s -> new SubjectItem(s.getId(), s.getName(), s.isTechnical()))
             .toList();
     }

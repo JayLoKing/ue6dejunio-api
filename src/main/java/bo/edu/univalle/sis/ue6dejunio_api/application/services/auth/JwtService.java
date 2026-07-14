@@ -31,7 +31,7 @@ public class JwtService implements IJwtService {
     }
 
     @Override
-    public AuthenticatedUser issueToken(User user, String gradeName, String parallelName, java.util.UUID courseId) {
+    public AuthenticatedUser issueToken(User user, String gradeName, String parallelName, java.util.UUID courseId, Boolean technical) {
         Instant now = Instant.now();
         Instant exp = now.plus(ttlMinutes, ChronoUnit.MINUTES);
         String role = user.getRole() != null ? user.getRole().name() : "";
@@ -48,6 +48,7 @@ public class JwtService implements IJwtService {
             .claim("gradeName", gradeName != null ? gradeName : "")
             .claim("parallelName", parallelName != null ? parallelName : "")
             .claim("courseId", courseId != null ? courseId.toString() : "")
+            .claim("technical", technical != null ? technical.toString() : "")
             .build();
 
         String token = jwtEncoder.encode(
@@ -56,7 +57,7 @@ public class JwtService implements IJwtService {
 
         return new AuthenticatedUser(
             user.getId(), user.getEmail(), user.fullName(), role, token, now, exp,
-            user.isMustChangePassword(), gradeName, parallelName, courseId
+            user.isMustChangePassword(), gradeName, parallelName, courseId, technical
         );
     }
 }

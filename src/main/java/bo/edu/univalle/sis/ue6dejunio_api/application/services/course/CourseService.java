@@ -2,9 +2,13 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.course;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.CreateClassGroupCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import org.springframework.data.domain.Page;
@@ -12,20 +16,23 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class CourseService implements ICourseService {
 
     private final ICourseDomain courseDomain;
+    private final IClassGroupService classGroupService;
 
-    public CourseService(ICourseDomain courseDomain) {
+    public CourseService(ICourseDomain courseDomain, IClassGroupService classGroupService) {
         this.courseDomain = courseDomain;
+        this.classGroupService = classGroupService;
     }
 
     @Override
     @Transactional
-    public Course create(CreateCourseCommand c) {
+    public CourseWithSubjects create(CreateCourseCommand c) {
         if (!courseDomain.gradeExists(c.gradeId())) {
             throw new ResourceNotFoundException("Grado", c.gradeId());
         }
@@ -40,7 +47,18 @@ public class CourseService implements ICourseService {
         if (c.homeroomTeacherId() != null && !courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
             throw new IllegalArgumentException("El docente de aula debe ser Teacher NO tecnico");
         }
-        return courseDomain.create(c.gradeId(), c.parallelId(), yearId, c.homeroomTeacherId());
+
+        Course course = courseDomain.create(c.gradeId(), c.parallelId(), yearId, c.homeroomTeacherId());
+
+        List<ClassGroup> classGroups = List.of();
+        if (c.assignments() != null && !c.assignments().isEmpty()) {
+            List<CreateClassGroupCommand.Assignment> assignments = c.assignments().stream()
+                .map(a -> new CreateClassGroupCommand.Assignment(a.subjectId(), a.teacherId()))
+                .toList();
+            classGroups = classGroupService.createForCourse(
+                new CreateClassGroupCommand(course.id(), assignments));
+        }
+        return new CourseWithSubjects(course, classGroups);
     }
 
     @Override

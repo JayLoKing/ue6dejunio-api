@@ -1,10 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.course;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseWithSubjectsResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateCourseRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HomeroomTeacherRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -45,10 +48,14 @@ public class CourseController {
     }
 
     @PostMapping
-    @Operation(summary = "Crear curso (unico por grado+paralelo+anio)")
-    public ResponseEntity<CourseResponse> create(@Valid @RequestBody CreateCourseRequest r) {
-        Course c = courseService.create(new CreateCourseCommand(r.gradeId(), r.parallelId(), r.homeroomTeacherId()));
-        return ResponseEntity.ok(CourseResponse.from(c));
+    @Operation(summary = "Crear curso + materias (1 transaccion: courses + class_groups). Anio auto")
+    public ResponseEntity<CourseWithSubjectsResponse> create(@Valid @RequestBody CreateCourseRequest r) {
+        List<CreateCourseCommand.Assignment> assignments = r.assignments().stream()
+            .map(a -> new CreateCourseCommand.Assignment(a.subjectId(), a.teacherId()))
+            .toList();
+        CourseWithSubjects created = courseService.create(new CreateCourseCommand(
+            r.gradeId(), r.parallelId(), r.homeroomTeacherId(), assignments));
+        return ResponseEntity.ok(CourseWithSubjectsResponse.from(created));
     }
 
     @GetMapping("/{id}")

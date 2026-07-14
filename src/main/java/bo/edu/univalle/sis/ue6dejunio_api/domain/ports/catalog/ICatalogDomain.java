@@ -8,7 +8,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.TeacherItem;
 import java.util.List;
 
 public interface ICatalogDomain {
-    List<SubjectItem> subjects();
+    List<SubjectItem> subjects(Boolean technical);
     List<GradeItem> grades();
     List<ParallelItem> parallels();
     List<TeacherItem> teachers(Boolean technical);

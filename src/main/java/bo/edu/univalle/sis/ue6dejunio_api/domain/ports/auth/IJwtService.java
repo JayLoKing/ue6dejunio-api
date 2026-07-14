@@ -6,5 +6,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import java.util.UUID;
 
 public interface IJwtService {
-    AuthenticatedUser issueToken(User user, String gradeName, String parallelName, UUID courseId);
+    AuthenticatedUser issueToken(User user, String gradeName, String parallelName,
+                                 UUID courseId, Boolean technical);
 }

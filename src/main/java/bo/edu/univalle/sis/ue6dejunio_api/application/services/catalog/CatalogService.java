@@ -20,8 +20,8 @@ public class CatalogService implements ICatalogService {
     }
 
     @Override
-    public List<SubjectItem> subjects() {
-        return catalogDomain.subjects();
+    public List<SubjectItem> subjects(Boolean technical) {
+        return catalogDomain.subjects(technical);
     }
 
     @Override

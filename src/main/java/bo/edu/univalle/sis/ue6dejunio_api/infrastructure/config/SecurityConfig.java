@@ -41,7 +41,6 @@ public class SecurityConfig {
                 .requestMatchers(PUBLIC_PATHS).permitAll()
                 .requestMatchers("/api/users/**").hasRole("Director")
                 .requestMatchers("/api/courses/**").hasRole("Director")
-                .requestMatchers("/api/class-groups/**").hasRole("Director")
                 .requestMatchers("/api/levels/**").hasRole("Director")
                 .requestMatchers("/api/grades/**").hasRole("Director")
                 .requestMatchers("/api/subjects/**").hasRole("Director")

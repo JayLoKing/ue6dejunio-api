@@ -31,8 +31,10 @@ public class UserRepositoryAdapter implements IUserDomain {
     @Override
     public Page<UsersList> getUsers(Pageable pageable, @Nullable String search,
                                     java.util.UUID excludeUserId) {
-        String q = (search == null || search.isBlank()) ? null : search;
-        return repo.search(q, excludeUserId, pageable).map(mapper::toListItem);
+        if (search == null || search.isBlank()) {
+            return repo.listExcluding(excludeUserId, pageable).map(mapper::toListItem);
+        }
+        return repo.search(search, excludeUserId, pageable).map(mapper::toListItem);
     }
 
     @Override

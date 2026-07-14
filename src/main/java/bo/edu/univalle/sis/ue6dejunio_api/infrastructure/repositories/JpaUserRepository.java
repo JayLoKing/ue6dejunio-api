@@ -22,10 +22,13 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
     List<UserEntity> findByRole_NameAndActiveTrueOrderByLastNames(String roleName);
     List<UserEntity> findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(String roleName, boolean technical);
 
+    @Query("SELECT u FROM UserEntity u WHERE (:excludeId IS NULL OR u.id <> :excludeId)")
+    Page<UserEntity> listExcluding(@Param("excludeId") java.util.UUID excludeId, Pageable pageable);
+
     @Query("""
         SELECT u FROM UserEntity u
         WHERE (:excludeId IS NULL OR u.id <> :excludeId)
-              AND (:q IS NULL OR LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
+              AND (LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
                           OR LOWER(u.names) LIKE LOWER(CONCAT('%', :q, '%')))
         """)
     Page<UserEntity> search(@Param("q") String q, @Param("excludeId") java.util.UUID excludeId, Pageable pageable);
