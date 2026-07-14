@@ -3,7 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.assessment;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment.AssessmentScoreService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.CriterionAvg;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.DimensionAvg;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.SetScoreCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
@@ -37,32 +37,61 @@ class AssessmentScoreServiceTest {
     @Mock private IClassGroupDomain classGroupDomain;
     @InjectMocks private AssessmentScoreService service;
 
-    private AssessmentEvent event(UUID id, UUID cg, String dim, String max) {
-        return new AssessmentEvent(id, UUID.randomUUID(), cg, 1, dim, "Tema 1", null, new BigDecimal(max));
+    private AssessmentEvent event(UUID id, UUID cg, String dim) {
+        return new AssessmentEvent(id, UUID.randomUUID(), cg, 1, dim, "Tema 1", null, new BigDecimal("100"));
     }
 
     @Test
-    void setScore_consolidatesWeighted() {
+    void setScore_consolidatesSimpleAveragePerDimension() {
         UUID ce = UUID.randomUUID();
         UUID cg = UUID.randomUUID();
         UUID evId = UUID.randomUUID();
         UUID asId = UUID.randomUUID();
         UUID course = UUID.randomUUID();
-        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Knowing", "100")));
+        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Knowing")));
         when(scoreDomain.courseOfCourseEnrollment(ce)).thenReturn(course);
         when(classGroupDomain.courseIdOfClassGroup(cg)).thenReturn(course);
-        when(scoreDomain.upsert(ce, evId, new BigDecimal("80")))
-            .thenReturn(new AssessmentScore(UUID.randomUUID(), ce, evId, new BigDecimal("80")));
-        // criterion Knowing weight 45, avg 80 -> 80/100*45 = 36
-        when(scoreDomain.criterionAveragesForConsolidation(ce, cg, 1)).thenReturn(List.of(
-            new CriterionAvg("Knowing", new BigDecimal("45"), new BigDecimal("80"))));
+        when(scoreDomain.upsert(ce, evId, new BigDecimal("40")))
+            .thenReturn(new AssessmentScore(UUID.randomUUID(), ce, evId, new BigDecimal("40"), null, null));
+        // Saber: notas 45,45,10,10,10,10 -> media 21.666.. -> 21.67
+        when(scoreDomain.dimensionAverages(ce, cg, 1)).thenReturn(List.of(
+            new DimensionAvg("Knowing", new BigDecimal("21.6666"))));
         when(academicScoreDomain.ensureAcademicScore(eq(ce), eq(cg), eq(1), any())).thenReturn(asId);
 
-        service.setScore(new SetScoreCommand(ce, evId, new BigDecimal("80"), UUID.randomUUID()));
+        service.setScore(new SetScoreCommand(ce, evId, new BigDecimal("40"), UUID.randomUUID()));
 
         ArgumentCaptor<BigDecimal> knowing = ArgumentCaptor.forClass(BigDecimal.class);
         verify(academicScoreDomain).setDimensions(eq(asId), any(), knowing.capture(), any(), any());
-        assertThat(knowing.getValue()).isEqualByComparingTo("36.00");
+        assertThat(knowing.getValue()).isEqualByComparingTo("21.67");
+    }
+
+    @Test
+    void setScore_aboveDimensionCap_throws() {
+        UUID ce = UUID.randomUUID();
+        UUID cg = UUID.randomUUID();
+        UUID evId = UUID.randomUUID();
+        UUID course = UUID.randomUUID();
+        // Being max 10, nota 11 invalida
+        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Being")));
+        when(scoreDomain.courseOfCourseEnrollment(ce)).thenReturn(course);
+        when(classGroupDomain.courseIdOfClassGroup(cg)).thenReturn(course);
+        assertThatThrownBy(() -> service.setScore(
+            new SetScoreCommand(ce, evId, new BigDecimal("11"), UUID.randomUUID())))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void setScore_negative_throws() {
+        UUID ce = UUID.randomUUID();
+        UUID cg = UUID.randomUUID();
+        UUID evId = UUID.randomUUID();
+        UUID course = UUID.randomUUID();
+        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Doing")));
+        when(scoreDomain.courseOfCourseEnrollment(ce)).thenReturn(course);
+        when(classGroupDomain.courseIdOfClassGroup(cg)).thenReturn(course);
+        assertThatThrownBy(() -> service.setScore(
+            new SetScoreCommand(ce, evId, new BigDecimal("-1"), UUID.randomUUID())))
+            .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -70,25 +99,11 @@ class AssessmentScoreServiceTest {
         UUID ce = UUID.randomUUID();
         UUID cg = UUID.randomUUID();
         UUID evId = UUID.randomUUID();
-        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Doing", "100")));
+        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Doing")));
         when(scoreDomain.courseOfCourseEnrollment(ce)).thenReturn(UUID.randomUUID());
         when(classGroupDomain.courseIdOfClassGroup(cg)).thenReturn(UUID.randomUUID());
         assertThatThrownBy(() -> service.setScore(
-            new SetScoreCommand(ce, evId, new BigDecimal("50"), UUID.randomUUID())))
-            .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void setScore_aboveMax_throws() {
-        UUID ce = UUID.randomUUID();
-        UUID cg = UUID.randomUUID();
-        UUID evId = UUID.randomUUID();
-        UUID course = UUID.randomUUID();
-        when(eventDomain.findById(evId)).thenReturn(Optional.of(event(evId, cg, "Being", "100")));
-        when(scoreDomain.courseOfCourseEnrollment(ce)).thenReturn(course);
-        when(classGroupDomain.courseIdOfClassGroup(cg)).thenReturn(course);
-        assertThatThrownBy(() -> service.setScore(
-            new SetScoreCommand(ce, evId, new BigDecimal("101"), UUID.randomUUID())))
+            new SetScoreCommand(ce, evId, new BigDecimal("30"), UUID.randomUUID())))
             .isInstanceOf(IllegalArgumentException.class);
     }
 }

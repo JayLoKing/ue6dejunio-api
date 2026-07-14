@@ -47,7 +47,7 @@ public class CriterionController {
     @Operation(summary = "Crear criterio. Valida que la suma de pesos por dimension no exceda el tope")
     public ResponseEntity<CriterionResponse> create(@Valid @RequestBody CreateCriterionRequest r) {
         EvaluationCriterion c = criterionService.create(new CreateCriterionCommand(
-            r.classGroupId(), r.trimester(), r.dimension(), r.name(), r.maxWeight(), r.curriculumPlanId()));
+            r.classGroupId(), r.trimester(), r.dimension(), r.name(), r.curriculumPlanId()));
         return ResponseEntity.ok(CriterionResponse.from(c));
     }
 
@@ -72,7 +72,7 @@ public class CriterionController {
     @Operation(summary = "Actualizar criterio (nombre, peso)")
     public ResponseEntity<CriterionResponse> update(@PathVariable UUID id,
                                                     @Valid @RequestBody UpdateCriterionRequest r) {
-        EvaluationCriterion c = criterionService.update(id, new UpdateCriterionCommand(r.name(), r.maxWeight()));
+        EvaluationCriterion c = criterionService.update(id, new UpdateCriterionCommand(r.name()));
         return ResponseEntity.ok(CriterionResponse.from(c));
     }
 

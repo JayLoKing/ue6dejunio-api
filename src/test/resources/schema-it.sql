@@ -124,7 +124,6 @@ CREATE TABLE evaluation_criteria (
     trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
     dimension varchar(20) NOT NULL CHECK (dimension IN ('Being','Knowing','Doing','Deciding')),
     name varchar(150) NOT NULL,
-    max_weight numeric(5,2) NOT NULL,
     id_curriculum_plan uuid REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE SET NULL,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_criterion UNIQUE (id_class_group, trimester, dimension, name)

@@ -11,7 +11,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -38,9 +37,6 @@ public class EvaluationCriterionEntity {
 
     @Column(name = "name", nullable = false, length = 150)
     private String name;
-
-    @Column(name = "max_weight", nullable = false)
-    private BigDecimal maxWeight;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_curriculum_plan")

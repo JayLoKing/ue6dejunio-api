@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,14 +19,4 @@ public interface JpaEvaluationCriterionRepository extends JpaRepository<Evaluati
     List<EvaluationCriterionEntity> search(@Param("classGroupId") UUID classGroupId,
                                            @Param("trimester") Integer trimester,
                                            @Param("dimension") String dimension);
-
-    @Query("""
-        SELECT COALESCE(SUM(c.maxWeight), 0) FROM EvaluationCriterionEntity c
-        WHERE c.classGroup.id = :classGroupId AND c.trimester = :trimester
-              AND c.dimension = :dimension AND (:excludeId IS NULL OR c.id <> :excludeId)
-        """)
-    BigDecimal sumWeights(@Param("classGroupId") UUID classGroupId,
-                          @Param("trimester") Integer trimester,
-                          @Param("dimension") String dimension,
-                          @Param("excludeId") UUID excludeId);
 }

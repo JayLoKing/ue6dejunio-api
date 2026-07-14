@@ -18,15 +18,14 @@ public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentSc
     List<AssessmentScoreEntity> findByCourseEnrollment_Id(UUID courseEnrollmentId);
 
     @Query("""
-        SELECT ec.dimension, ec.maxWeight, AVG(s.score)
-        FROM EvaluationCriterionEntity ec
-        JOIN AssessmentEventEntity ev ON ev.criterion.id = ec.id
-        LEFT JOIN AssessmentScoreEntity s ON s.event.id = ev.id
-              AND s.courseEnrollment.id = :courseEnrollmentId
-        WHERE ec.classGroup.id = :classGroupId AND ec.trimester = :trimester
-        GROUP BY ec.id, ec.dimension, ec.maxWeight
+        SELECT s.event.criterion.dimension, AVG(s.score)
+        FROM AssessmentScoreEntity s
+        WHERE s.courseEnrollment.id = :courseEnrollmentId
+              AND s.event.criterion.classGroup.id = :classGroupId
+              AND s.event.criterion.trimester = :trimester
+        GROUP BY s.event.criterion.dimension
         """)
-    List<Object[]> consolidationRows(@Param("courseEnrollmentId") UUID courseEnrollmentId,
-                                     @Param("classGroupId") UUID classGroupId,
-                                     @Param("trimester") Integer trimester);
+    List<Object[]> dimensionAverageRows(@Param("courseEnrollmentId") UUID courseEnrollmentId,
+                                        @Param("classGroupId") UUID classGroupId,
+                                        @Param("trimester") Integer trimester);
 }

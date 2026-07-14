@@ -10,7 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaEvaluat
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -40,13 +39,12 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     @Override
     @Transactional
     public EvaluationCriterion create(UUID classGroupId, Integer trimester, String dimension,
-                                      String name, BigDecimal maxWeight, UUID curriculumPlanId) {
+                                      String name, UUID curriculumPlanId) {
         EvaluationCriterionEntity e = new EvaluationCriterionEntity();
         e.setClassGroup(classGroupRepo.getReferenceById(classGroupId));
         e.setTrimester(trimester);
         e.setDimension(dimension);
         e.setName(name);
-        e.setMaxWeight(maxWeight);
         if (curriculumPlanId != null) {
             e.setCurriculumPlan(planRepo.getReferenceById(curriculumPlanId));
         }
@@ -56,11 +54,10 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
 
     @Override
     @Transactional
-    public EvaluationCriterion update(UUID id, String name, BigDecimal maxWeight) {
+    public EvaluationCriterion update(UUID id, String name) {
         EvaluationCriterionEntity e = criterionRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Criterion", id));
         if (name != null) e.setName(name);
-        if (maxWeight != null) e.setMaxWeight(maxWeight);
         return toDomain(criterionRepo.save(e));
     }
 
@@ -75,11 +72,6 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     }
 
     @Override
-    public BigDecimal sumWeights(UUID classGroupId, Integer trimester, String dimension, UUID excludeId) {
-        return criterionRepo.sumWeights(classGroupId, trimester, dimension, excludeId);
-    }
-
-    @Override
     @Transactional
     public void deleteById(UUID id) {
         criterionRepo.deleteById(id);
@@ -87,8 +79,7 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
 
     private EvaluationCriterion toDomain(EvaluationCriterionEntity e) {
         return new EvaluationCriterion(
-            e.getId(), e.getClassGroup().getId(), e.getTrimester(), e.getDimension(),
-            e.getName(), e.getMaxWeight(),
+            e.getId(), e.getClassGroup().getId(), e.getTrimester(), e.getDimension(), e.getName(),
             e.getCurriculumPlan() != null ? e.getCurriculumPlan().getId() : null);
     }
 }

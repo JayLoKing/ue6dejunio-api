@@ -2,7 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.CriterionAvg;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.DimensionAvg;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AssessmentScoreEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentEventRepository;
@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,12 +41,10 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
                 AssessmentScoreEntity n = new AssessmentScoreEntity();
                 n.setCourseEnrollment(enrollmentRepo.getReferenceById(courseEnrollmentId));
                 n.setEvent(eventRepo.getReferenceById(eventId));
-                n.setCreatedAt(LocalDateTime.now());
                 return n;
             });
         e.setScore(score);
-        e.setUpdatedAt(LocalDateTime.now());
-        return toDomain(scoreRepo.save(e));
+        return toDomain(scoreRepo.saveAndFlush(e));
     }
 
     @Override
@@ -66,13 +63,11 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
     }
 
     @Override
-    public List<CriterionAvg> criterionAveragesForConsolidation(UUID courseEnrollmentId,
-                                                                UUID classGroupId, Integer trimester) {
-        return scoreRepo.consolidationRows(courseEnrollmentId, classGroupId, trimester).stream()
-            .map(r -> new CriterionAvg(
+    public List<DimensionAvg> dimensionAverages(UUID courseEnrollmentId, UUID classGroupId, Integer trimester) {
+        return scoreRepo.dimensionAverageRows(courseEnrollmentId, classGroupId, trimester).stream()
+            .map(r -> new DimensionAvg(
                 (String) r[0],
-                (BigDecimal) r[1],
-                r[2] != null ? new BigDecimal(r[2].toString()) : null))
+                r[1] != null ? new BigDecimal(r[1].toString()) : null))
             .toList();
     }
 
@@ -91,6 +86,7 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
 
     private AssessmentScore toDomain(AssessmentScoreEntity e) {
         return new AssessmentScore(
-            e.getId(), e.getCourseEnrollment().getId(), e.getEvent().getId(), e.getScore());
+            e.getId(), e.getCourseEnrollment().getId(), e.getEvent().getId(), e.getScore(),
+            e.getCreatedAt(), e.getUpdatedAt());
     }
 }

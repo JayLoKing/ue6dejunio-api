@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -10,6 +11,9 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,6 +23,7 @@ import java.util.UUID;
 @Table(name = "assessment_scores")
 @Getter
 @Setter
+@EntityListeners(AuditingEntityListener.class)
 public class AssessmentScoreEntity {
 
     @Id
@@ -40,9 +45,11 @@ public class AssessmentScoreEntity {
     @Column(name = "digital_signature_hash")
     private String digitalSignatureHash;
 
+    @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

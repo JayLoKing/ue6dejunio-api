@@ -4,7 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentDimension;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.CriterionAvg;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.DimensionAvg;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.SetScoreCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
@@ -21,8 +21,6 @@ import java.util.UUID;
 
 @Service
 public class AssessmentScoreService implements IAssessmentScoreService {
-
-    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final IAssessmentScoreDomain scoreDomain;
     private final IAssessmentEventDomain eventDomain;
@@ -51,8 +49,12 @@ public class AssessmentScoreService implements IAssessmentScoreService {
             throw new IllegalArgumentException(
                 "El estudiante no pertenece al curso de la materia evaluada");
         }
-        if (c.score().compareTo(BigDecimal.ZERO) < 0 || c.score().compareTo(event.maxScore()) > 0) {
-            throw new IllegalArgumentException("Nota fuera de rango (0-" + event.maxScore() + ")");
+
+        // La nota no puede exceder el tope de la dimension del criterio
+        BigDecimal dimensionMax = AssessmentDimension.max(event.dimension());
+        if (c.score().compareTo(BigDecimal.ZERO) < 0 || c.score().compareTo(dimensionMax) > 0) {
+            throw new IllegalArgumentException(
+                "Nota fuera de rango para " + event.dimension() + " (0-" + dimensionMax + ")");
         }
 
         AssessmentScore saved = scoreDomain.upsert(c.courseEnrollmentId(), c.eventId(), c.score());
@@ -83,29 +85,28 @@ public class AssessmentScoreService implements IAssessmentScoreService {
         consolidate(existing.courseEnrollmentId(), event.classGroupId(), event.trimester(), null);
     }
 
+    // Consolidado: promedio simple de las notas registradas de cada dimension.
+    // total_score = suma de las 4 (columna GENERATED en BD).
     private void consolidate(UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID createdBy) {
-        List<CriterionAvg> aggs = scoreDomain.criterionAveragesForConsolidation(
-            courseEnrollmentId, classGroupId, trimester);
+        List<DimensionAvg> avgs = scoreDomain.dimensionAverages(courseEnrollmentId, classGroupId, trimester);
         BigDecimal being = BigDecimal.ZERO;
         BigDecimal knowing = BigDecimal.ZERO;
         BigDecimal doing = BigDecimal.ZERO;
         BigDecimal deciding = BigDecimal.ZERO;
 
-        for (CriterionAvg a : aggs) {
-            BigDecimal avg = a.avgScore() != null ? a.avgScore() : BigDecimal.ZERO;
-            BigDecimal weighted = avg.divide(HUNDRED, 6, RoundingMode.HALF_UP).multiply(a.maxWeight());
+        for (DimensionAvg a : avgs) {
+            BigDecimal avg = a.avgScore() != null ? scale(a.avgScore()) : BigDecimal.ZERO;
             switch (a.dimension()) {
-                case AssessmentDimension.BEING -> being = being.add(weighted);
-                case AssessmentDimension.KNOWING -> knowing = knowing.add(weighted);
-                case AssessmentDimension.DOING -> doing = doing.add(weighted);
-                case AssessmentDimension.DECIDING -> deciding = deciding.add(weighted);
+                case AssessmentDimension.BEING -> being = avg;
+                case AssessmentDimension.KNOWING -> knowing = avg;
+                case AssessmentDimension.DOING -> doing = avg;
+                case AssessmentDimension.DECIDING -> deciding = avg;
                 default -> { }
             }
         }
         UUID academicScoreId = academicScoreDomain.ensureAcademicScore(
             courseEnrollmentId, classGroupId, trimester, createdBy);
-        academicScoreDomain.setDimensions(academicScoreId,
-            scale(being), scale(knowing), scale(doing), scale(deciding));
+        academicScoreDomain.setDimensions(academicScoreId, being, knowing, doing, deciding);
     }
 
     private BigDecimal scale(BigDecimal v) {
