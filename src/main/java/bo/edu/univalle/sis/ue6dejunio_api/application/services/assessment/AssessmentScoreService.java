@@ -104,9 +104,24 @@ public class AssessmentScoreService implements IAssessmentScoreService {
                 default -> { }
             }
         }
+        checkCap(being, AssessmentDimension.BEING);
+        checkCap(knowing, AssessmentDimension.KNOWING);
+        checkCap(doing, AssessmentDimension.DOING);
+        checkCap(deciding, AssessmentDimension.DECIDING);
+
         UUID academicScoreId = academicScoreDomain.ensureAcademicScore(
             courseEnrollmentId, classGroupId, trimester, createdBy);
         academicScoreDomain.setDimensions(academicScoreId, being, knowing, doing, deciding);
+    }
+
+    private void checkCap(BigDecimal value, String dimension) {
+        BigDecimal max = AssessmentDimension.max(dimension);
+        if (value.compareTo(max) > 0) {
+            throw new IllegalArgumentException(
+                "El promedio de " + dimension + " (" + value + ") excede el tope " + max
+                + ". Revise que las casillas esten en escala 0-" + max
+                + " (posibles notas antiguas en escala 0-100).");
+        }
     }
 
     private BigDecimal scale(BigDecimal v) {
