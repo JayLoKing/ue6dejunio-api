@@ -9,7 +9,8 @@ public record CourseStudent(
     String identityCard,
     String names,
     String lastNames,
-    String status
+    String status,
+    String gender
 ) {
     public String fullName() {
         return names + " " + lastNames;

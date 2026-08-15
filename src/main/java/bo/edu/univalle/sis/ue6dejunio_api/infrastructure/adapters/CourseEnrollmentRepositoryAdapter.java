@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -76,7 +77,7 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     @Override
     @Transactional
     public int withdrawActiveEnrollments(UUID studentId) {
-        java.util.List<CourseEnrollmentEntity> active =
+        List<CourseEnrollmentEntity> active =
             enrollmentRepo.findByStudent_IdAndStatus(studentId, STATUS_EFFECTIVE);
         for (CourseEnrollmentEntity e : active) {
             e.setStatus(STATUS_WITHDRAWN);
@@ -96,6 +97,6 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
         StudentEntity s = e.getStudent();
         return new CourseStudent(
             e.getId(), s.getId(), s.getRudeCode(), s.getIdentityCard(),
-            s.getNames(), s.getLastNames(), e.getStatus());
+            s.getNames(), s.getLastNames(), e.getStatus(), s.getGender());
     }
 }

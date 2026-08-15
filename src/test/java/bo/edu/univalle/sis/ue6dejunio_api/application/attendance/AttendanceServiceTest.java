@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,6 +16,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,11 +37,12 @@ class AttendanceServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 8, 14);
 
     @Mock private IAttendanceDomain attendanceDomain;
+    @Mock private ITrimesterPeriodDomain trimesterPeriodDomain;
 
     private AttendanceService attendanceService;
 
     private void init() {
-        attendanceService = new AttendanceService(attendanceDomain, FIXED_CLOCK);
+        attendanceService = new AttendanceService(attendanceDomain, trimesterPeriodDomain, FIXED_CLOCK);
     }
 
     @Test
@@ -84,12 +88,13 @@ class AttendanceServiceTest {
     void registerDailyBatch_forToday_succeeds() {
         init();
         UUID ceId = UUID.randomUUID();
-        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
+        when(attendanceDomain.existingCourseEnrollmentIds(List.of(ceId))).thenReturn(Set.of(ceId));
 
         var result = attendanceService.registerDailyBatch(
             TODAY, List.of(new IAttendanceService.DailyMark(ceId, "P")));
 
         assertThat(result.saved()).isEqualTo(1);
+        verify(attendanceDomain).upsertDailyBatch(TODAY, Map.of(ceId, "P"));
     }
 
     @Test
@@ -102,6 +107,74 @@ class AttendanceServiceTest {
             past, List.of(new IAttendanceService.DailyMark(ceId, "P"))))
             .isInstanceOf(ConflictException.class)
             .hasMessage("no puede modificar registros de dias anteriores");
-        verify(attendanceDomain, never()).upsertDaily(ceId, past, "P");
+        verify(attendanceDomain, never()).upsertDailyBatch(past, Map.of(ceId, "P"));
+    }
+
+    @Test
+    void registerDailyBatch_withDuplicateEnrollment_dedupesAndReportsActualSavedCount() {
+        init();
+        UUID ceId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        when(attendanceDomain.existingCourseEnrollmentIds(List.of(ceId, otherId, ceId)))
+            .thenReturn(Set.of(ceId, otherId));
+
+        var result = attendanceService.registerDailyBatch(TODAY, List.of(
+            new IAttendanceService.DailyMark(ceId, "P"),
+            new IAttendanceService.DailyMark(otherId, "A"),
+            // Same courseEnrollmentId repeated: last status wins, one row is actually persisted.
+            new IAttendanceService.DailyMark(ceId, "L")));
+
+        assertThat(result.total()).isEqualTo(3);
+        assertThat(result.saved()).isEqualTo(2);
+        verify(attendanceDomain).upsertDailyBatch(TODAY, Map.of(ceId, "L", otherId, "A"));
+    }
+
+    @Test
+    void registerDailyBatch_withOneMissingEnrollment_throwsNotFoundAndSavesNothing() {
+        init();
+        UUID okId = UUID.randomUUID();
+        UUID missingId = UUID.randomUUID();
+        // Only okId is reported back by the single bounded existence check — one query for the
+        // whole batch instead of one per mark.
+        when(attendanceDomain.existingCourseEnrollmentIds(List.of(okId, missingId)))
+            .thenReturn(Set.of(okId));
+
+        assertThatThrownBy(() -> attendanceService.registerDailyBatch(TODAY, List.of(
+            new IAttendanceService.DailyMark(okId, "P"),
+            new IAttendanceService.DailyMark(missingId, "A"))))
+            .isInstanceOf(bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException.class);
+
+        // Whole batch fails atomically: nothing gets persisted, not even the valid mark.
+        verify(attendanceDomain, never()).upsertDailyBatch(org.mockito.ArgumentMatchers.eq(TODAY), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void registerSession_forToday_succeeds() {
+        init();
+        UUID ceId = UUID.randomUUID();
+        UUID cgId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
+        when(attendanceDomain.courseOfCourseEnrollment(ceId)).thenReturn(courseId);
+        when(attendanceDomain.courseOfClassGroup(cgId)).thenReturn(courseId);
+        when(attendanceDomain.upsertSession(ceId, cgId, TODAY, "P"))
+            .thenReturn(new Attendance(UUID.randomUUID(), ceId, cgId, TODAY, "P"));
+
+        Attendance r = attendanceService.registerSession(ceId, cgId, TODAY, "P");
+
+        assertThat(r.date()).isEqualTo(TODAY);
+    }
+
+    @Test
+    void registerSession_forPastDate_throwsConflict() {
+        init();
+        UUID ceId = UUID.randomUUID();
+        UUID cgId = UUID.randomUUID();
+        LocalDate past = TODAY.minusDays(1);
+
+        assertThatThrownBy(() -> attendanceService.registerSession(ceId, cgId, past, "P"))
+            .isInstanceOf(ConflictException.class)
+            .hasMessage("no puede modificar registros de dias anteriores");
+        verify(attendanceDomain, never()).upsertSession(ceId, cgId, past, "P");
     }
 }

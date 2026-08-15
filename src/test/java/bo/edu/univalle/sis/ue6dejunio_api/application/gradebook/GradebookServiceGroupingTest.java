@@ -76,7 +76,7 @@ class GradebookServiceGroupingTest {
     }
 
     private CourseStudent courseStudent(UUID enrollmentId, UUID studentId, String names, String lastNames) {
-        return new CourseStudent(enrollmentId, studentId, "RUDE", "ID", names, lastNames, "Effective");
+        return new CourseStudent(enrollmentId, studentId, "RUDE", "ID", names, lastNames, "Effective", "F");
     }
 
     private AcademicScore score(UUID enrollmentId, UUID classGroupId, String subject, Integer trimester,

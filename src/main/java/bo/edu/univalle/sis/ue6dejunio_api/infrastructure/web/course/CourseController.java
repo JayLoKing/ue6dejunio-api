@@ -5,10 +5,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubject
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ClassGroupResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceStatsResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseOverviewResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseWithSubjectsResponse;
@@ -52,12 +54,14 @@ public class CourseController {
     private final ICourseService courseService;
     private final IClassGroupService classGroupService;
     private final IGradebookService gradebookService;
+    private final IAttendanceService attendanceService;
 
     public CourseController(ICourseService courseService, IClassGroupService classGroupService,
-                            IGradebookService gradebookService) {
+                            IGradebookService gradebookService, IAttendanceService attendanceService) {
         this.courseService = courseService;
         this.classGroupService = classGroupService;
         this.gradebookService = gradebookService;
+        this.attendanceService = attendanceService;
     }
 
     @PostMapping
@@ -125,6 +129,18 @@ public class CourseController {
         Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
         return ResponseEntity.ok(CourseOverviewResponse.from(
             gradebookService.courseOverview(id, trimester, p)));
+    }
+
+    @GetMapping("/{id}/attendance-stats")
+    @PreAuthorize("@authz.canReadCourse(authentication, #id)")
+    @Operation(summary = "Estadisticas de asistencia diaria del curso (id_class_group NULL). "
+        + "trimester opcional: presente -> alcance trimestral, ausente -> alcance anual")
+    public ResponseEntity<CourseAttendanceStatsResponse> attendanceStats(
+        @PathVariable UUID id,
+        @RequestParam(required = false) @Min(1) @Max(3) Integer trimester
+    ) {
+        return ResponseEntity.ok(CourseAttendanceStatsResponse.from(
+            attendanceService.attendanceStats(id, trimester)));
     }
 
     @PutMapping("/{courseId}/class-groups/{classGroupId}/teacher")

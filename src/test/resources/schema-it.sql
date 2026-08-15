@@ -174,6 +174,16 @@ CREATE TABLE attendance (
 CREATE UNIQUE INDEX uq_att_daily ON attendance (id_course_enrollment, date) WHERE id_class_group IS NULL;
 CREATE UNIQUE INDEX uq_att_session ON attendance (id_course_enrollment, date, id_class_group) WHERE id_class_group IS NOT NULL;
 
+CREATE TABLE academic_trimesters (
+    id_academic_trimester uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_academic_year integer NOT NULL REFERENCES academic_years(id_academic_year) ON DELETE CASCADE,
+    trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    CONSTRAINT uq_trimester_period UNIQUE (id_academic_year, trimester),
+    CONSTRAINT chk_trimester_dates CHECK (end_date >= start_date)
+);
+
 CREATE TABLE risk_predictions (
     id_risk_prediction uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_student uuid REFERENCES students(id_student) ON DELETE CASCADE,
@@ -195,3 +205,9 @@ INSERT INTO grades (id_level, name) VALUES (1, 'Primero');
 INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C');
 INSERT INTO academic_years (year) VALUES (2026);
 INSERT INTO subjects (name) VALUES ('Matematicas'), ('Lenguaje');
+INSERT INTO academic_trimesters (id_academic_year, trimester, start_date, end_date)
+    SELECT id_academic_year, 1, DATE '2026-02-01', DATE '2026-05-31' FROM academic_years WHERE year = 2026
+    UNION ALL
+    SELECT id_academic_year, 2, DATE '2026-06-01', DATE '2026-08-31' FROM academic_years WHERE year = 2026
+    UNION ALL
+    SELECT id_academic_year, 3, DATE '2026-09-01', DATE '2026-11-30' FROM academic_years WHERE year = 2026;

@@ -10,11 +10,12 @@ public record CourseStudentResponse(
     String rudeCode,
     String identityCard,
     String fullName,
-    String status
+    String status,
+    String gender
 ) {
     public static CourseStudentResponse from(CourseStudent s) {
         return new CourseStudentResponse(
             s.courseEnrollmentId(), s.studentId(), s.rudeCode(), s.identityCard(),
-            s.fullName(), s.status());
+            s.fullName(), s.status(), s.gender());
     }
 }
