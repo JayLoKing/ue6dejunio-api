@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.subject;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.subject.SubjectService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
@@ -48,8 +49,20 @@ class SubjectServiceTest {
     void delete_softDeactivates() {
         UUID id = UUID.randomUUID();
         when(subjectDomain.findById(id)).thenReturn(Optional.of(new Subject(id, "X", false, true)));
+        when(subjectDomain.hasScoresForSubject(id)).thenReturn(false);
         subjectService.delete(id);
         verify(subjectDomain).deactivate(id);
+    }
+
+    @Test
+    void delete_withExistingScores_throwsConflict() {
+        UUID id = UUID.randomUUID();
+        when(subjectDomain.findById(id)).thenReturn(Optional.of(new Subject(id, "X", false, true)));
+        when(subjectDomain.hasScoresForSubject(id)).thenReturn(true);
+        assertThatThrownBy(() -> subjectService.delete(id))
+            .isInstanceOf(ConflictException.class)
+            .hasMessage("no se pudo desactivar la materia porque tiene calificaciones registradas");
+        verify(subjectDomain, org.mockito.Mockito.never()).deactivate(id);
     }
 
     @Test

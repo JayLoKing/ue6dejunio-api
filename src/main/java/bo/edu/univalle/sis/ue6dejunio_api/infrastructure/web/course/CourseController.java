@@ -4,12 +4,18 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ClassGroupResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseOverviewResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseWithSubjectsResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateCourseRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HomeroomTeacherRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReassignTeacherRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateCourseRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -19,7 +25,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,9 +50,14 @@ import java.util.UUID;
 public class CourseController {
 
     private final ICourseService courseService;
+    private final IClassGroupService classGroupService;
+    private final IGradebookService gradebookService;
 
-    public CourseController(ICourseService courseService) {
+    public CourseController(ICourseService courseService, IClassGroupService classGroupService,
+                            IGradebookService gradebookService) {
         this.courseService = courseService;
+        this.classGroupService = classGroupService;
+        this.gradebookService = gradebookService;
     }
 
     @PostMapping
@@ -97,5 +110,29 @@ public class CourseController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         courseService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/overview")
+    @PreAuthorize("@authz.canReadCourse(authentication, #id)")
+    @Operation(summary = "Vista consolidada del curso: header, docente de aula, class_groups y "
+        + "estudiantes con notas del trimestre (paginado)")
+    public ResponseEntity<CourseOverviewResponse> overview(
+        @PathVariable UUID id,
+        @RequestParam @Min(1) @Max(3) Integer trimester,
+        @RequestParam(defaultValue = "1") @Min(1) int offset,
+        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
+    ) {
+        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
+        return ResponseEntity.ok(CourseOverviewResponse.from(
+            gradebookService.courseOverview(id, trimester, p)));
+    }
+
+    @PutMapping("/{courseId}/class-groups/{classGroupId}/teacher")
+    @Operation(summary = "Reasignar docente de un class group del curso")
+    public ResponseEntity<ClassGroupResponse> reassignTeacher(@PathVariable UUID courseId,
+                                                              @PathVariable UUID classGroupId,
+                                                              @Valid @RequestBody ReassignTeacherRequest r) {
+        ClassGroup updated = classGroupService.reassignTeacher(courseId, classGroupId, r.teacherId());
+        return ResponseEntity.ok(ClassGroupResponse.from(updated));
     }
 }

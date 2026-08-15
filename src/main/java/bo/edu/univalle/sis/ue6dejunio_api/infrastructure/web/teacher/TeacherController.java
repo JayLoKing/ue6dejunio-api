@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,6 +50,7 @@ public class TeacherController {
     }
 
     @GetMapping("/{userId}/class-groups")
+    @PreAuthorize("@authz.canReadTeacherRoster(authentication, #userId)")
     @Operation(summary = "Materias (class_groups) que dicta el docente")
     public ResponseEntity<List<ClassGroupResponse>> classGroups(@PathVariable UUID userId) {
         return ResponseEntity.ok(classGroupService.byTeacher(userId).stream()
@@ -56,6 +58,7 @@ public class TeacherController {
     }
 
     @GetMapping("/{userId}/students")
+    @PreAuthorize("@authz.canReadTeacherRoster(authentication, #userId)")
     @Operation(summary = "Estudiantes del curso de aula del docente (homeroom). Paginado")
     public ResponseEntity<PagedResponse<CourseStudentResponse>> homeroomStudents(
         @PathVariable UUID userId,

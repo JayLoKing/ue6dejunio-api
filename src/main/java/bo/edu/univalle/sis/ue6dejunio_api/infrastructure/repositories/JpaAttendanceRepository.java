@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AttendanceEnti
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,4 +14,5 @@ public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity,
     Optional<AttendanceEntity> findByCourseEnrollment_IdAndClassGroup_IdAndDate(UUID courseEnrollmentId, UUID classGroupId, LocalDate date);
     List<AttendanceEntity> findByCourseEnrollment_IdOrderByDate(UUID courseEnrollmentId);
     List<AttendanceEntity> findByCourseEnrollment_IdAndClassGroupIsNullOrderByDate(UUID courseEnrollmentId);
+    List<AttendanceEntity> findByCourseEnrollment_IdInAndClassGroupIsNullOrderByDate(Collection<UUID> courseEnrollmentIds);
 }

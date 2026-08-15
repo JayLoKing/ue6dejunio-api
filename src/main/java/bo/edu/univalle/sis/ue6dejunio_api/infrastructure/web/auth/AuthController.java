@@ -6,8 +6,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AuthResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ChangePasswordRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.LoginRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.MeResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ResetPasswordRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -76,6 +79,22 @@ public class AuthController {
         authService.changePassword(new ChangePasswordCommand(
             userId, request.currentPassword(), request.newPassword()
         ));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Solicitar recuperación de contraseña", security = {})
+    public ResponseEntity<ForgotPasswordResponse> forgotPassword(
+        @Valid @RequestBody ForgotPasswordRequest request
+    ) {
+        authService.forgotPassword(request.email());
+        return ResponseEntity.ok(ForgotPasswordResponse.generic());
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Restablecer contraseña con token de recuperación", security = {})
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.token(), request.newPassword());
         return ResponseEntity.noContent().build();
     }
 }

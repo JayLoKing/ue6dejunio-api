@@ -22,6 +22,7 @@ import java.util.UUID;
 public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomain {
 
     private static final String STATUS_EFFECTIVE = "Effective";
+    private static final String STATUS_WITHDRAWN = "Withdrawn";
 
     private final JpaCourseEnrollmentRepository enrollmentRepo;
     private final JpaStudentRepository studentRepo;
@@ -70,6 +71,18 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     @Override
     public Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId) {
         return enrollmentRepo.findById(courseEnrollmentId).map(this::toCourseStudent);
+    }
+
+    @Override
+    @Transactional
+    public int withdrawActiveEnrollments(UUID studentId) {
+        java.util.List<CourseEnrollmentEntity> active =
+            enrollmentRepo.findByStudent_IdAndStatus(studentId, STATUS_EFFECTIVE);
+        for (CourseEnrollmentEntity e : active) {
+            e.setStatus(STATUS_WITHDRAWN);
+        }
+        enrollmentRepo.saveAll(active);
+        return active.size();
     }
 
     @Override

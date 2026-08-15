@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.subject;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
@@ -52,6 +53,9 @@ public class SubjectService implements ISubjectService {
     @Transactional
     public void delete(UUID id) {
         getById(id);
+        if (subjectDomain.hasScoresForSubject(id)) {
+            throw new ConflictException("no se pudo desactivar la materia porque tiene calificaciones registradas");
+        }
         subjectDomain.deactivate(id);
     }
 }

@@ -51,6 +51,41 @@ public class EmailServiceAdapter implements IEmailService {
         }
     }
 
+    @Override
+    @Async
+    public void sendPasswordReset(String toEmail, String fullName, String resetLink) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(from, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("Recuperación de contraseña - Sistema UE 6 de Junio");
+            helper.setText(buildPasswordResetBody(fullName, resetLink), true);
+            mailSender.send(message);
+            log.info("Email de recuperación de contraseña enviado a {}", toEmail);
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("Error enviando email de recuperación a {}: {}", toEmail, e.getMessage(), e);
+            throw new IllegalStateException("No se pudo enviar el correo de recuperación", e);
+        }
+    }
+
+    private String buildPasswordResetBody(String fullName, String resetLink) {
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+              <h2 style="color: #1f4e79;">Unidad Educativa 6 de Junio</h2>
+              <p>Hola <b>%s</b>,</p>
+              <p>Recibimos una solicitud para restablecer tu contrase&ntilde;a. Haz clic en el siguiente enlace para continuar:</p>
+              <p style="margin: 16px 0;"><a href="%s" style="background:#1f4e79;color:#fff;padding:10px 16px;text-decoration:none;border-radius:4px;">Restablecer contrase&ntilde;a</a></p>
+              <p style="color:#b00;"><b>Importante:</b> este enlace expira en un corto periodo de tiempo y solo puede usarse una vez.</p>
+              <p>Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
+              <hr>
+              <p style="font-size:12px;color:#666;">Mensaje autom&aacute;tico, no responder.</p>
+            </body>
+            </html>
+            """.formatted(fullName, resetLink);
+    }
+
     private String buildBody(String fullName, String email, String password) {
         return """
             <html>

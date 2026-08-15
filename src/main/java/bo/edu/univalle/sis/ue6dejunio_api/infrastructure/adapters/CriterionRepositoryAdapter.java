@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.EvaluationCriterionEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaEvaluationCriterionRepository;
@@ -22,13 +23,16 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     private final JpaEvaluationCriterionRepository criterionRepo;
     private final JpaClassGroupRepository classGroupRepo;
     private final JpaCurriculumPlanRepository planRepo;
+    private final JpaAssessmentScoreRepository assessmentScoreRepo;
 
     public CriterionRepositoryAdapter(JpaEvaluationCriterionRepository criterionRepo,
                                       JpaClassGroupRepository classGroupRepo,
-                                      JpaCurriculumPlanRepository planRepo) {
+                                      JpaCurriculumPlanRepository planRepo,
+                                      JpaAssessmentScoreRepository assessmentScoreRepo) {
         this.criterionRepo = criterionRepo;
         this.classGroupRepo = classGroupRepo;
         this.planRepo = planRepo;
+        this.assessmentScoreRepo = assessmentScoreRepo;
     }
 
     @Override
@@ -75,6 +79,11 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     @Transactional
     public void deleteById(UUID id) {
         criterionRepo.deleteById(id);
+    }
+
+    @Override
+    public boolean hasScoresForCriterion(UUID id) {
+        return assessmentScoreRepo.existsByEvent_Criterion_Id(id);
     }
 
     private EvaluationCriterion toDomain(EvaluationCriterionEntity e) {

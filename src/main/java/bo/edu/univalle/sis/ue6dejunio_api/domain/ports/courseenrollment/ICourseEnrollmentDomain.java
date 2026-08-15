@@ -15,4 +15,5 @@ public interface ICourseEnrollmentDomain {
     Page<CourseStudent> studentsByCourse(UUID courseId, Pageable pageable);
     UUID courseOfEnrollment(UUID courseEnrollmentId);
     Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId);
+    int withdrawActiveEnrollments(UUID studentId);
 }

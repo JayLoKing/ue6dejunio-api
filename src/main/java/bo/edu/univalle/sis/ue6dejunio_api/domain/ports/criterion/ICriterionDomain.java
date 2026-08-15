@@ -14,4 +14,5 @@ public interface ICriterionDomain {
     Optional<EvaluationCriterion> findById(UUID id);
     List<EvaluationCriterion> list(UUID classGroupId, Integer trimester, String dimension);
     void deleteById(UUID id);
+    boolean hasScoresForCriterion(UUID id);
 }

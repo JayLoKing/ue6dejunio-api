@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +48,7 @@ public class GradebookController {
     }
 
     @GetMapping("/centralizer")
+    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
     @Operation(summary = "Centralizador del curso: todos los estudiantes con totales + promedio general")
     public ResponseEntity<PagedResponse<StudentSummaryResponse>> centralizer(
         @RequestParam("id_course") UUID courseId,
@@ -60,6 +62,7 @@ public class GradebookController {
     }
 
     @GetMapping("/attendance")
+    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
     @Operation(summary = "Asistencia diaria del curso. date opcional filtra una fecha")
     public ResponseEntity<PagedResponse<CourseAttendanceResponse>> attendance(
         @RequestParam("id_course") UUID courseId,

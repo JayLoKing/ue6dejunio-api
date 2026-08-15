@@ -46,3 +46,7 @@ src/test/resources/keys/private.pem
 
 ### Claude worktrees ###
 .claude/worktrees/
+
+### Agent / review tooling (personal, machine-specific) ###
+.atl/
+.gga

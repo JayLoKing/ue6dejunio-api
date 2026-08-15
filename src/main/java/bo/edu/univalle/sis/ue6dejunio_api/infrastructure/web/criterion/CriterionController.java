@@ -32,7 +32,7 @@ import java.util.UUID;
 @RestController
 @Validated
 @RequestMapping("/api/criteria")
-@Tag(name = "Criteria", description = "Criterios de evaluacion con nota permitida (peso). Tope por dimension")
+@Tag(name = "Criteria", description = "Criterios de evaluacion (solo nombre)")
 @SecurityRequirement(name = "bearerAuth")
 public class CriterionController {
 
@@ -44,7 +44,7 @@ public class CriterionController {
 
     @PostMapping
     @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
-    @Operation(summary = "Crear criterio. Valida que la suma de pesos por dimension no exceda el tope")
+    @Operation(summary = "Crear criterio")
     public ResponseEntity<CriterionResponse> create(@Valid @RequestBody CreateCriterionRequest r) {
         EvaluationCriterion c = criterionService.create(new CreateCriterionCommand(
             r.classGroupId(), r.trimester(), r.dimension(), r.name(), r.curriculumPlanId()));
@@ -69,7 +69,7 @@ public class CriterionController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar criterio (nombre, peso)")
+    @Operation(summary = "Actualizar criterio (nombre)")
     public ResponseEntity<CriterionResponse> update(@PathVariable UUID id,
                                                     @Valid @RequestBody UpdateCriterionRequest r) {
         EvaluationCriterion c = criterionService.update(id, new UpdateCriterionCommand(r.name()));

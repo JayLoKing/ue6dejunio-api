@@ -17,6 +17,10 @@ public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentSc
 
     List<AssessmentScoreEntity> findByCourseEnrollment_Id(UUID courseEnrollmentId);
 
+    boolean existsByEvent_Criterion_ClassGroup_Subject_Id(UUID subjectId);
+
+    boolean existsByEvent_Criterion_Id(UUID criterionId);
+
     @Query("""
         SELECT s.event.criterion.dimension, AVG(s.score)
         FROM AssessmentScoreEntity s

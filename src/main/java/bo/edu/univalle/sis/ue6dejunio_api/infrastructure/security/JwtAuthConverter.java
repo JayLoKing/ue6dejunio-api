@@ -5,6 +5,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +15,14 @@ import java.util.List;
 @Component
 public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
+    private static final String RESET_PURPOSE = "pwd_reset";
+
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
+        if (RESET_PURPOSE.equals(jwt.getClaimAsString("purpose"))) {
+            throw new InvalidBearerTokenException("Reset tokens cannot be used as access tokens");
+        }
+
         String role = jwt.getClaimAsString("role");
         Collection<GrantedAuthority> authorities = role == null || role.isBlank()
             ? List.of()

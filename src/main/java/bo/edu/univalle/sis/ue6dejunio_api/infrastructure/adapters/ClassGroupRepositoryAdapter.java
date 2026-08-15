@@ -138,6 +138,17 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         classGroupRepo.save(e);
     }
 
+    @Override
+    @Transactional
+    public ClassGroup setTeacher(UUID classGroupId, UUID teacherId) {
+        ClassGroupEntity e = classGroupRepo.findById(classGroupId)
+            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+        UserEntity teacher = userRepo.findById(teacherId)
+            .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
+        e.setTeacher(teacher);
+        return toDomain(classGroupRepo.save(e));
+    }
+
     private ClassGroup toDomain(ClassGroupEntity e) {
         CourseEntity c = e.getCourse();
         UserEntity t = e.getTeacher();

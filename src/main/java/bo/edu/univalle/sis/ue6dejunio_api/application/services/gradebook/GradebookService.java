@@ -2,12 +2,17 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentTrimesterSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.SubjectScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.AcademicScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
@@ -21,7 +26,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class GradebookService implements IGradebookService {
@@ -29,13 +36,19 @@ public class GradebookService implements IGradebookService {
     private final ICourseEnrollmentDomain enrollmentDomain;
     private final IScoreDomain scoreDomain;
     private final IAttendanceDomain attendanceDomain;
+    private final ICourseService courseService;
+    private final IClassGroupDomain classGroupDomain;
 
     public GradebookService(ICourseEnrollmentDomain enrollmentDomain,
                             IScoreDomain scoreDomain,
-                            IAttendanceDomain attendanceDomain) {
+                            IAttendanceDomain attendanceDomain,
+                            ICourseService courseService,
+                            IClassGroupDomain classGroupDomain) {
         this.enrollmentDomain = enrollmentDomain;
         this.scoreDomain = scoreDomain;
         this.attendanceDomain = attendanceDomain;
+        this.courseService = courseService;
+        this.classGroupDomain = classGroupDomain;
     }
 
     @Override
@@ -49,15 +62,27 @@ public class GradebookService implements IGradebookService {
     @Override
     @Transactional(readOnly = true)
     public Page<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, Pageable pageable) {
-        return enrollmentDomain.studentsByCourse(courseId, pageable)
-            .map(cs -> buildSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), trimester));
+        Page<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageable);
+        List<UUID> ids = page.getContent().stream().map(CourseStudent::courseEnrollmentId).toList();
+        Map<UUID, List<AcademicScore>> grouped = ids.isEmpty()
+            ? Map.of()
+            : scoreDomain.findByCourseEnrollmentIn(ids).stream()
+                .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
+        return page.map(cs -> buildSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), trimester,
+            grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, Pageable pageable) {
-        return enrollmentDomain.studentsByCourse(courseId, pageable).map(cs -> {
-            List<Attendance> att = attendanceDomain.dailyByCourseEnrollment(cs.courseEnrollmentId());
+        Page<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageable);
+        List<UUID> ids = page.getContent().stream().map(CourseStudent::courseEnrollmentId).toList();
+        Map<UUID, List<Attendance>> grouped = ids.isEmpty()
+            ? Map.of()
+            : attendanceDomain.dailyByCourseEnrollmentIn(ids).stream()
+                .collect(Collectors.groupingBy(Attendance::courseEnrollmentId));
+        return page.map(cs -> {
+            List<Attendance> att = grouped.getOrDefault(cs.courseEnrollmentId(), List.of());
             if (date != null) {
                 att = att.stream().filter(a -> date.equals(a.date())).toList();
             }
@@ -65,9 +90,26 @@ public class GradebookService implements IGradebookService {
         });
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public CourseOverview courseOverview(UUID courseId, Integer trimester, Pageable pageable) {
+        Course course = courseService.getById(courseId);
+        List<ClassGroup> classGroups = classGroupDomain.byCourse(courseId);
+        Page<StudentTrimesterSummary> students = centralizer(courseId, trimester, pageable);
+        return new CourseOverview(course, classGroups, students);
+    }
+
     private StudentTrimesterSummary buildSummary(UUID courseEnrollmentId, UUID studentId,
                                                  String fullName, Integer trimester) {
-        List<AcademicScore> scores = scoreDomain.findByCourseEnrollment(courseEnrollmentId).stream()
+        return buildSummary(courseEnrollmentId, studentId, fullName, trimester,
+            scoreDomain.findByCourseEnrollment(courseEnrollmentId));
+    }
+
+    /** Overload consuming a pre-grouped (batch-loaded) score list; keeps the averaging math verbatim. */
+    private StudentTrimesterSummary buildSummary(UUID courseEnrollmentId, UUID studentId,
+                                                 String fullName, Integer trimester,
+                                                 List<AcademicScore> allScores) {
+        List<AcademicScore> scores = allScores.stream()
             .filter(s -> trimester.equals(s.trimester()))
             .toList();
         List<SubjectScore> subjects = new ArrayList<>();

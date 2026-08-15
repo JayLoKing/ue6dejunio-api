@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -97,6 +98,15 @@ public class AttendanceRepositoryAdapter implements IAttendanceDomain {
     @Override
     public List<Attendance> dailyByCourseEnrollment(UUID courseEnrollmentId) {
         return attendanceRepo.findByCourseEnrollment_IdAndClassGroupIsNullOrderByDate(courseEnrollmentId)
+            .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<Attendance> dailyByCourseEnrollmentIn(Collection<UUID> courseEnrollmentIds) {
+        if (courseEnrollmentIds.isEmpty()) {
+            return List.of();
+        }
+        return attendanceRepo.findByCourseEnrollment_IdInAndClassGroupIsNullOrderByDate(courseEnrollmentIds)
             .stream().map(this::toDomain).toList();
     }
 

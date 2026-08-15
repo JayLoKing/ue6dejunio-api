@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.criterion;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentDimension;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.CreateCriterionCommand;
@@ -39,6 +40,10 @@ public class CriterionService implements ICriterionService {
     @Transactional
     public EvaluationCriterion update(UUID id, UpdateCriterionCommand c) {
         getById(id);
+        if (criterionDomain.hasScoresForCriterion(id)) {
+            throw new ConflictException(
+                "el criterio no puede modificarse porque ya cuenta con calificaciones registradas");
+        }
         return criterionDomain.update(id, c.name());
     }
 
@@ -62,6 +67,10 @@ public class CriterionService implements ICriterionService {
     @Transactional
     public void delete(UUID id) {
         getById(id);
+        if (criterionDomain.hasScoresForCriterion(id)) {
+            throw new ConflictException(
+                "el criterio no puede modificarse porque ya cuenta con calificaciones registradas");
+        }
         criterionDomain.deleteById(id);
     }
 }

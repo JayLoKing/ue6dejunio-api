@@ -1,10 +1,16 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.config;
 
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.ClientIpResolver;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitProperties;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitStore;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitingFilter;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.JwtAuthConverter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -20,6 +26,8 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
         "/api/auth/login",
+        "/api/auth/forgot-password",
+        "/api/auth/reset-password",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html",
@@ -30,12 +38,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(
         HttpSecurity http,
         JwtAuthConverter jwtAuthConverter,
+        RateLimitingFilter rateLimitingFilter,
         @Qualifier("corsConfigurationSource") CorsConfigurationSource corsSource
     ) throws Exception {
         http
             .cors(c -> c.configurationSource(corsSource))
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(PUBLIC_PATHS).permitAll()
@@ -67,5 +77,28 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {
         return cfg.getAuthenticationManager();
+    }
+
+    @Bean
+    public RateLimitingFilter rateLimitingFilter(
+        RateLimitProperties properties, ClientIpResolver ipResolver, RateLimitStore store
+    ) {
+        return new RateLimitingFilter(properties, ipResolver, store);
+    }
+
+    /**
+     * {@link RateLimitingFilter} is already wired into the security chain via
+     * {@link #filterChain}. Disabling its servlet-container auto-registration prevents Spring
+     * Boot from also registering it as a plain servlet {@code Filter} bean, which would otherwise
+     * run it a second time per request.
+     */
+    @Bean
+    public FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration(
+        RateLimitingFilter rateLimitingFilter
+    ) {
+        FilterRegistrationBean<RateLimitingFilter> registration =
+            new FilterRegistrationBean<>(rateLimitingFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +13,5 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     boolean existsByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
     Optional<CourseEnrollmentEntity> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
     Page<CourseEnrollmentEntity> findByCourse_Id(UUID courseId, Pageable pageable);
+    List<CourseEnrollmentEntity> findByStudent_IdAndStatus(UUID studentId, String status);
 }

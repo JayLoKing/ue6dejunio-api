@@ -14,4 +14,5 @@ public interface ISubjectDomain {
     boolean usedInClassGroups(UUID id);
     Page<Subject> list(Pageable pageable);
     void deactivate(UUID id);
+    boolean hasScoresForSubject(UUID id);
 }

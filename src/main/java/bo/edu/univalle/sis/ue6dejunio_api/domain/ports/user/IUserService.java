@@ -16,4 +16,5 @@ public interface IUserService {
     User getById(UUID id);
     Page<UsersList> list(Pageable pageable, @Nullable String search, java.util.UUID excludeUserId);
     void deactivate(UUID id);
+    User activate(UUID id);
 }

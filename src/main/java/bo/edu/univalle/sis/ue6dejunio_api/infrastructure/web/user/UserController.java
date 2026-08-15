@@ -99,4 +99,10 @@ public class UserController {
         userService.deactivate(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/activate")
+    @Operation(summary = "Activar usuario (idempotente)")
+    public ResponseEntity<UserResponse> activate(@PathVariable UUID id) {
+        return ResponseEntity.ok(UserResponse.from(userService.activate(id)));
+    }
 }

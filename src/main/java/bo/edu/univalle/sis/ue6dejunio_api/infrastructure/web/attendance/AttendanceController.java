@@ -35,6 +35,7 @@ public class AttendanceController {
     }
 
     @PostMapping("/daily")
+    @PreAuthorize("@authz.canWriteDailyAttendance(authentication, #r.courseEnrollmentId())")
     @Operation(summary = "Asistencia diaria de curso (id_class_group NULL). Regularidad oficial")
     public ResponseEntity<AttendanceResponse> daily(@Valid @RequestBody DailyAttendanceRequest r) {
         return ResponseEntity.ok(AttendanceResponse.from(
@@ -42,6 +43,7 @@ public class AttendanceController {
     }
 
     @PostMapping("/daily/batch")
+    @PreAuthorize("@authz.canWriteDailyBatch(authentication, #r.records().![courseEnrollmentId()])")
     @Operation(summary = "Asistencia diaria de todo el curso en una fecha")
     public ResponseEntity<DailyBatchResult> dailyBatch(@Valid @RequestBody DailyBatchRequest r) {
         List<IAttendanceService.DailyMark> marks = r.records().stream()
@@ -59,6 +61,7 @@ public class AttendanceController {
     }
 
     @GetMapping
+    @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
     @Operation(summary = "Asistencia de un course_enrollment (diaria + sesiones)")
     public ResponseEntity<List<AttendanceResponse>> byCourseEnrollment(
         @RequestParam("id_course_enrollment") UUID courseEnrollmentId) {

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,6 +71,16 @@ public class ScoreRepositoryAdapter implements IScoreDomain {
     @Override
     public List<AcademicScore> findByCourseEnrollment(UUID courseEnrollmentId) {
         return scoreRepo.findByCourseEnrollment_IdOrderByClassGroup_Subject_NameAscTrimesterAsc(courseEnrollmentId)
+            .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<AcademicScore> findByCourseEnrollmentIn(Collection<UUID> courseEnrollmentIds) {
+        if (courseEnrollmentIds.isEmpty()) {
+            return List.of();
+        }
+        return scoreRepo
+            .findByCourseEnrollment_IdInOrderByClassGroup_Subject_NameAscTrimesterAsc(courseEnrollmentIds)
             .stream().map(this::toDomain).toList();
     }
 

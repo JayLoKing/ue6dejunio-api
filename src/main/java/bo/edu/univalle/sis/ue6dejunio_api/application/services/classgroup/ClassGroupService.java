@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.classgroup;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -36,15 +37,7 @@ public class ClassGroupService implements IClassGroupService {
             if (a.teacherId() == null) {
                 throw new IllegalArgumentException("Cada materia requiere un docente asignado");
             }
-            boolean technicalSubject = classGroupDomain.subjectIsTechnical(a.subjectId());
-            if (technicalSubject && !classGroupDomain.userIsTechnicalTeacher(a.teacherId())) {
-                throw new IllegalArgumentException(
-                    "Materia tecnica requiere docente tecnico: " + a.subjectId());
-            }
-            if (!technicalSubject && !classGroupDomain.userIsNonTechnicalTeacher(a.teacherId())) {
-                throw new IllegalArgumentException(
-                    "Materia no tecnica requiere docente de aula (no tecnico): " + a.subjectId());
-            }
+            validateTeacherMatchesSubject(a.subjectId(), a.teacherId());
             if (classGroupDomain.existsByCourseAndSubject(command.courseId(), a.subjectId())) {
                 throw new DuplicateResourceException("class_group (materia ya asignada al curso)",
                     a.subjectId().toString());
@@ -78,5 +71,31 @@ public class ClassGroupService implements IClassGroupService {
     public void delete(UUID id) {
         getById(id);
         classGroupDomain.setActive(id, false);
+    }
+
+    @Override
+    @Transactional
+    public ClassGroup reassignTeacher(UUID courseId, UUID classGroupId, UUID teacherId) {
+        ClassGroup cg = classGroupDomain.findById(classGroupId)
+            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+        if (!cg.courseId().equals(courseId)) {
+            throw new ResourceNotFoundException("ClassGroup", classGroupId);
+        }
+        if (!classGroupDomain.userIsTeacher(teacherId)) {
+            throw new ResourceNotFoundException("Docente", teacherId);
+        }
+        validateTeacherMatchesSubject(cg.subjectId(), teacherId);
+        return classGroupDomain.setTeacher(classGroupId, teacherId);
+    }
+
+    private void validateTeacherMatchesSubject(UUID subjectId, UUID teacherId) {
+        boolean technicalSubject = classGroupDomain.subjectIsTechnical(subjectId);
+        if (technicalSubject && !classGroupDomain.userIsTechnicalTeacher(teacherId)) {
+            throw new ConflictException("Materia tecnica requiere docente tecnico: " + subjectId);
+        }
+        if (!technicalSubject && !classGroupDomain.userIsNonTechnicalTeacher(teacherId)) {
+            throw new ConflictException(
+                "Materia no tecnica requiere docente de aula (no tecnico): " + subjectId);
+        }
     }
 }

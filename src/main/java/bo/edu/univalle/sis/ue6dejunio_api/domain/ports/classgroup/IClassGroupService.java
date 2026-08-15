@@ -12,4 +12,5 @@ public interface IClassGroupService {
     List<ClassGroup> byTeacher(UUID teacherId);
     ClassGroup getById(UUID id);
     void delete(UUID id);
+    ClassGroup reassignTeacher(UUID courseId, UUID classGroupId, UUID teacherId);
 }

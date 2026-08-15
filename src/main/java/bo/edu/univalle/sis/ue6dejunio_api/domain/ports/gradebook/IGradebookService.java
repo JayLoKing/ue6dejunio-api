@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentTrimesterSummary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,4 +13,5 @@ public interface IGradebookService {
     StudentTrimesterSummary studentSummary(UUID courseEnrollmentId, Integer trimester);
     Page<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, Pageable pageable);
     Page<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, Pageable pageable);
+    CourseOverview courseOverview(UUID courseId, Integer trimester, Pageable pageable);
 }

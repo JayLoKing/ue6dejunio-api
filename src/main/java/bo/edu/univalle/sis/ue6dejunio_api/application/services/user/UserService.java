@@ -107,4 +107,12 @@ public class UserService implements IUserService {
     public void deactivate(UUID id) {
         userDomain.deactivate(id);
     }
+
+    @Override
+    public User activate(UUID id) {
+        User user = userDomain.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+        user.setActive(true);
+        return userDomain.save(user);
+    }
 }

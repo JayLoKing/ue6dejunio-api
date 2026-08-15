@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.SubjectEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
 import org.springframework.data.domain.Page;
@@ -20,10 +21,13 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
 
     private final JpaSubjectRepository subjectRepo;
     private final JpaClassGroupRepository classGroupRepo;
+    private final JpaAssessmentScoreRepository assessmentScoreRepo;
 
-    public SubjectRepositoryAdapter(JpaSubjectRepository subjectRepo, JpaClassGroupRepository classGroupRepo) {
+    public SubjectRepositoryAdapter(JpaSubjectRepository subjectRepo, JpaClassGroupRepository classGroupRepo,
+                                    JpaAssessmentScoreRepository assessmentScoreRepo) {
         this.subjectRepo = subjectRepo;
         this.classGroupRepo = classGroupRepo;
+        this.assessmentScoreRepo = assessmentScoreRepo;
     }
 
     @Override
@@ -69,6 +73,11 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
             .orElseThrow(() -> new ResourceNotFoundException("Subject", id));
         e.setActive(false);
         subjectRepo.save(e);
+    }
+
+    @Override
+    public boolean hasScoresForSubject(UUID id) {
+        return assessmentScoreRepo.existsByEvent_Criterion_ClassGroup_Subject_Id(id);
     }
 
     private Subject toDomain(SubjectEntity e) {

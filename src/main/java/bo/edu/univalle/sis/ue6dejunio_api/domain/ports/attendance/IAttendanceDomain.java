@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,4 +16,5 @@ public interface IAttendanceDomain {
     Attendance upsertSession(UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status);
     List<Attendance> byCourseEnrollment(UUID courseEnrollmentId);
     List<Attendance> dailyByCourseEnrollment(UUID courseEnrollmentId);
+    List<Attendance> dailyByCourseEnrollmentIn(Collection<UUID> courseEnrollmentIds);
 }

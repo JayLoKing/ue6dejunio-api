@@ -1,10 +1,14 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.StudentMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,5 +57,23 @@ public class StudentRepositoryAdapter implements IStudentDomain {
     @Override
     public boolean existsByIdentityCard(String identityCard) {
         return repo.existsByIdentityCard(identityCard);
+    }
+
+    @Override
+    public Page<StudentDirectoryItem> searchDirectory(String q, UUID courseId, Pageable pageable) {
+        if (q == null || q.isBlank()) {
+            return repo.listDirectory(courseId, pageable);
+        }
+        return repo.searchDirectory(q, courseId, pageable);
+    }
+
+    @Override
+    @Transactional
+    public void updateStatus(UUID studentId, String status, String statusReason) {
+        StudentEntity entity = repo.findById(studentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
+        entity.setStatus(status);
+        entity.setStatusReason(statusReason);
+        repo.save(entity);
     }
 }

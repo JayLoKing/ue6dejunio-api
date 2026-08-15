@@ -86,4 +86,38 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.create(validCommand()))
             .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    void activate_deactivatedUser_setsActiveTrueAndSaves() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = User.builder().id(id).email("ana@ue6.bo").active(false).build();
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User result = userService.activate(id);
+
+        assertThat(result.isActive()).isTrue();
+        verify(userDomain).save(user);
+    }
+
+    @Test
+    void activate_alreadyActiveUser_idempotent_staysActiveNoError() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = User.builder().id(id).email("ana@ue6.bo").active(true).build();
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User result = userService.activate(id);
+
+        assertThat(result.isActive()).isTrue();
+    }
+
+    @Test
+    void activate_nonexistentUser_throwsResourceNotFound() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.activate(id))
+            .isInstanceOf(ResourceNotFoundException.class);
+    }
 }

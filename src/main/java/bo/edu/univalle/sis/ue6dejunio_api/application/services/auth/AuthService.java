@@ -8,10 +8,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordComma
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +30,19 @@ public class AuthService implements IAuthService {
     private final PasswordEncoder passwordEncoder;
     private final IJwtService jwtService;
     private final ICourseDomain courseDomain;
+    private final IEmailService emailService;
+    private final String resetUrl;
 
     public AuthService(IUserDomain userDomain, PasswordEncoder passwordEncoder,
-                       IJwtService jwtService, ICourseDomain courseDomain) {
+                       IJwtService jwtService, ICourseDomain courseDomain,
+                       IEmailService emailService,
+                       @Value("${app.frontend.reset-url}") String resetUrl) {
         this.userDomain = userDomain;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.courseDomain = courseDomain;
+        this.emailService = emailService;
+        this.resetUrl = resetUrl;
     }
 
     @Override
@@ -77,6 +86,30 @@ public class AuthService implements IAuthService {
             throw new UserInactiveException();
         }
         user.setPassword(passwordEncoder.encode(command.newPassword()));
+        user.setMustChangePassword(false);
+        userDomain.save(user);
+    }
+
+    @Override
+    public void forgotPassword(String email) {
+        Optional<User> maybeUser = userDomain.findByEmail(email);
+        if (maybeUser.isPresent() && maybeUser.get().isActive()) {
+            User user = maybeUser.get();
+            String token = jwtService.issuePasswordResetToken(user);
+            String link = resetUrl + "?token=" + token;
+            emailService.sendPasswordReset(user.getEmail(), user.fullName(), link);
+        }
+        // Enumeration-safe: always returns normally regardless of whether the email exists.
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        java.util.UUID userId = jwtService.validatePasswordResetToken(token);
+        User user = userDomain.findById(userId)
+            .orElseThrow(InvalidResetTokenException::new);
+
+        user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
         userDomain.save(user);
     }

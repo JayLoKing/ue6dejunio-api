@@ -8,4 +8,8 @@ import java.util.UUID;
 public interface IJwtService {
     AuthenticatedUser issueToken(User user, String gradeName, String parallelName,
                                  UUID courseId, Boolean technical);
+
+    String issuePasswordResetToken(User user);
+
+    UUID validatePasswordResetToken(String token);
 }

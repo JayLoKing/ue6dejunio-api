@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,6 +37,7 @@ public class AssessmentScoreController {
     }
 
     @PostMapping
+    @PreAuthorize("@authz.canWriteScoreEvent(authentication, #r.eventId())")
     @Operation(summary = "Registrar/actualizar nota (course_enrollment + actividad). Consolida dimension")
     public ResponseEntity<AssessmentScoreResponse> setScore(@Valid @RequestBody SetScoreRequest r,
                                                            JwtAuthenticationToken token) {
@@ -46,6 +48,7 @@ public class AssessmentScoreController {
     }
 
     @GetMapping("/event/{eventId}")
+    @PreAuthorize("@authz.canReadScoreEvent(authentication, #eventId)")
     @Operation(summary = "Notas de todos los estudiantes en una actividad")
     public ResponseEntity<List<AssessmentScoreResponse>> byEvent(@PathVariable UUID eventId) {
         return ResponseEntity.ok(scoreService.listByEvent(eventId).stream()
@@ -53,6 +56,7 @@ public class AssessmentScoreController {
     }
 
     @GetMapping
+    @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
     @Operation(summary = "Notas de un estudiante (por course_enrollment)")
     public ResponseEntity<List<AssessmentScoreResponse>> byCourseEnrollment(
         @RequestParam("id_course_enrollment") UUID courseEnrollmentId) {
@@ -61,6 +65,7 @@ public class AssessmentScoreController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@authz.canWriteScore(authentication, #id)")
     @Operation(summary = "Eliminar nota (consolida)")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         scoreService.delete(id);

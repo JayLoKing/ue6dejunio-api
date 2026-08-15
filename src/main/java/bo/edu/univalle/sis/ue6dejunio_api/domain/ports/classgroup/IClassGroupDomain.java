@@ -22,4 +22,5 @@ public interface IClassGroupDomain {
     UUID courseIdOfClassGroup(UUID classGroupId);
     UUID teacherIdOfClassGroup(UUID classGroupId);
     void setActive(UUID classGroupId, boolean active);
+    ClassGroup setTeacher(UUID classGroupId, UUID teacherId);
 }
