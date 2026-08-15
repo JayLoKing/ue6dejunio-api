@@ -7,4 +7,5 @@ import java.util.Optional;
 
 public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEntity, Integer> {
     Optional<AcademicYearEntity> findTopByOrderByYearDesc();
+    Optional<AcademicYearEntity> findByYear(Integer year);
 }
