@@ -70,6 +70,12 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
+    public Page<CourseStudent> activeStudentsByCourse(UUID courseId, Pageable pageable) {
+        return enrollmentRepo.findByCourse_IdAndStatus(courseId, STATUS_EFFECTIVE, pageable)
+            .map(this::toCourseStudent);
+    }
+
+    @Override
     public Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId) {
         return enrollmentRepo.findById(courseEnrollmentId).map(this::toCourseStudent);
     }

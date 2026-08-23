@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
@@ -55,7 +56,7 @@ public class AttendanceService implements IAttendanceService {
     @Override
     @Transactional
     public Attendance registerDaily(UUID courseEnrollmentId, LocalDate date, String status) {
-        requireCurrentDay(date);
+        requireEditableSchoolDay(date);
         if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
             throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }
@@ -65,7 +66,7 @@ public class AttendanceService implements IAttendanceService {
     @Override
     @Transactional
     public DailyBatchResult registerDailyBatch(LocalDate date, List<DailyMark> marks) {
-        requireCurrentDay(date);
+        requireEditableSchoolDay(date);
         if (marks.isEmpty()) {
             return new DailyBatchResult(0, 0);
         }
@@ -93,16 +94,68 @@ public class AttendanceService implements IAttendanceService {
         return new DailyBatchResult(marks.size(), statusByCourseEnrollmentId.size());
     }
 
-    private void requireCurrentDay(LocalDate date) {
-        if (!LocalDate.now(clock).equals(date)) {
-            throw new ConflictException("no puede modificar registros de dias anteriores");
+    @Override
+    @Transactional
+    public DailyBatchResult registerSessionBatch(UUID classGroupId, LocalDate date, List<DailyMark> marks) {
+        requireEditableSchoolDay(date);
+        if (marks.isEmpty()) {
+            return new DailyBatchResult(0, 0);
+        }
+        UUID courseId = attendanceDomain.courseOfClassGroup(classGroupId);
+        List<UUID> courseEnrollmentIds = marks.stream().map(DailyMark::courseEnrollmentId).toList();
+
+        Set<UUID> existingIds = attendanceDomain.existingCourseEnrollmentIds(courseEnrollmentIds);
+        for (DailyMark m : marks) {
+            if (!existingIds.contains(m.courseEnrollmentId())) {
+                throw new ResourceNotFoundException("CourseEnrollment", m.courseEnrollmentId());
+            }
+        }
+
+        // Second bounded query instead of a course lookup per mark. Everyone in the batch must
+        // belong to the course this class group teaches, and the whole batch fails before
+        // anything is persisted — same atomicity contract as the daily batch.
+        Set<UUID> inCourse = attendanceDomain.courseEnrollmentIdsInCourse(courseEnrollmentIds, courseId);
+        for (DailyMark m : marks) {
+            if (!inCourse.contains(m.courseEnrollmentId())) {
+                throw new ConflictException("El estudiante no pertenece al curso de la materia");
+            }
+        }
+
+        Map<UUID, String> statusByCourseEnrollmentId = new LinkedHashMap<>();
+        for (DailyMark m : marks) {
+            statusByCourseEnrollmentId.put(m.courseEnrollmentId(), m.status());
+        }
+        attendanceDomain.upsertSessionBatch(classGroupId, date, statusByCourseEnrollmentId);
+        return new DailyBatchResult(marks.size(), statusByCourseEnrollmentId.size());
+    }
+
+    /**
+     * Attendance is writable for any school day (Mon-Fri) of the current ISO week, so a teacher
+     * who forgot to mark — or marked wrong — can still fix it before the week closes. Once the
+     * week rolls over the records are frozen, because they feed regularity reporting.
+     *
+     * <p>The window is anchored on the ISO week of {@code today}, so Saturday and Sunday still
+     * allow correcting that same week's Mon-Fri; only the date being written must be a school day.
+     */
+    private void requireEditableSchoolDay(LocalDate date) {
+        LocalDate today = LocalDate.now(clock);
+        if (date.isAfter(today)) {
+            throw new ConflictException("no puede registrar asistencia de fechas futuras");
+        }
+        DayOfWeek day = date.getDayOfWeek();
+        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
+            throw new ConflictException("no se registra asistencia en sabados ni domingos");
+        }
+        if (date.isBefore(today.with(DayOfWeek.MONDAY))) {
+            throw new ConflictException(
+                "solo puede modificar registros de la semana en curso (lunes a viernes)");
         }
     }
 
     @Override
     @Transactional
     public Attendance registerSession(UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
-        requireCurrentDay(date);
+        requireEditableSchoolDay(date);
         if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
             throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }

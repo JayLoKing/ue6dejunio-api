@@ -1,11 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.attendance;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyBatchResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AttendanceResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.BatchResultResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.DailyAttendanceRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.DailyBatchRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.SessionAttendanceRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.SessionBatchRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,11 +46,12 @@ public class AttendanceController {
     @PostMapping("/daily/batch")
     @PreAuthorize("@authz.canWriteDailyBatch(authentication, #r.records().![courseEnrollmentId()])")
     @Operation(summary = "Asistencia diaria de todo el curso en una fecha")
-    public ResponseEntity<DailyBatchResult> dailyBatch(@Valid @RequestBody DailyBatchRequest r) {
+    public ResponseEntity<BatchResultResponse> dailyBatch(@Valid @RequestBody DailyBatchRequest r) {
         List<IAttendanceService.DailyMark> marks = r.records().stream()
             .map(m -> new IAttendanceService.DailyMark(m.courseEnrollmentId(), m.status()))
             .toList();
-        return ResponseEntity.ok(attendanceService.registerDailyBatch(r.date(), marks));
+        return ResponseEntity.ok(
+            BatchResultResponse.from(attendanceService.registerDailyBatch(r.date(), marks)));
     }
 
     @PostMapping("/session")
@@ -58,6 +60,17 @@ public class AttendanceController {
     public ResponseEntity<AttendanceResponse> session(@Valid @RequestBody SessionAttendanceRequest r) {
         return ResponseEntity.ok(AttendanceResponse.from(
             attendanceService.registerSession(r.courseEnrollmentId(), r.classGroupId(), r.date(), r.status())));
+    }
+
+    @PostMapping("/session/batch")
+    @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
+    @Operation(summary = "Asistencia de sesion de toda la materia en una fecha")
+    public ResponseEntity<BatchResultResponse> sessionBatch(@Valid @RequestBody SessionBatchRequest r) {
+        List<IAttendanceService.DailyMark> marks = r.records().stream()
+            .map(m -> new IAttendanceService.DailyMark(m.courseEnrollmentId(), m.status()))
+            .toList();
+        return ResponseEntity.ok(BatchResultResponse.from(
+            attendanceService.registerSessionBatch(r.classGroupId(), r.date(), marks)));
     }
 
     @GetMapping

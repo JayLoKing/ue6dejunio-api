@@ -1,11 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
     id_role SERIAL PRIMARY KEY,
     name varchar(20) NOT NULL UNIQUE
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id_user uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ci varchar(15) NOT NULL UNIQUE,
     names varchar(100) NOT NULL,
@@ -23,16 +23,16 @@ CREATE TABLE users (
     updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE academic_years (id_academic_year SERIAL PRIMARY KEY, year integer NOT NULL UNIQUE);
-CREATE TABLE levels (id_level SERIAL PRIMARY KEY, name varchar(100) NOT NULL UNIQUE);
-CREATE TABLE grades (
+CREATE TABLE IF NOT EXISTS academic_years (id_academic_year SERIAL PRIMARY KEY, year integer NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS levels (id_level SERIAL PRIMARY KEY, name varchar(100) NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS grades (
     id_grade SERIAL PRIMARY KEY,
     id_level integer NOT NULL REFERENCES levels(id_level) ON DELETE RESTRICT,
     name varchar(50) NOT NULL,
     CONSTRAINT uq_grade_per_level UNIQUE (id_level, name)
 );
-CREATE TABLE parallels (id_parallel SERIAL PRIMARY KEY, name char(1) NOT NULL UNIQUE);
-CREATE TABLE subjects (
+CREATE TABLE IF NOT EXISTS parallels (id_parallel SERIAL PRIMARY KEY, name char(1) NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS subjects (
     id_subject uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name varchar(100) NOT NULL,
     is_technical boolean DEFAULT false,
@@ -40,7 +40,7 @@ CREATE TABLE subjects (
     CONSTRAINT uq_subject_name UNIQUE (name)
 );
 
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
     id_student uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     rude_code varchar(20) NOT NULL UNIQUE,
     identity_card varchar(15) NOT NULL UNIQUE,
@@ -53,7 +53,7 @@ CREATE TABLE students (
     created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE courses (
+CREATE TABLE IF NOT EXISTS courses (
     id_course uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_grade integer NOT NULL REFERENCES grades(id_grade) ON DELETE RESTRICT,
     id_parallel integer NOT NULL REFERENCES parallels(id_parallel) ON DELETE RESTRICT,
@@ -63,7 +63,7 @@ CREATE TABLE courses (
     CONSTRAINT uq_course UNIQUE (id_grade, id_parallel, id_academic_year)
 );
 
-CREATE TABLE course_enrollments (
+CREATE TABLE IF NOT EXISTS course_enrollments (
     id_course_enrollment uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE RESTRICT,
     id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE RESTRICT,
@@ -72,7 +72,7 @@ CREATE TABLE course_enrollments (
     CONSTRAINT uq_course_enrollment UNIQUE (id_student, id_course)
 );
 
-CREATE TABLE class_groups (
+CREATE TABLE IF NOT EXISTS class_groups (
     id_class_group uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE RESTRICT,
     id_subject uuid NOT NULL REFERENCES subjects(id_subject) ON DELETE RESTRICT,
@@ -81,7 +81,7 @@ CREATE TABLE class_groups (
     CONSTRAINT uq_class_group UNIQUE (id_course, id_subject)
 );
 
-CREATE TABLE curriculum_plans (
+CREATE TABLE IF NOT EXISTS curriculum_plans (
     id_curriculum_plan uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_class_group uuid REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
     trimester integer CHECK (trimester BETWEEN 1 AND 3),
@@ -97,7 +97,7 @@ CREATE TABLE curriculum_plans (
     updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL
 );
 
-CREATE TABLE curriculum_plan_progress (
+CREATE TABLE IF NOT EXISTS curriculum_plan_progress (
     id_progress uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
     progress_date date NOT NULL DEFAULT CURRENT_DATE,
@@ -108,7 +108,7 @@ CREATE TABLE curriculum_plan_progress (
     created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE curriculum_adaptations (
+CREATE TABLE IF NOT EXISTS curriculum_adaptations (
     id_curriculum_adaptation uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
     id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE CASCADE,
@@ -118,7 +118,7 @@ CREATE TABLE curriculum_adaptations (
     created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE evaluation_criteria (
+CREATE TABLE IF NOT EXISTS evaluation_criteria (
     id_criterion uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
     trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
@@ -129,7 +129,7 @@ CREATE TABLE evaluation_criteria (
     CONSTRAINT uq_criterion UNIQUE (id_class_group, trimester, dimension, name)
 );
 
-CREATE TABLE assessment_events (
+CREATE TABLE IF NOT EXISTS assessment_events (
     id_assessment_event uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_criterion uuid NOT NULL REFERENCES evaluation_criteria(id_criterion) ON DELETE CASCADE,
     title varchar(150) NOT NULL,
@@ -138,7 +138,7 @@ CREATE TABLE assessment_events (
     created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE assessment_scores (
+CREATE TABLE IF NOT EXISTS assessment_scores (
     id_assessment_score uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE CASCADE,
     id_assessment_event uuid NOT NULL REFERENCES assessment_events(id_assessment_event) ON DELETE CASCADE,
@@ -148,7 +148,7 @@ CREATE TABLE assessment_scores (
     CONSTRAINT uq_assessment_score UNIQUE (id_course_enrollment, id_assessment_event)
 );
 
-CREATE TABLE academic_scores (
+CREATE TABLE IF NOT EXISTS academic_scores (
     id_academic_score uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE RESTRICT,
     id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE RESTRICT,
@@ -164,17 +164,21 @@ CREATE TABLE academic_scores (
     CONSTRAINT uq_academic_score UNIQUE (id_course_enrollment, id_class_group, trimester)
 );
 
-CREATE TABLE attendance (
+CREATE TABLE IF NOT EXISTS attendance (
     id_attendance uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE CASCADE,
     id_class_group uuid REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
     date date NOT NULL,
-    status varchar(15) NOT NULL CHECK (status IN ('Present','Absent','Excused','Late'))
+    status varchar(15) NOT NULL CHECK (status IN ('Present','Absent','Excused','Late')),
+    created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX uq_att_daily ON attendance (id_course_enrollment, date) WHERE id_class_group IS NULL;
-CREATE UNIQUE INDEX uq_att_session ON attendance (id_course_enrollment, date, id_class_group) WHERE id_class_group IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_att_daily ON attendance (id_course_enrollment, date) WHERE id_class_group IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_att_session ON attendance (id_course_enrollment, date, id_class_group) WHERE id_class_group IS NOT NULL;
 
-CREATE TABLE academic_trimesters (
+CREATE TABLE IF NOT EXISTS academic_trimesters (
     id_academic_trimester uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_academic_year integer NOT NULL REFERENCES academic_years(id_academic_year) ON DELETE CASCADE,
     trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
@@ -184,7 +188,7 @@ CREATE TABLE academic_trimesters (
     CONSTRAINT chk_trimester_dates CHECK (end_date >= start_date)
 );
 
-CREATE TABLE risk_predictions (
+CREATE TABLE IF NOT EXISTS risk_predictions (
     id_risk_prediction uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_student uuid REFERENCES students(id_student) ON DELETE CASCADE,
     trimester integer, risk_level varchar(20), probability_score numeric(5,4),
@@ -192,22 +196,28 @@ CREATE TABLE risk_predictions (
     CONSTRAINT uq_risk_pred UNIQUE (id_student, trimester)
 );
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id_notification uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     sender_id uuid REFERENCES users(id_user) ON DELETE CASCADE,
     receiver_id uuid REFERENCES users(id_user) ON DELETE CASCADE,
     message text NOT NULL, is_read boolean DEFAULT false, created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO roles (name) VALUES ('Director'), ('Secretary'), ('Teacher');
-INSERT INTO levels (name) VALUES ('Primaria Comunitaria Vocacional');
-INSERT INTO grades (id_level, name) VALUES (1, 'Primero');
-INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C');
-INSERT INTO academic_years (year) VALUES (2026);
-INSERT INTO subjects (name) VALUES ('Matematicas'), ('Lenguaje');
+-- The catalog seed runs once per Spring context, and more than one context is created against the
+-- same shared container (ProdProfileHardeningIT activates a second profile). Every statement here
+-- is therefore idempotent: re-running the script must be a no-op, not a duplicate-key failure.
+INSERT INTO roles (name) VALUES ('Director'), ('Secretary'), ('Teacher') ON CONFLICT DO NOTHING;
+INSERT INTO levels (name) VALUES ('Primaria Comunitaria Vocacional') ON CONFLICT DO NOTHING;
+INSERT INTO grades (id_level, name)
+    SELECT id_level, 'Primero' FROM levels WHERE name = 'Primaria Comunitaria Vocacional'
+    ON CONFLICT DO NOTHING;
+INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C') ON CONFLICT DO NOTHING;
+INSERT INTO academic_years (year) VALUES (2026) ON CONFLICT DO NOTHING;
+INSERT INTO subjects (name) VALUES ('Matematicas'), ('Lenguaje') ON CONFLICT DO NOTHING;
 INSERT INTO academic_trimesters (id_academic_year, trimester, start_date, end_date)
     SELECT id_academic_year, 1, DATE '2026-02-01', DATE '2026-05-31' FROM academic_years WHERE year = 2026
     UNION ALL
     SELECT id_academic_year, 2, DATE '2026-06-01', DATE '2026-08-31' FROM academic_years WHERE year = 2026
     UNION ALL
-    SELECT id_academic_year, 3, DATE '2026-09-01', DATE '2026-11-30' FROM academic_years WHERE year = 2026;
+    SELECT id_academic_year, 3, DATE '2026-09-01', DATE '2026-11-30' FROM academic_years WHERE year = 2026
+    ON CONFLICT DO NOTHING;

@@ -151,7 +151,7 @@ class GradebookServiceGroupingTest {
             courseStudent(enrollmentA, studentA, "Ana", "Perez"),
             courseStudent(enrollmentB, studentB, "Luis", "Gomez")
         ), pageable, 2);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
 
         Attendance attA1 = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 1), "Present");
         Attendance attA2 = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 2), "Absent");
@@ -173,7 +173,7 @@ class GradebookServiceGroupingTest {
         Page<CourseStudent> page = new PageImpl<>(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
         ), pageable, 1);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
         when(attendanceDomain.dailyByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
         Page<CourseAttendanceRow> result = service.courseAttendance(courseId, null, pageable);
@@ -186,7 +186,7 @@ class GradebookServiceGroupingTest {
         Page<CourseStudent> page = new PageImpl<>(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
         ), pageable, 1);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
 
         Attendance attMatch = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 1), "Present");
         Attendance attOther = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 2), "Absent");
@@ -197,6 +197,96 @@ class GradebookServiceGroupingTest {
             service.courseAttendance(courseId, LocalDate.of(2026, 3, 1), pageable);
 
         assertThat(result.getContent().get(0).attendances()).containsExactly(attMatch);
+    }
+
+    @Test
+    void classGroupAttendance_loadsActiveRosterOfTheClassGroupCourse_withItsSessionRows() {
+        Page<CourseStudent> page = new PageImpl<>(List.of(
+            courseStudent(enrollmentA, studentA, "Ana", "Perez"),
+            courseStudent(enrollmentB, studentB, "Luis", "Gomez")
+        ), pageable, 2);
+        when(attendanceDomain.courseOfClassGroup(classGroupMath)).thenReturn(courseId);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+
+        Attendance sessionA = new Attendance(UUID.randomUUID(), enrollmentA, classGroupMath,
+            LocalDate.of(2026, 3, 1), "Present");
+        Attendance sessionB = new Attendance(UUID.randomUUID(), enrollmentB, classGroupMath,
+            LocalDate.of(2026, 3, 1), "Absent");
+        when(attendanceDomain.sessionByClassGroupAndCourseEnrollmentIn(
+            org.mockito.ArgumentMatchers.eq(classGroupMath), anyCollection()))
+            .thenReturn(List.of(sessionA, sessionB));
+
+        Page<CourseAttendanceRow> result =
+            service.classGroupAttendance(classGroupMath, null, pageable);
+
+        assertThat(result.getContent().get(0).attendances()).containsExactly(sessionA);
+        assertThat(result.getContent().get(1).attendances()).containsExactly(sessionB);
+        // The subject sheet must never fall back to the course-wide daily rows.
+        verify(attendanceDomain, never()).dailyByCourseEnrollmentIn(anyCollection());
+    }
+
+    @Test
+    void classGroupAttendance_dateFilter_appliedAfterGrouping() {
+        Page<CourseStudent> page = new PageImpl<>(List.of(
+            courseStudent(enrollmentA, studentA, "Ana", "Perez")
+        ), pageable, 1);
+        when(attendanceDomain.courseOfClassGroup(classGroupMath)).thenReturn(courseId);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+
+        Attendance match = new Attendance(UUID.randomUUID(), enrollmentA, classGroupMath,
+            LocalDate.of(2026, 3, 1), "Present");
+        Attendance other = new Attendance(UUID.randomUUID(), enrollmentA, classGroupMath,
+            LocalDate.of(2026, 3, 2), "Absent");
+        when(attendanceDomain.sessionByClassGroupAndCourseEnrollmentIn(
+            org.mockito.ArgumentMatchers.eq(classGroupMath), anyCollection()))
+            .thenReturn(List.of(match, other));
+
+        Page<CourseAttendanceRow> result =
+            service.classGroupAttendance(classGroupMath, LocalDate.of(2026, 3, 1), pageable);
+
+        assertThat(result.getContent().get(0).attendances()).containsExactly(match);
+    }
+
+    @Test
+    void classGroupAttendance_emptyRoster_skipsTheAttendanceQuery() {
+        when(attendanceDomain.courseOfClassGroup(classGroupMath)).thenReturn(courseId);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable))
+            .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        Page<CourseAttendanceRow> result =
+            service.classGroupAttendance(classGroupMath, null, pageable);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(attendanceDomain, never())
+            .sessionByClassGroupAndCourseEnrollmentIn(any(), anyCollection());
+    }
+
+    @Test
+    void courseAttendance_usesActiveRoster_soWithdrawnStudentsNeverReachTheSheet() {
+        Page<CourseStudent> page = new PageImpl<>(List.of(
+            courseStudent(enrollmentA, studentA, "Ana", "Perez")
+        ), pageable, 1);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        when(attendanceDomain.dailyByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
+
+        service.courseAttendance(courseId, null, pageable);
+
+        // The unfiltered roster still backs the centralizer, but the daily sheet must never use it:
+        // a withdrawn enrollment would otherwise keep showing up for marking every day.
+        verify(enrollmentDomain, never()).studentsByCourse(any(), any());
+    }
+
+    @Test
+    void centralizer_keepsUnfilteredRoster_soWithdrawnStudentsKeepTheirRecord() {
+        Page<CourseStudent> page = new PageImpl<>(List.of(
+            courseStudent(enrollmentA, studentA, "Ana", "Perez")
+        ), pageable, 1);
+        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
+
+        service.centralizer(courseId, 1, pageable);
+
+        verify(enrollmentDomain, never()).activeStudentsByCourse(any(), any());
     }
 
     @Test

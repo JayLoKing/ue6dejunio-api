@@ -13,5 +13,9 @@ public interface IGradebookService {
     StudentTrimesterSummary studentSummary(UUID courseEnrollmentId, Integer trimester);
     Page<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, Pageable pageable);
     Page<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, Pageable pageable);
+
+    /** Per-subject sheet: the active roster of the class group's course, with that class group's
+     * session rows only. */
+    Page<CourseAttendanceRow> classGroupAttendance(UUID classGroupId, LocalDate date, Pageable pageable);
     CourseOverview courseOverview(UUID courseId, Integer trimester, Pageable pageable);
 }

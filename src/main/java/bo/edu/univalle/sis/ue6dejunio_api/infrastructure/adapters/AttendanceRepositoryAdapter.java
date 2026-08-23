@@ -51,9 +51,18 @@ public class AttendanceRepositoryAdapter implements IAttendanceDomain {
         if (courseEnrollmentIds.isEmpty()) {
             return Set.of();
         }
-        Set<UUID> existing = new HashSet<>();
-        enrollmentRepo.findAllById(courseEnrollmentIds).forEach(e -> existing.add(e.getId()));
-        return existing;
+        // Id projection, not findAllById: the caller only needs to know which ids exist, and
+        // CourseEnrollmentEntity.student is EAGER, so hydrating the entities would fire a
+        // secondary select per row.
+        return new HashSet<>(enrollmentRepo.findExistingIds(courseEnrollmentIds));
+    }
+
+    @Override
+    public Set<UUID> courseEnrollmentIdsInCourse(Collection<UUID> courseEnrollmentIds, UUID courseId) {
+        if (courseEnrollmentIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(enrollmentRepo.findIdsInCourse(courseEnrollmentIds, courseId));
     }
 
     @Override
@@ -158,6 +167,35 @@ public class AttendanceRepositoryAdapter implements IAttendanceDomain {
     }
 
     @Override
+    @Transactional
+    public List<Attendance> upsertSessionBatch(UUID classGroupId, LocalDate date,
+                                               Map<UUID, String> statusByCourseEnrollmentId) {
+        if (statusByCourseEnrollmentId.isEmpty()) {
+            return List.of();
+        }
+        List<AttendanceEntity> existing = attendanceRepo
+            .findByCourseEnrollment_IdInAndDateAndClassGroup_Id(
+                statusByCourseEnrollmentId.keySet(), date, classGroupId);
+        Map<UUID, AttendanceEntity> existingByEnrollmentId = existing.stream()
+            .collect(Collectors.toMap(e -> e.getCourseEnrollment().getId(), e -> e));
+
+        List<AttendanceEntity> toSave = new ArrayList<>(statusByCourseEnrollmentId.size());
+        for (Map.Entry<UUID, String> mark : statusByCourseEnrollmentId.entrySet()) {
+            UUID courseEnrollmentId = mark.getKey();
+            AttendanceEntity e = existingByEnrollmentId.get(courseEnrollmentId);
+            if (e == null) {
+                e = new AttendanceEntity();
+                e.setCourseEnrollment(enrollmentRepo.getReferenceById(courseEnrollmentId));
+                e.setClassGroup(classGroupRepo.getReferenceById(classGroupId));
+                e.setDate(date);
+            }
+            e.setStatus(mark.getValue());
+            toSave.add(e);
+        }
+        return attendanceRepo.saveAll(toSave).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<Attendance> byCourseEnrollment(UUID courseEnrollmentId) {
         return attendanceRepo.findByCourseEnrollment_IdOrderByDate(courseEnrollmentId)
             .stream().map(this::toDomain).toList();
@@ -178,9 +216,21 @@ public class AttendanceRepositoryAdapter implements IAttendanceDomain {
             .stream().map(this::toDomain).toList();
     }
 
+    @Override
+    public List<Attendance> sessionByClassGroupAndCourseEnrollmentIn(
+        UUID classGroupId, Collection<UUID> courseEnrollmentIds) {
+        if (courseEnrollmentIds.isEmpty()) {
+            return List.of();
+        }
+        return attendanceRepo
+            .findByCourseEnrollment_IdInAndClassGroup_IdOrderByDate(courseEnrollmentIds, classGroupId)
+            .stream().map(this::toDomain).toList();
+    }
+
     private Attendance toDomain(AttendanceEntity e) {
         return new Attendance(e.getId(), e.getCourseEnrollment().getId(),
             e.getClassGroup() != null ? e.getClassGroup().getId() : null,
-            e.getDate(), e.getStatus());
+            e.getDate(), e.getStatus(),
+            e.getCreatedBy(), e.getCreatedAt(), e.getUpdatedBy(), e.getUpdatedAt());
     }
 }

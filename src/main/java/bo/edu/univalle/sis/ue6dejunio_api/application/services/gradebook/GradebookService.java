@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -75,11 +76,29 @@ public class GradebookService implements IGradebookService {
     @Override
     @Transactional(readOnly = true)
     public Page<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, Pageable pageable) {
-        Page<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageable);
+        Page<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageable);
+        return attendanceRows(page, date, attendanceDomain::dailyByCourseEnrollmentIn);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseAttendanceRow> classGroupAttendance(UUID classGroupId, LocalDate date,
+                                                          Pageable pageable) {
+        // The roster is the course's, but the rows are the subject's: a technical teacher marks the
+        // same students the homeroom teacher does, only for their own class group.
+        UUID courseId = attendanceDomain.courseOfClassGroup(classGroupId);
+        Page<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageable);
+        return attendanceRows(page, date,
+            ids -> attendanceDomain.sessionByClassGroupAndCourseEnrollmentIn(classGroupId, ids));
+    }
+
+    /** One batched load for the whole page, then in-memory grouping — never a query per student. */
+    private Page<CourseAttendanceRow> attendanceRows(Page<CourseStudent> page, LocalDate date,
+                                                     Function<List<UUID>, List<Attendance>> loader) {
         List<UUID> ids = page.getContent().stream().map(CourseStudent::courseEnrollmentId).toList();
         Map<UUID, List<Attendance>> grouped = ids.isEmpty()
             ? Map.of()
-            : attendanceDomain.dailyByCourseEnrollmentIn(ids).stream()
+            : loader.apply(ids).stream()
                 .collect(Collectors.groupingBy(Attendance::courseEnrollmentId));
         return page.map(cs -> {
             List<Attendance> att = grouped.getOrDefault(cs.courseEnrollmentId(), List.of());

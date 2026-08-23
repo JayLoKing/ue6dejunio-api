@@ -26,15 +26,28 @@ public interface IAttendanceDomain {
     List<Attendance> dailyByCourseEnrollment(UUID courseEnrollmentId);
     List<Attendance> dailyByCourseEnrollmentIn(Collection<UUID> courseEnrollmentIds);
 
+    /** Session rows (id_class_group = the given group) for a batch of enrollments, in one query.
+     * Backs the per-subject sheet the technical teacher fills in. */
+    List<Attendance> sessionByClassGroupAndCourseEnrollmentIn(
+        UUID classGroupId, Collection<UUID> courseEnrollmentIds);
+
     /** Single IN-query existence check for a batch of course enrollment ids. Returns only the
      * subset that actually exist, so the caller can report the first missing id without an
      * existence query per row. */
     Set<UUID> existingCourseEnrollmentIds(Collection<UUID> courseEnrollmentIds);
 
+    /** Subset of the given enrollments that actually belong to the given course, in one query.
+     * Lets a session batch reject a foreign student without a course lookup per mark. */
+    Set<UUID> courseEnrollmentIdsInCourse(Collection<UUID> courseEnrollmentIds, UUID courseId);
+
     /** Batched upsert of daily (id_class_group NULL) attendance for the given date: loads any
      * existing rows for (courseEnrollmentId IN ..., date) in one query, then creates/updates and
      * saves all rows in a single batch — no per-mark find + save round trip. */
     List<Attendance> upsertDailyBatch(LocalDate date, Map<UUID, String> statusByCourseEnrollmentId);
+
+    /** Same batched upsert as {@link #upsertDailyBatch}, but for one class group's session rows. */
+    List<Attendance> upsertSessionBatch(UUID classGroupId, LocalDate date,
+                                        Map<UUID, String> statusByCourseEnrollmentId);
 
     /** One aggregated GROUP BY query: daily (id_class_group IS NULL) attendance counts per
      * (date, status) for all enrollments in the given course. No per-enrollment loop. */

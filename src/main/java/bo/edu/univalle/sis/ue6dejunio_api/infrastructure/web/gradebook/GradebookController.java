@@ -38,6 +38,7 @@ public class GradebookController {
     }
 
     @GetMapping("/student-summary")
+    @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
     @Operation(summary = "Resumen del estudiante: total por materia + promedio general del trimestre")
     public ResponseEntity<StudentSummaryResponse> studentSummary(
         @RequestParam("id_course_enrollment") UUID courseEnrollmentId,
@@ -73,5 +74,21 @@ public class GradebookController {
         Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.courseAttendance(courseId, date, p).map(CourseAttendanceResponse::from)));
+    }
+
+    @GetMapping("/attendance/session")
+    @PreAuthorize("@authz.canWriteClassGroup(authentication, #classGroupId)")
+    @Operation(summary = "Asistencia de una materia. Lista de estudiantes del curso con las "
+        + "sesiones de esa materia. date opcional filtra una fecha")
+    public ResponseEntity<PagedResponse<CourseAttendanceResponse>> classGroupAttendance(
+        @RequestParam("id_class_group") UUID classGroupId,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(defaultValue = "1") @Min(1) int offset,
+        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
+    ) {
+        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
+        return ResponseEntity.ok(PagedResponse.of(
+            gradebookService.classGroupAttendance(classGroupId, date, p)
+                .map(CourseAttendanceResponse::from)));
     }
 }

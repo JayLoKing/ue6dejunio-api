@@ -5,7 +5,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,5 +18,18 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     Optional<CourseEnrollmentEntity> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
     @EntityGraph(attributePaths = "student")
     Page<CourseEnrollmentEntity> findByCourse_Id(UUID courseId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "student")
+    Page<CourseEnrollmentEntity> findByCourse_IdAndStatus(UUID courseId, String status, Pageable pageable);
+
+    /** Ids of the given enrollments that exist, without hydrating the entities behind them. */
+    @Query("SELECT ce.id FROM CourseEnrollmentEntity ce WHERE ce.id IN :courseEnrollmentIds")
+    List<UUID> findExistingIds(@Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds);
+
+    /** Ids of the given enrollments that belong to the given course, in a single query. */
+    @Query("SELECT ce.id FROM CourseEnrollmentEntity ce "
+        + "WHERE ce.id IN :courseEnrollmentIds AND ce.course.id = :courseId")
+    List<UUID> findIdsInCourse(@Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds,
+                               @Param("courseId") UUID courseId);
     List<CourseEnrollmentEntity> findByStudent_IdAndStatus(UUID studentId, String status);
 }

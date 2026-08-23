@@ -12,6 +12,10 @@ public interface IAttendanceService {
     Attendance registerDaily(UUID courseEnrollmentId, LocalDate date, String status);
     DailyBatchResult registerDailyBatch(LocalDate date, List<DailyMark> marks);
     Attendance registerSession(UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status);
+
+    /** Whole-group session marking in one transaction, so the technical teacher's single "Guardar"
+     * either persists every student or none. */
+    DailyBatchResult registerSessionBatch(UUID classGroupId, LocalDate date, List<DailyMark> marks);
     List<Attendance> byCourseEnrollment(UUID courseEnrollmentId);
 
     /** Daily-only (id_class_group IS NULL) attendance stats for a course. trimester == null

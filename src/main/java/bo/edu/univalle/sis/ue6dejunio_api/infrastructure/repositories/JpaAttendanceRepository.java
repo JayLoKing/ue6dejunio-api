@@ -18,6 +18,14 @@ public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity,
     List<AttendanceEntity> findByCourseEnrollment_IdAndClassGroupIsNullOrderByDate(UUID courseEnrollmentId);
     List<AttendanceEntity> findByCourseEnrollment_IdInAndClassGroupIsNullOrderByDate(Collection<UUID> courseEnrollmentIds);
 
+    List<AttendanceEntity> findByCourseEnrollment_IdInAndClassGroup_IdOrderByDate(
+        Collection<UUID> courseEnrollmentIds, UUID classGroupId);
+
+    /** Existing session rows for a batch of enrollments on one date and one class group, in a
+     * single query. Mirrors the daily variant used by the batch upsert. */
+    List<AttendanceEntity> findByCourseEnrollment_IdInAndDateAndClassGroup_Id(
+        Collection<UUID> courseEnrollmentIds, LocalDate date, UUID classGroupId);
+
     /** Existing daily (id_class_group IS NULL) rows for a batch of enrollments on one date, in a
      * single query. Used to build a batch upsert set without a per-enrollment find. */
     List<AttendanceEntity> findByCourseEnrollment_IdInAndDateAndClassGroupIsNull(

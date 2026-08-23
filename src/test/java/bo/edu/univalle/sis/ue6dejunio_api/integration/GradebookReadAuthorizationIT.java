@@ -34,6 +34,32 @@ class GradebookReadAuthorizationIT extends AbstractIntegrationTest {
         seedClassGroup(courseA, homeroomTeacher, "Matematicas");
     }
 
+    // ---- student-summary: it was the one read in this controller with no ownership guard ----
+
+    @Test
+    void studentSummary_nonOwnerTeacher_forbidden() throws Exception {
+        UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
+
+        // Without an ownership check any authenticated teacher could read another course's grades
+        // just by guessing an enrollment id.
+        mvc.perform(get("/api/gradebook/student-summary")
+                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                .param("id_course_enrollment", enrollmentInA.toString())
+                .param("trimester", "1"))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void studentSummary_homeroomTeacher_ok() throws Exception {
+        UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
+
+        mvc.perform(get("/api/gradebook/student-summary")
+                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                .param("id_course_enrollment", enrollmentInA.toString())
+                .param("trimester", "1"))
+            .andExpect(status().isOk());
+    }
+
     @Test
     void centralizer_director_ok() throws Exception {
         mvc.perform(get("/api/gradebook/centralizer")

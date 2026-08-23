@@ -13,6 +13,14 @@ public interface ICourseEnrollmentDomain {
     void saveEnrollment(UUID studentId, UUID courseId);
     Optional<UUID> findByStudentAndCourse(UUID studentId, UUID courseId);
     Page<CourseStudent> studentsByCourse(UUID courseId, Pageable pageable);
+
+    /**
+     * Only the enrollments still in force for the course. Operational sheets that are filled in
+     * day after day — attendance above all — must not keep listing a student who was withdrawn.
+     * Year-end academic records keep using {@link #studentsByCourse}, because a withdrawn student
+     * still owns the grades they earned before leaving.
+     */
+    Page<CourseStudent> activeStudentsByCourse(UUID courseId, Pageable pageable);
     UUID courseOfEnrollment(UUID courseEnrollmentId);
     Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId);
     int withdrawActiveEnrollments(UUID studentId);
