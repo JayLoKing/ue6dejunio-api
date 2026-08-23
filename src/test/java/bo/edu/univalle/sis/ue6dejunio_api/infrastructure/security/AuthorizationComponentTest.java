@@ -22,10 +22,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -186,11 +188,42 @@ class AuthorizationComponentTest {
         UUID ce1 = UUID.randomUUID();
         UUID ce2 = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
-        when(courseEnrollmentDomain.courseOfEnrollment(any())).thenReturn(courseId);
+        when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ce1, ce2)))
+            .thenReturn(Map.of(ce1, courseId, ce2, courseId));
         when(courseDomain.findById(courseId)).thenReturn(
             Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
 
         assertThat(authz.canWriteDailyBatch(token(homeroomTeacher, "Teacher"), List.of(ce1, ce2))).isTrue();
+    }
+
+    @Test
+    void canWriteDailyBatch_teacherWithTwoHomerooms_allowsBoth() {
+        UUID teacher = UUID.randomUUID();
+        UUID ce1 = UUID.randomUUID();
+        UUID ce2 = UUID.randomUUID();
+        UUID courseA = UUID.randomUUID();
+        UUID courseB = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ce1, ce2)))
+            .thenReturn(Map.of(ce1, courseA, ce2, courseB));
+        when(courseDomain.findById(courseA)).thenReturn(
+            Optional.of(new Course(courseA, 1, "Primero", 1, "A", 1, 2026, teacher, "Ana", true)));
+        when(courseDomain.findById(courseB)).thenReturn(
+            Optional.of(new Course(courseB, 1, "Primero", 1, "B", 1, 2026, teacher, "Ana", true)));
+
+        // The per-student endpoint accepts any course the caller is homeroom of, so the batch has
+        // to agree: same actor, same rows, same answer.
+        assertThat(authz.canWriteDailyBatch(token(teacher, "Teacher"), List.of(ce1, ce2))).isTrue();
+    }
+
+    @Test
+    void canWriteDailyBatch_unknownEnrollment_denies() {
+        UUID teacher = UUID.randomUUID();
+        UUID known = UUID.randomUUID();
+        UUID unknown = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(known, unknown)))
+            .thenReturn(Map.of(known, UUID.randomUUID()));
+
+        assertThat(authz.canWriteDailyBatch(token(teacher, "Teacher"), List.of(known, unknown))).isFalse();
     }
 
     @Test
@@ -200,14 +233,115 @@ class AuthorizationComponentTest {
         UUID ceForeign = UUID.randomUUID();
         UUID courseA = UUID.randomUUID();
         UUID courseB = UUID.randomUUID();
-        when(courseEnrollmentDomain.courseOfEnrollment(ceOwned)).thenReturn(courseA);
-        when(courseEnrollmentDomain.courseOfEnrollment(ceForeign)).thenReturn(courseB);
-        when(courseDomain.findById(courseA)).thenReturn(
+        when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ceOwned, ceForeign)))
+            .thenReturn(Map.of(ceOwned, courseA, ceForeign, courseB));
+        // Lenient: the check walks the distinct courses in unspecified order and short-circuits on
+        // the first foreign one, so the owned course may never be looked up.
+        lenient().when(courseDomain.findById(courseA)).thenReturn(
             Optional.of(new Course(courseA, 1, "Primero", 1, "A", 1, 2026, homeroomTeacherA, "Ana", true)));
-        when(courseDomain.findById(courseB)).thenReturn(
+        lenient().when(courseDomain.findById(courseB)).thenReturn(
             Optional.of(new Course(courseB, 1, "Primero", 1, "B", 1, 2026, UUID.randomUUID(), "Otro", true)));
 
         assertThat(authz.canWriteDailyBatch(token(homeroomTeacherA, "Teacher"), List.of(ceOwned, ceForeign))).isFalse();
+    }
+
+    @Test
+    void canWriteDailyBatch_courseWithoutHomeroomTeacher_denies() {
+        UUID teacher = UUID.randomUUID();
+        UUID ce = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ce)))
+            .thenReturn(Map.of(ce, courseId));
+        when(courseDomain.findById(courseId)).thenReturn(
+            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, null, null, true)));
+
+        assertThat(authz.canWriteDailyBatch(token(teacher, "Teacher"), List.of(ce))).isFalse();
+    }
+
+    // ---- canReadCourseRoster / canReadStudent ----
+
+    @Test
+    void canReadCourseRoster_technicalTeacherOfTheCourse_true() {
+        UUID technicalTeacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseDomain.findById(courseId)).thenReturn(
+            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true)));
+        when(classGroupDomain.teachesInCourse(technicalTeacher, courseId)).thenReturn(true);
+
+        // A technical teacher has no homeroom; gating the roster on homeroom alone would cut them
+        // off from the students they take attendance for.
+        assertThat(authz.canReadCourseRoster(token(technicalTeacher, "Teacher"), courseId)).isTrue();
+    }
+
+    @Test
+    void canReadCourseRoster_homeroomTeacher_true() {
+        UUID homeroomTeacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseDomain.findById(courseId)).thenReturn(
+            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
+
+        assertThat(authz.canReadCourseRoster(token(homeroomTeacher, "Teacher"), courseId)).isTrue();
+    }
+
+    @Test
+    void canReadCourseRoster_unrelatedTeacher_false() {
+        UUID otherTeacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseDomain.findById(courseId)).thenReturn(
+            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true)));
+        when(classGroupDomain.teachesInCourse(otherTeacher, courseId)).thenReturn(false);
+
+        assertThat(authz.canReadCourseRoster(token(otherTeacher, "Teacher"), courseId)).isFalse();
+    }
+
+    @Test
+    void canReadCourseRoster_secretary_true() {
+        assertThat(authz.canReadCourseRoster(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+    }
+
+    @Test
+    void canReadStudent_teacherOfOneOfTheirCourses_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID foreignCourse = UUID.randomUUID();
+        UUID ownCourse = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseIdsOfStudent(studentId))
+            .thenReturn(List.of(foreignCourse, ownCourse));
+        lenient().when(courseDomain.findById(foreignCourse)).thenReturn(
+            Optional.of(new Course(foreignCourse, 1, "Primero", 1, "B", 1, 2026, UUID.randomUUID(), "Otro", true)));
+        lenient().when(classGroupDomain.teachesInCourse(teacher, foreignCourse)).thenReturn(false);
+        when(courseDomain.findById(ownCourse)).thenReturn(
+            Optional.of(new Course(ownCourse, 1, "Primero", 1, "A", 1, 2026, teacher, "Ana", true)));
+
+        assertThat(authz.canReadStudent(token(teacher, "Teacher"), studentId)).isTrue();
+    }
+
+    @Test
+    void canReadStudent_studentOutsideEveryCourseOfTheTeacher_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID foreignCourse = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(List.of(foreignCourse));
+        when(courseDomain.findById(foreignCourse)).thenReturn(
+            Optional.of(new Course(foreignCourse, 1, "Primero", 1, "B", 1, 2026, UUID.randomUUID(), "Otro", true)));
+        when(classGroupDomain.teachesInCourse(teacher, foreignCourse)).thenReturn(false);
+
+        assertThat(authz.canReadStudent(token(teacher, "Teacher"), studentId)).isFalse();
+    }
+
+    @Test
+    void canReadStudent_director_bypassesWithoutLookup() {
+        assertThat(authz.canReadStudent(
+            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+    }
+
+    @Test
+    void canReadScoreEvent_secretary_true() {
+        // SecurityConfig admits Secretary on GET /api/scores/**; the method guard has to agree or
+        // the role rule is dead and the documented scope is a lie.
+        assertThat(authz.canReadScoreEvent(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
     }
 
     @Test
@@ -277,5 +411,65 @@ class AuthorizationComponentTest {
         when(courseDomain.findById(courseId)).thenReturn(Optional.empty());
 
         assertThat(authz.canReadCourse(token(teacherA, "Teacher"), courseId)).isFalse();
+    }
+
+    // ---- Secretary: school-wide read actor, zero write ----
+
+    @Test
+    void canReadCourse_secretary_true_forAnyCourseItDoesNotOwn() {
+        // No stub on courseDomain: the secretariat is school-wide, so the check must short-circuit
+        // before any ownership lookup.
+        assertThat(authz.canReadCourse(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+    }
+
+    @Test
+    void canReadEnrollmentScope_secretary_true_forAnyEnrollment() {
+        assertThat(authz.canReadEnrollmentScope(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+    }
+
+    @Test
+    void effectiveDirectoryCourseId_secretary_keepsRequestedCourse() {
+        UUID requested = UUID.randomUUID();
+
+        // A teacher would be pinned to their own homeroom here; the secretariat is not.
+        assertThat(authz.effectiveDirectoryCourseId(
+            token(UUID.randomUUID(), "Secretary"), requested)).isEqualTo(requested);
+    }
+
+    @Test
+    void canWriteDailyAttendance_secretary_false() {
+        UUID courseId = UUID.randomUUID();
+        UUID enrollmentId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(enrollmentId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId)).thenReturn(
+            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true)));
+
+        // Read access must never leak into the write predicates: they share ownsEnrollmentCourse,
+        // which is exactly why the Secretary bypass lives at the read entry points instead.
+        assertThat(authz.canWriteDailyAttendance(
+            token(UUID.randomUUID(), "Secretary"), enrollmentId)).isFalse();
+    }
+
+    @Test
+    void canWriteClassGroup_secretary_false() {
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
+
+        assertThat(authz.canWriteClassGroup(
+            token(UUID.randomUUID(), "Secretary"), classGroupId)).isFalse();
+    }
+
+    @Test
+    void canWriteScoreEvent_secretary_false() {
+        UUID eventId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(assessmentEventDomain.findById(eventId)).thenReturn(
+            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t", null, BigDecimal.TEN)));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
+
+        assertThat(authz.canWriteScoreEvent(
+            token(UUID.randomUUID(), "Secretary"), eventId)).isFalse();
     }
 }

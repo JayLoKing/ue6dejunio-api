@@ -14,7 +14,10 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -67,6 +70,23 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     @Override
     public Page<CourseStudent> studentsByCourse(UUID courseId, Pageable pageable) {
         return enrollmentRepo.findByCourse_Id(courseId, pageable).map(this::toCourseStudent);
+    }
+
+    @Override
+    public List<UUID> courseIdsOfStudent(UUID studentId) {
+        return enrollmentRepo.findCourseIdsOfStudent(studentId);
+    }
+
+    @Override
+    public Map<UUID, UUID> courseIdsByEnrollment(Collection<UUID> courseEnrollmentIds) {
+        if (courseEnrollmentIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, UUID> byEnrollment = new HashMap<>();
+        for (Object[] row : enrollmentRepo.findCourseIdsByEnrollment(courseEnrollmentIds)) {
+            byEnrollment.put((UUID) row[0], (UUID) row[1]);
+        }
+        return byEnrollment;
     }
 
     @Override

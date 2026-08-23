@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +47,7 @@ public class StudentController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@authz.canReadStudent(authentication, #id)")
     @Operation(summary = "Obtener estudiante por id")
     public ResponseEntity<StudentResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(StudentResponse.from(studentService.getById(id)));
@@ -67,6 +69,7 @@ public class StudentController {
     }
 
     @PostMapping("/{id}/withdraw")
+    @PreAuthorize("@authz.canWriteStudent(authentication, #id)")
     @Operation(summary = "Baja logica de estudiante (retiro/transferencia/otro)")
     public ResponseEntity<Void> withdraw(@PathVariable UUID id, @Valid @RequestBody WithdrawStudentRequest request) {
         StudentWithdrawalReason reason = StudentWithdrawalReason.fromRequestValue(request.reason())

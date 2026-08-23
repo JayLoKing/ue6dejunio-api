@@ -26,6 +26,15 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     @Query("SELECT ce.id FROM CourseEnrollmentEntity ce WHERE ce.id IN :courseEnrollmentIds")
     List<UUID> findExistingIds(@Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds);
 
+    /** (enrollmentId, courseId) pairs for the given enrollments, as raw rows: the tuple-to-map
+     * conversion belongs in the adapter, not in a domain type. */
+    @Query("SELECT ce.id, ce.course.id FROM CourseEnrollmentEntity ce WHERE ce.id IN :courseEnrollmentIds")
+    List<Object[]> findCourseIdsByEnrollment(
+        @Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds);
+
+    @Query("SELECT ce.course.id FROM CourseEnrollmentEntity ce WHERE ce.student.id = :studentId")
+    List<UUID> findCourseIdsOfStudent(@Param("studentId") UUID studentId);
+
     /** Ids of the given enrollments that belong to the given course, in a single query. */
     @Query("SELECT ce.id FROM CourseEnrollmentEntity ce "
         + "WHERE ce.id IN :courseEnrollmentIds AND ce.course.id = :courseId")

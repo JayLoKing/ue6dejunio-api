@@ -14,6 +14,10 @@ public interface IClassGroupDomain {
     boolean userIsNonTechnicalTeacher(UUID userId);
     boolean subjectIsTechnical(UUID subjectId);
     boolean existsByCourseAndSubject(UUID courseId, UUID subjectId);
+
+    /** Whether the teacher runs at least one class group in the course. A technical teacher has no
+     * homeroom, so this is what ties them to the course's roster. */
+    boolean teachesInCourse(UUID teacherId, UUID courseId);
     ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId);
     Optional<ClassGroup> findById(UUID id);
     List<UUID> classGroupIdsByCourse(UUID courseId);

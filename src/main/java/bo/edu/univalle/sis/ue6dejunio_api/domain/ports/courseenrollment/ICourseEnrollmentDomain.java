@@ -5,6 +5,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface ICourseEnrollmentDomain {
@@ -22,6 +25,15 @@ public interface ICourseEnrollmentDomain {
      */
     Page<CourseStudent> activeStudentsByCourse(UUID courseId, Pageable pageable);
     UUID courseOfEnrollment(UUID courseEnrollmentId);
+
+    /** Course of each given enrollment, in a single query. Ids that do not exist are absent from
+     * the result, which lets a whole-roster authorization check both resolve and validate without
+     * one lookup per student. */
+    Map<UUID, UUID> courseIdsByEnrollment(Collection<UUID> courseEnrollmentIds);
+
+    /** Courses the student is enrolled in, whatever the enrollment status. Used to decide who may
+     * read the student, so a withdrawn enrollment still ties them to their former teachers. */
+    List<UUID> courseIdsOfStudent(UUID studentId);
     Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId);
     int withdrawActiveEnrollments(UUID studentId);
 }

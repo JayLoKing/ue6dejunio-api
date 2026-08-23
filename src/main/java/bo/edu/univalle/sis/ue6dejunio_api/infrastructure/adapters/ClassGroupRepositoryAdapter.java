@@ -79,10 +79,15 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     }
 
     @Override
+    public boolean teachesInCourse(UUID teacherId, UUID courseId) {
+        return classGroupRepo.existsByCourse_IdAndTeacher_Id(courseId, teacherId);
+    }
+
+    @Override
     @Transactional
     public ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId) {
         CourseEntity course = courseRepo.findById(courseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Course", courseId));
+            .orElseThrow(() -> new ResourceNotFoundException("Curso", courseId));
         SubjectEntity subject = subjectRepo.findById(subjectId)
             .orElseThrow(() -> new ResourceNotFoundException("Materia", subjectId));
         ClassGroupEntity e = new ClassGroupEntity();
@@ -119,21 +124,21 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     public UUID courseIdOfClassGroup(UUID classGroupId) {
         return classGroupRepo.findById(classGroupId)
             .map(cg -> cg.getCourse().getId())
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
     }
 
     @Override
     public UUID teacherIdOfClassGroup(UUID classGroupId) {
         return classGroupRepo.findById(classGroupId)
             .map(cg -> cg.getTeacher() != null ? cg.getTeacher().getId() : null)
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
     }
 
     @Override
     @Transactional
     public void setActive(UUID classGroupId, boolean active) {
         ClassGroupEntity e = classGroupRepo.findById(classGroupId)
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
         e.setActive(active);
         classGroupRepo.save(e);
     }
@@ -142,7 +147,7 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Transactional
     public ClassGroup setTeacher(UUID classGroupId, UUID teacherId) {
         ClassGroupEntity e = classGroupRepo.findById(classGroupId)
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
         UserEntity teacher = userRepo.findById(teacherId)
             .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
         e.setTeacher(teacher);

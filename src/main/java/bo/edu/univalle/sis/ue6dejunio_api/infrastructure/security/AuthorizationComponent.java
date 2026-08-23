@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
@@ -9,24 +10,40 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDom
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import org.springframework.security.core.Authentication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * B10: autorizacion por propiedad. Director escribe/lee todo; Teacher solo sus class_groups
- * (materia) o su curso de aula (homeroom), segun el recurso.
- * Uso en @PreAuthorize: @authz.canWriteClassGroup(authentication, #id)
+ * Ownership-based authorization. Director reads and writes everything; Teacher only their own
+ * class groups (subject) or their homeroom course, depending on the resource; Secretary reads
+ * across the school and writes nothing.
+ *
+ * <p>Used from {@code @PreAuthorize}, e.g.
+ * {@code @authz.canWriteClassGroup(authentication, #id)}.
  */
 @Component("authz")
 public class AuthorizationComponent {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthorizationComponent.class);
+
     private static final String ROLE_DIRECTOR = "ROLE_Director";
+    /**
+     * School-wide read actor: reaches the academic record without owning a course, and matches no
+     * write rule anywhere. Which reads exactly is decided by the GET rules in SecurityConfig — the
+     * chain is the stricter layer, so a predicate granting more than the chain admits is simply
+     * unreachable.
+     */
+    private static final String ROLE_SECRETARY = "ROLE_Secretary";
     private static final UUID NO_MATCH_COURSE_ID = new UUID(0L, 0L);
 
     private final IClassGroupDomain classGroupDomain;
@@ -57,7 +74,14 @@ public class AuthorizationComponent {
             return true;
         }
         UUID userId = userId(authentication);
-        UUID owner = classGroupDomain.teacherIdOfClassGroup(classGroupId);
+        UUID owner;
+        try {
+            owner = classGroupDomain.teacherIdOfClassGroup(classGroupId);
+        } catch (ResourceNotFoundException ex) {
+            // Same rule as ownsEnrollmentCourse: an id that resolves to nothing denies with 403
+            // rather than surfacing as 404 from inside the guard.
+            return false;
+        }
         return userId != null && userId.equals(owner);
     }
 
@@ -90,11 +114,27 @@ public class AuthorizationComponent {
     }
 
     public boolean canReadScoreEvent(Authentication authentication, UUID eventId) {
+        if (isReadOnlyStaff(authentication)) {
+            return true;
+        }
         return canWriteScoreEvent(authentication, eventId);
     }
 
     public boolean canReadEnrollmentScope(Authentication authentication, UUID courseEnrollmentId) {
+        if (isReadOnlyStaff(authentication)) {
+            return true;
+        }
         return ownsEnrollmentCourse(authentication, courseEnrollmentId);
+    }
+
+    /**
+     * The secretariat is a school-wide READ actor: it consults any course's records without owning
+     * one. It is deliberately checked here, at the read entry points, and never inside
+     * {@link #ownsEnrollmentCourse} — that helper also backs the write predicates, so widening it
+     * would silently hand out write access.
+     */
+    private boolean isReadOnlyStaff(Authentication authentication) {
+        return authentication != null && hasRole(authentication, ROLE_SECRETARY);
     }
 
     public boolean canWriteDailyAttendance(Authentication authentication, UUID courseEnrollmentId) {
@@ -108,8 +148,24 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        for (UUID courseEnrollmentId : courseEnrollmentIds) {
-            if (!ownsEnrollmentCourse(authentication, courseEnrollmentId)) {
+        UUID teacherId = userId(authentication);
+        if (teacherId == null) {
+            return false;
+        }
+        // A daily batch covers a whole roster, so resolving ownership one enrollment at a time
+        // meant two queries per student inside @PreAuthorize. One query maps every enrollment to
+        // its course; the homeroom check then runs over the distinct courses, which in practice is
+        // one. Deliberately NOT homeroomCourseOf(teacherId): that returns a single course, so a
+        // teacher holding two active homerooms would pass the per-student endpoint and be refused
+        // by the batch for the very same rows.
+        Map<UUID, UUID> courseByEnrollment =
+            courseEnrollmentDomain.courseIdsByEnrollment(courseEnrollmentIds);
+        if (!courseByEnrollment.keySet().containsAll(courseEnrollmentIds)) {
+            return false;
+        }
+        for (UUID courseId : new HashSet<>(courseByEnrollment.values())) {
+            Optional<Course> course = courseDomain.findById(courseId);
+            if (course.isEmpty() || !teacherId.equals(course.get().homeroomTeacherId())) {
                 return false;
             }
         }
@@ -117,12 +173,16 @@ public class AuthorizationComponent {
     }
 
     /**
-     * B31: alcance del directorio de estudiantes. Director ve todo (courseId solicitado o null).
-     * Teacher siempre queda acotado a su propio curso de aula (homeroom); nunca a otro curso.
-     * Nunca deniega (403): si el Teacher no tiene homeroom, retorna un UUID que no matchea nada.
+     * Scope of the student directory. Director and Secretary see whatever course was asked for
+     * (or all of them when none is); a Teacher is always pinned to their own homeroom course and
+     * never reaches another one.
+     *
+     * <p>Never denies with 403: a Teacher without a homeroom gets an id that matches nothing, so
+     * the listing comes back empty instead of erroring.
      */
     public UUID effectiveDirectoryCourseId(Authentication authentication, UUID requestedCourseId) {
-        if (authentication != null && hasRole(authentication, ROLE_DIRECTOR)) {
+        if (authentication != null
+            && (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication))) {
             return requestedCourseId;
         }
         UUID teacherId = authentication != null ? userId(authentication) : null;
@@ -138,7 +198,7 @@ public class AuthorizationComponent {
         if (authentication == null || courseId == null) {
             return false;
         }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
+        if (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication)) {
             return true;
         }
         Optional<Course> course = courseDomain.findById(courseId);
@@ -147,6 +207,78 @@ public class AuthorizationComponent {
         }
         UUID userId = userId(authentication);
         return userId != null && userId.equals(course.get().homeroomTeacherId());
+    }
+
+    /**
+     * Who may read a course's roster. Wider than {@link #canReadCourse} on purpose: that one is
+     * homeroom-only, and a technical teacher has no homeroom — gating the roster on it would cut
+     * them off from the very students they take attendance for.
+     */
+    public boolean canReadCourseRoster(Authentication authentication, UUID courseId) {
+        if (authentication == null || courseId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication)) {
+            return true;
+        }
+        UUID teacherId = userId(authentication);
+        if (teacherId == null) {
+            return false;
+        }
+        Optional<Course> course = courseDomain.findById(courseId);
+        if (course.isEmpty()) {
+            return false;
+        }
+        return teacherId.equals(course.get().homeroomTeacherId())
+            || classGroupDomain.teachesInCourse(teacherId, courseId);
+    }
+
+    /**
+     * Who may read a single student. A teacher reaches only students enrolled in a course they
+     * are tied to, either as homeroom teacher or through a class group they run.
+     */
+    public boolean canReadStudent(Authentication authentication, UUID studentId) {
+        if (authentication == null || studentId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication)) {
+            return true;
+        }
+        for (UUID courseId : courseEnrollmentDomain.courseIdsOfStudent(studentId)) {
+            if (canReadCourseRoster(authentication, courseId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Who may enroll students into a course. Narrower than {@link #canReadCourseRoster}: running a
+     * subject in the course is enough to read its roster, but composing that roster is the
+     * homeroom teacher's act, or the Director's.
+     */
+    public boolean canWriteCourseEnrollment(Authentication authentication, UUID courseId) {
+        return canReadCourse(authentication, courseId) && !isReadOnlyStaff(authentication);
+    }
+
+    /**
+     * Who may act on a student's record — withdrawal above all, which flips every effective
+     * enrollment and therefore removes them from other teachers' rosters too. Only the Director or
+     * the homeroom teacher of a course the student belongs to.
+     */
+    public boolean canWriteStudent(Authentication authentication, UUID studentId) {
+        if (authentication == null || studentId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        for (UUID courseId : courseEnrollmentDomain.courseIdsOfStudent(studentId)) {
+            if (canReadCourse(authentication, courseId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean canReadTeacherRoster(Authentication authentication, UUID userId) {
@@ -170,7 +302,9 @@ public class AuthorizationComponent {
         UUID courseId;
         try {
             courseId = courseEnrollmentDomain.courseOfEnrollment(courseEnrollmentId);
-        } catch (RuntimeException ex) {
+        } catch (ResourceNotFoundException ex) {
+            // An id that resolves to nothing is a denial, not an error. Anything else — a dropped
+            // connection, say — must keep propagating instead of being reported as "not owner".
             return false;
         }
         if (courseId == null) {
@@ -193,10 +327,24 @@ public class AuthorizationComponent {
         return false;
     }
 
+    /**
+     * Caller id, or {@code null} when the token carries no usable subject. These predicates run
+     * inside {@code @PreAuthorize}, so an exception here would surface as 500 instead of 403 —
+     * a malformed subject must deny, not fail.
+     */
     private UUID userId(Authentication auth) {
         if (auth instanceof JwtAuthenticationToken token) {
             Jwt jwt = token.getToken();
-            return UUID.fromString(jwt.getSubject());
+            String subject = jwt.getSubject();
+            if (subject == null) {
+                return null;
+            }
+            try {
+                return UUID.fromString(subject);
+            } catch (IllegalArgumentException ex) {
+                log.debug("Rejecting token with non-UUID subject");
+                return null;
+            }
         }
         return null;
     }

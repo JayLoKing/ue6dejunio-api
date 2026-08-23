@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,6 +51,7 @@ public class CourseEnrollmentController {
     }
 
     @PostMapping
+    @PreAuthorize("@authz.canWriteCourseEnrollment(authentication, #request.courseId())")
     @Operation(summary = "Inscribir un estudiante al curso (registro manual)")
     public ResponseEntity<EnrollResponse> enrollSingle(@Valid @RequestBody EnrollStudentRequest request) {
         EnrollResult result = enrollmentService.enroll(new EnrollToCourseCommand(
@@ -58,6 +60,7 @@ public class CourseEnrollmentController {
     }
 
     @PostMapping("/sync")
+    @PreAuthorize("@authz.canWriteCourseEnrollment(authentication, #request.courseId())")
     @Operation(summary = "Sincronizar nomina (PDF): crea estudiantes e inscribe al curso. Transaccion ACID")
     public ResponseEntity<EnrollResponse> sync(@Valid @RequestBody EnrollCourseRequest request) {
         List<CreateStudentCommand> students = request.students().stream()
@@ -68,6 +71,7 @@ public class CourseEnrollmentController {
     }
 
     @GetMapping
+    @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
     @Operation(summary = "Listar estudiantes inscritos a un curso")
     public ResponseEntity<PagedResponse<CourseStudentResponse>> students(
         @RequestParam("id_course") UUID courseId,
