@@ -94,6 +94,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, HttpServletRequest req) {
+        // Spring's own web exceptions already carry the correct status: 404 for a path with no
+        // handler, 405 for a wrong method, 415 for an unsupported media type. Flattening them into
+        // 500 would report the caller's mistake as a server failure and make every unmapped URL
+        // look like an outage.
+        if (ex instanceof org.springframework.web.ErrorResponse springError) {
+            HttpStatus status = HttpStatus.resolve(springError.getStatusCode().value());
+            if (status != null) {
+                return build(status, status.getReasonPhrase(), status.getReasonPhrase(), req);
+            }
+        }
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
             "Error interno del servidor", req);
     }
