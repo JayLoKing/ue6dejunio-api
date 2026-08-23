@@ -20,7 +20,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProdProfileHardeningIT extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mvc;
-    private final ObjectMapper json = new ObjectMapper();
 
     @Test
     void swaggerApiDocs_unavailableInProd() throws Exception {

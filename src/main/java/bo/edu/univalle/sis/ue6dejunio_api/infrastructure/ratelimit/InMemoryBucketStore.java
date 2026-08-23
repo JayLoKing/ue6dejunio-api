@@ -31,4 +31,12 @@ public class InMemoryBucketStore implements RateLimitStore {
             key,
             k -> Bucket.builder().withCustomTimePrecision(timeMeter).addLimit(bandwidth).build());
     }
+
+    /**
+     * Drops every registered bucket. Integration tests share a single Spring context, so an
+     * exhausted bucket left behind by one test would reject the next one's very first request.
+     */
+    public void clear() {
+        buckets.clear();
+    }
 }

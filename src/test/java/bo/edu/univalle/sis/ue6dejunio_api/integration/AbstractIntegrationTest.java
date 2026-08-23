@@ -1,5 +1,10 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.InMemoryBucketStore;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -12,8 +17,8 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
@@ -26,13 +31,29 @@ import java.util.UUID;
 @Testcontainers(disabledWithoutDocker = true)
 public abstract class AbstractIntegrationTest {
 
-    @Container
+    /**
+     * Singleton container: started once per JVM and never stopped between test classes. Ryuk
+     * removes it when the run ends.
+     *
+     * <p>Deliberately NOT annotated {@code @Container}. That made JUnit stop the container after
+     * the first test class and restart it on a fresh random port for the next one, while Spring
+     * kept reusing the cached context holding the port {@code @DynamicPropertySource} had already
+     * resolved — every class after the first one then failed with ConnectException.
+     */
     @SuppressWarnings("resource")
     static final PostgreSQLContainer<?> POSTGRES =
         new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("ue6_it")
             .withUsername("it")
             .withPassword("it");
+
+    static {
+        // This block runs at class-load time, before disabledWithoutDocker gets a chance to skip
+        // anything, so the availability check has to happen here rather than being inherited.
+        if (DockerClientFactory.instance().isDockerAvailable()) {
+            POSTGRES.start();
+        }
+    }
 
     @DynamicPropertySource
     static void datasourceProps(DynamicPropertyRegistry registry) {
@@ -44,6 +65,38 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected JwtEncoder jwtEncoder;
+    @Autowired private InMemoryBucketStore bucketStore;
+
+    /**
+     * Shared request serializer. A bare ObjectMapper refuses java.time types, so every subclass
+     * building a body with a LocalDate needs the JSR-310 module registered — one place instead of
+     * one per test class.
+     */
+    protected final ObjectMapper json = JsonMapper.builder().addModule(new JavaTimeModule()).build();
+
+    /**
+     * Everything a test writes. Truncated before each test because the container is now a
+     * singleton shared by every IT class — without this, one class's courses and students leak
+     * into the next one's assertions.
+     *
+     * <p>The catalog tables are deliberately absent: roles, levels, grades, parallels, subjects,
+     * academic_years and academic_trimesters are seeded once by schema-it.sql, and the trimester
+     * periods that several tests depend on hang off academic_years.
+     */
+    private static final String[] TRANSACTIONAL_TABLES = {
+        "notifications", "risk_predictions", "attendance", "academic_scores", "assessment_scores",
+        "assessment_events", "evaluation_criteria", "curriculum_adaptations",
+        "curriculum_plan_progress", "curriculum_plans", "class_groups", "course_enrollments",
+        "courses", "students", "users"
+    };
+
+    @BeforeEach
+    void resetSharedState() {
+        jdbc.execute("TRUNCATE TABLE " + String.join(", ", TRANSACTIONAL_TABLES) + " CASCADE");
+        // Rate-limit buckets live in the shared context, not the database, so they need their own
+        // reset: otherwise a test that deliberately exhausts a bucket makes the next one fail 429.
+        bucketStore.clear();
+    }
 
     @Value("${app.security.jwt.issuer}")
     protected String jwtIssuer;
@@ -107,10 +160,24 @@ public abstract class AbstractIntegrationTest {
     protected UUID seedStudent() {
         UUID id = UUID.randomUUID();
         String suffix = id.toString().substring(0, 8);
+        return insertStudent(id, "Est" + suffix, "Apellido" + suffix);
+    }
+
+    /**
+     * Seeds a student with stable names. Needed wherever the assertion depends on the response
+     * text or on row order: listings sort by last name, and the generated names carry a random
+     * UUID fragment, so two students would swap places from one run to the next.
+     */
+    protected UUID seedStudent(String names, String lastNames) {
+        return insertStudent(UUID.randomUUID(), names, lastNames);
+    }
+
+    private UUID insertStudent(UUID id, String names, String lastNames) {
+        String suffix = id.toString().substring(0, 8);
         jdbc.update(
             "INSERT INTO students (id_student, rude_code, identity_card, names, last_names, "
                 + "birth_date, gender, status) VALUES (?,?,?,?,?,?,?,?)",
-            id, "RUDE-" + suffix, "ID-" + suffix, "Est" + suffix, "Apellido" + suffix,
+            id, "RUDE-" + suffix, "ID-" + suffix, names, lastNames,
             java.sql.Date.valueOf("2015-01-01"), "M", STATUS_EFFECTIVE);
         return id;
     }

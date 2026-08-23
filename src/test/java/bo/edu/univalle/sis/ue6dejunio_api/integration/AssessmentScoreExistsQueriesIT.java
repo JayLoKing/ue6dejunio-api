@@ -32,8 +32,8 @@ class AssessmentScoreExistsQueriesIT extends AbstractIntegrationTest {
         subjectId = jdbc.queryForObject(
             "SELECT id_subject FROM class_groups WHERE id_class_group = ?", UUID.class, classGroup);
 
-        criterionWithScore = seedCriterion(classGroup, 1, "COGNITIVA", "Con notas");
-        criterionWithoutScore = seedCriterion(classGroup, 1, "COGNITIVA", "Sin notas");
+        criterionWithScore = seedCriterion(classGroup, 1, "Knowing", "Con notas");
+        criterionWithoutScore = seedCriterion(classGroup, 1, "Knowing", "Sin notas");
 
         UUID event = seedEvent(criterionWithScore, "Prueba 1", 10.0);
         UUID student = seedStudent();

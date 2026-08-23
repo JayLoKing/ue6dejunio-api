@@ -36,14 +36,16 @@ class GradebookAttendanceGoldenTest extends AbstractIntegrationTest {
         UUID teacher = seedUser("Teacher", false);
         courseId = seedCourse(teacher, "A");
 
+        // Fixed names: the listing sorts by last name, so random ones would swap the two rows
+        // between runs. "Perez" sorts before "Zapata", pinning the student with records first.
         // Student with two daily attendance records.
-        UUID studentWithAttendance = seedStudent();
+        UUID studentWithAttendance = seedStudent("Ana", "Perez");
         UUID enrollmentWithAttendance = seedEnrollment(studentWithAttendance, courseId);
         seedDailyAttendance(enrollmentWithAttendance, LocalDate.of(2026, 3, 2), "Present");
         seedDailyAttendance(enrollmentWithAttendance, LocalDate.of(2026, 3, 3), "Absent");
 
         // Student enrolled but with zero attendance records (empty-attendance scenario).
-        UUID studentNoAttendance = seedStudent();
+        UUID studentNoAttendance = seedStudent("Luis", "Zapata");
         seedEnrollment(studentNoAttendance, courseId);
     }
 

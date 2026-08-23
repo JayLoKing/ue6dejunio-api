@@ -60,9 +60,12 @@ class AccountRecoveryIT extends AbstractIntegrationTest {
     /** Mints a real RS256 reset token mirroring JwtService.issuePasswordResetToken. */
     private String resetTokenFor(UUID userId, String pwh, Instant exp) {
         Instant now = Instant.now();
+        // An already-expired token still has to be internally consistent: JwtClaimsSet rejects an
+        // expiry that precedes issuance, so back-date issuedAt when the caller asks for a past exp.
+        Instant issuedAt = now.isBefore(exp) ? now : exp.minus(1, ChronoUnit.MINUTES);
         JwtClaimsSet claims = JwtClaimsSet.builder()
             .issuer(jwtIssuer)
-            .issuedAt(now)
+            .issuedAt(issuedAt)
             .expiresAt(exp)
             .subject(userId.toString())
             .claim("purpose", "pwd_reset")

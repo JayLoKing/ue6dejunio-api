@@ -30,7 +30,6 @@ class CourseOverviewIT extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mvc;
     @Autowired private EntityManagerFactory entityManagerFactory;
-    private final ObjectMapper json = new ObjectMapper();
 
     private UUID director;
     private UUID homeroomTeacher;
@@ -56,8 +55,12 @@ class CourseOverviewIT extends AbstractIntegrationTest {
             "INSERT INTO academic_scores (id_academic_score, id_course_enrollment, id_class_group, "
                 + "trimester, score_being, score_knowing, score_doing, score_deciding) "
                 + "VALUES (?,?,?,?,?,?,?,?)",
+            // Each dimension has its own ceiling in academic_scores (being<=10, knowing<=45,
+            // doing<=40, deciding<=5). Pin three of them at their cap and let "doing" absorb the
+            // requested total, which stays inside its own ceiling for every total used here.
             UUID.randomUUID(), enrollment, classGroupId, 1,
-            new BigDecimal("25"), new BigDecimal("25"), new BigDecimal("25"), total.subtract(new BigDecimal("75")));
+            new BigDecimal("10"), new BigDecimal("45"), total.subtract(new BigDecimal("60")),
+            new BigDecimal("5"));
     }
 
     @Test

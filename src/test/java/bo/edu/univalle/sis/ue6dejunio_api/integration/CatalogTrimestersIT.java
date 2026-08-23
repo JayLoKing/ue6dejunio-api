@@ -21,7 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CatalogTrimestersIT extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mvc;
-    private final ObjectMapper json = new ObjectMapper();
 
     private UUID teacher;
     private Integer academicYearId;

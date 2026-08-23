@@ -59,8 +59,10 @@ class GradebookQueryCountTest extends AbstractIntegrationTest {
                 "INSERT INTO academic_scores (id_academic_score, id_course_enrollment, id_class_group, "
                     + "trimester, score_being, score_knowing, score_doing, score_deciding) "
                     + "VALUES (?,?,?,?,?,?,?,?)",
+                // Each dimension has its own ceiling in academic_scores: being<=10, knowing<=45,
+                // doing<=40, deciding<=5.
                 UUID.randomUUID(), enrollment, classGroup, 1,
-                new BigDecimal("25"), new BigDecimal("25"), new BigDecimal("25"), new BigDecimal("25"));
+                new BigDecimal("10"), new BigDecimal("25"), new BigDecimal("25"), new BigDecimal("5"));
         }
     }
 

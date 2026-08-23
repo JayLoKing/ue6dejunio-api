@@ -9,7 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,7 +27,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AttendanceAuthorizationIT extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mvc;
-    private final ObjectMapper json = new ObjectMapper();
 
     private UUID homeroomTeacherA;
     private UUID otherTeacher;
@@ -52,7 +53,7 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
 
     @Test
     void nonHomeroomTeacher_daily_forbidden() throws Exception {
-        String body = json.writeValueAsString(new DailyBody(enrollmentInA, LocalDate.now(), "Present"));
+        String body = json.writeValueAsString(new DailyBody(enrollmentInA, editableSchoolDay(), "Present"));
 
         mvc.perform(post("/api/attendance/daily")
                 .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
@@ -63,7 +64,7 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
 
     @Test
     void homeroomTeacher_daily_ok() throws Exception {
-        String body = json.writeValueAsString(new DailyBody(enrollmentInA, LocalDate.now(), "Present"));
+        String body = json.writeValueAsString(new DailyBody(enrollmentInA, editableSchoolDay(), "Present"));
 
         mvc.perform(post("/api/attendance/daily")
                 .header("Authorization", "Bearer " + tokenFor(homeroomTeacherA, "Teacher"))
@@ -74,7 +75,7 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
 
     @Test
     void mixedOwnershipBatch_forbidden_nothingPersisted() throws Exception {
-        String body = json.writeValueAsString(new DailyBatchBody(LocalDate.now(),
+        String body = json.writeValueAsString(new DailyBatchBody(editableSchoolDay(),
             List.of(new Mark(enrollmentInA, "Present"), new Mark(enrollmentInB, "Present"))));
 
         mvc.perform(post("/api/attendance/daily/batch")
@@ -91,14 +92,17 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
 
     @Test
     void director_dailyAndBatch_ok() throws Exception {
-        String dailyBody = json.writeValueAsString(new DailyBody(enrollmentInB, LocalDate.now(), "Present"));
+        String dailyBody = json.writeValueAsString(new DailyBody(enrollmentInB, editableSchoolDay(), "Present"));
         mvc.perform(post("/api/attendance/daily")
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(dailyBody))
             .andExpect(status().isOk());
 
-        String batchBody = json.writeValueAsString(new DailyBatchBody(LocalDate.now().minusDays(1),
+        // Same school day as the daily post above: the batch simply upserts over it. A distinct
+        // earlier day cannot be used here, because on a Monday run no earlier school day exists
+        // inside the editable week.
+        String batchBody = json.writeValueAsString(new DailyBatchBody(editableSchoolDay(),
             List.of(new Mark(enrollmentInA, "Present"), new Mark(enrollmentInB, "Absent"))));
         mvc.perform(post("/api/attendance/daily/batch")
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
@@ -117,7 +121,7 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
     @Test
     void session_regression_nonOwnerForbidden_ownerAndDirectorOk() throws Exception {
         String body = json.writeValueAsString(
-            new SessionBody(enrollmentInA, classGroupA, LocalDate.now(), "Present"));
+            new SessionBody(enrollmentInA, classGroupA, editableSchoolDay(), "Present"));
 
         mvc.perform(post("/api/attendance/session")
                 .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
@@ -130,6 +134,20 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk());
+    }
+
+    /**
+     * A school day inside the current editable week, on the same zone the application Clock uses.
+     * These tests assert authorization, not the date window, so the date must never be the reason
+     * a request is rejected — on a weekend run this falls back to that week's Friday, which the
+     * service still accepts.
+     */
+    private static LocalDate editableSchoolDay() {
+        LocalDate today = LocalDate.now(ZoneId.of("America/La_Paz"));
+        return switch (today.getDayOfWeek()) {
+            case SATURDAY, SUNDAY -> today.with(DayOfWeek.FRIDAY);
+            default -> today;
+        };
     }
 
     private record DailyBody(

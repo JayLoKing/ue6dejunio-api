@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,11 +41,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   git stash pop
  *   ./gradlew test -Dtest=GradebookCentralizerGoldenTest,GradebookAttendanceGoldenTest -x spotlessCheck
  * </pre>
- * The first run (pre-refactor code) bootstraps the golden file if missing and always asserts
- * against it once present, so the second run (post-refactor code, after {@code stash pop})
- * proves byte-identical output. This class was authored without Docker available in the
- * implementation sandbox, so the golden file has NOT been captured/committed yet — see the
- * apply-progress report for this change.
+ * The first run bootstraps the golden file if missing and asserts against it once present, so the
+ * second run proves identical output.
+ *
+ * <p>The comparison runs over a normalized copy: surrogate UUIDs are replaced by a placeholder,
+ * because every seed mints fresh ones and a literal byte match would only ever succeed on the run
+ * that wrote the file. Student names are seeded fixed for the same reason — the listing sorts by
+ * last name, so generated names would reorder the rows between runs. Everything else is asserted
+ * verbatim: field names and order, subject names, totals, averages, null-vs-value and paging.
+ *
+ * <p>The golden files must be committed; left untracked they regenerate on a clean checkout and
+ * the test degrades into asserting the output against itself.
  */
 class GradebookCentralizerGoldenTest extends AbstractIntegrationTest {
 
@@ -65,16 +72,20 @@ class GradebookCentralizerGoldenTest extends AbstractIntegrationTest {
         UUID classGroupMath = seedClassGroup(courseId, teacher, "Matematicas");
         UUID classGroupLang = seedClassGroup(courseId, teacher, "Lenguaje");
 
+        // Fixed names: the centralizer sorts by last name, so random ones would swap the two rows
+        // between runs and the captured output would never be stable. "Perez" sorts before
+        // "Zapata", pinning the scored student to the first row.
         // Student with scores in both subjects, trimester 1.
-        UUID studentWithScores = seedStudent();
+        UUID studentWithScores = seedStudent("Ana", "Perez");
         UUID enrollmentWithScores = seedEnrollment(studentWithScores, courseId);
+        // academic_scores caps each dimension: being<=10, knowing<=45, doing<=40, deciding<=5.
         seedAcademicScore(enrollmentWithScores, classGroupMath, 1,
-            new BigDecimal("20"), new BigDecimal("20"), new BigDecimal("25"), new BigDecimal("25"));
+            new BigDecimal("10"), new BigDecimal("20"), new BigDecimal("25"), new BigDecimal("5"));
         seedAcademicScore(enrollmentWithScores, classGroupLang, 1,
-            new BigDecimal("15"), new BigDecimal("15"), new BigDecimal("15"), new BigDecimal("15"));
+            new BigDecimal("8"), new BigDecimal("15"), new BigDecimal("15"), new BigDecimal("4"));
 
         // Student enrolled but with zero recorded scores (empty-scores scenario).
-        UUID studentNoScores = seedStudent();
+        UUID studentNoScores = seedStudent("Luis", "Zapata");
         seedEnrollment(studentNoScores, courseId);
     }
 
@@ -105,12 +116,26 @@ class GradebookCentralizerGoldenTest extends AbstractIntegrationTest {
      * equality once a golden exists. See class javadoc for the required pre-refactor capture step.
      */
     static void assertGoldenMatch(Path goldenPath, String actual) throws IOException {
+        String normalized = normalizeIds(actual);
         if (Files.notExists(goldenPath)) {
             Files.createDirectories(goldenPath.getParent());
-            Files.writeString(goldenPath, actual, StandardCharsets.UTF_8);
+            Files.writeString(goldenPath, normalized, StandardCharsets.UTF_8);
             return;
         }
         String expected = Files.readString(goldenPath, StandardCharsets.UTF_8);
-        assertThat(actual).isEqualTo(expected);
+        assertThat(normalized).isEqualTo(expected);
     }
+
+    /**
+     * Blanks out the surrogate keys before comparing. Every seed mints fresh UUIDs, so a literal
+     * byte comparison could only ever succeed on the run that wrote the golden. Everything that
+     * actually characterizes the output — field names and order, student names, subject names,
+     * totals, averages, null-vs-value, paging — stays under assertion.
+     */
+    private static String normalizeIds(String json) {
+        return UUID_PATTERN.matcher(json).replaceAll("<uuid>");
+    }
+
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 }

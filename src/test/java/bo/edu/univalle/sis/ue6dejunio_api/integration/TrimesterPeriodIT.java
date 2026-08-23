@@ -23,7 +23,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TrimesterPeriodIT extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mvc;
-    private final ObjectMapper json = new ObjectMapper();
 
     private UUID director;
     private Integer academicYearId;
