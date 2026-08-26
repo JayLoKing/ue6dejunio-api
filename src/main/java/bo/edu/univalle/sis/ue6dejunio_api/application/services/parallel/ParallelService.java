@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.parallel;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.CreateParallelCommand;
@@ -7,8 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.Parallel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.UpdateParallelCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.parallel.IParallelDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.parallel.IParallelService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,8 +50,8 @@ public class ParallelService implements IParallelService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Parallel> list(Pageable pageable) {
-        return parallelDomain.list(pageable);
+    public PageResult<Parallel> list(PageQuery pageQuery) {
+        return parallelDomain.list(pageQuery);
     }
 
     @Override
@@ -58,7 +59,7 @@ public class ParallelService implements IParallelService {
     public void delete(Integer id) {
         getById(id);
         if (parallelDomain.hasClassGroups(id)) {
-            throw new IllegalStateException("No se puede eliminar: el paralelo tiene class_groups asociados");
+            throw new ConflictException("No se puede eliminar: el paralelo tiene class_groups asociados");
         }
         parallelDomain.deleteById(id);
     }

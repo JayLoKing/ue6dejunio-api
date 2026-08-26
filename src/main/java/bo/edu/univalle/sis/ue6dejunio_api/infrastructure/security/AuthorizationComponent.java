@@ -1,5 +1,10 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
@@ -21,6 +26,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,6 +60,9 @@ public class AuthorizationComponent {
     private final ICriterionDomain criterionDomain;
     private final ICourseEnrollmentDomain courseEnrollmentDomain;
     private final ICourseDomain courseDomain;
+    private final IPdcDomain pdcDomain;
+    private final INotificationDomain notificationDomain;
+    private final IAdaptationDomain adaptationDomain;
 
     public AuthorizationComponent(
         IClassGroupDomain classGroupDomain,
@@ -61,7 +70,10 @@ public class AuthorizationComponent {
         IAssessmentScoreDomain assessmentScoreDomain,
         ICriterionDomain criterionDomain,
         ICourseEnrollmentDomain courseEnrollmentDomain,
-        ICourseDomain courseDomain
+        ICourseDomain courseDomain,
+        IPdcDomain pdcDomain,
+        INotificationDomain notificationDomain,
+        IAdaptationDomain adaptationDomain
     ) {
         this.classGroupDomain = classGroupDomain;
         this.assessmentEventDomain = assessmentEventDomain;
@@ -69,6 +81,9 @@ public class AuthorizationComponent {
         this.criterionDomain = criterionDomain;
         this.courseEnrollmentDomain = courseEnrollmentDomain;
         this.courseDomain = courseDomain;
+        this.pdcDomain = pdcDomain;
+        this.notificationDomain = notificationDomain;
+        this.adaptationDomain = adaptationDomain;
     }
 
     public boolean canWriteClassGroup(Authentication authentication, UUID classGroupId) {
@@ -218,13 +233,7 @@ public class AuthorizationComponent {
         if (!courseByEnrollment.keySet().containsAll(courseEnrollmentIds)) {
             return false;
         }
-        for (UUID courseId : new HashSet<>(courseByEnrollment.values())) {
-            Optional<Course> course = courseDomain.findById(courseId);
-            if (course.isEmpty() || !teacherId.equals(course.get().homeroomTeacherId())) {
-                return false;
-            }
-        }
-        return true;
+        return courseDomain.isHomeroomTeacherOfAll(teacherId, new HashSet<>(courseByEnrollment.values()));
     }
 
     /**
@@ -291,6 +300,10 @@ public class AuthorizationComponent {
     /**
      * Who may read a single student. A teacher reaches only students enrolled in a course they
      * are tied to, either as homeroom teacher or through a class group they run.
+     *
+     * <p>The tie is asked once for every course at a time. Walking the courses and calling
+     * {@link #canReadCourseRoster} per course made the guard cost grow with the student's
+     * enrollments, and this runs before every read of the record.
      */
     public boolean canReadStudent(Authentication authentication, UUID studentId) {
         if (authentication == null || studentId == null) {
@@ -299,12 +312,16 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication)) {
             return true;
         }
-        for (UUID courseId : courseEnrollmentDomain.courseIdsOfStudent(studentId)) {
-            if (canReadCourseRoster(authentication, courseId)) {
-                return true;
-            }
+        UUID teacherId = userId(authentication);
+        if (teacherId == null) {
+            return false;
         }
-        return false;
+        List<UUID> courseIds = courseEnrollmentDomain.courseIdsOfStudent(studentId);
+        if (courseIds.isEmpty()) {
+            return false;
+        }
+        return courseDomain.isHomeroomTeacherOfAny(teacherId, courseIds)
+            || classGroupDomain.teachesInAnyCourse(teacherId, courseIds);
     }
 
     /**
@@ -328,12 +345,17 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        for (UUID courseId : courseEnrollmentDomain.courseIdsOfStudent(studentId)) {
-            if (canReadCourse(authentication, courseId)) {
-                return true;
-            }
+        UUID teacherId = userId(authentication);
+        if (teacherId == null) {
+            return false;
         }
-        return false;
+        List<UUID> courseIds = courseEnrollmentDomain.courseIdsOfStudent(studentId);
+        if (courseIds.isEmpty()) {
+            return false;
+        }
+        // Homeroom only, on purpose: running a subject in the course is not enough to withdraw
+        // a student out of everyone else's roster. Same rule canReadCourse applies per course.
+        return courseDomain.isHomeroomTeacherOfAny(teacherId, courseIds);
     }
 
     public boolean canReadTeacherRoster(Authentication authentication, UUID userId) {
@@ -345,6 +367,93 @@ public class AuthorizationComponent {
         }
         UUID callerId = userId(authentication);
         return callerId != null && callerId.equals(userId);
+    }
+
+    /**
+     * Ownership of a curricular plan. A PDC belongs to a class group, so the teacher who runs that
+     * class group owns it; the Director writes anywhere and read-only staff writes nowhere.
+     */
+    public boolean canWritePdc(Authentication authentication, UUID pdcId) {
+        if (authentication == null || pdcId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        Optional<Pdc> pdc = pdcDomain.findById(pdcId);
+        if (pdc.isEmpty() || pdc.get().getClassGroupId() == null) {
+            return false;
+        }
+        return canWriteClassGroup(authentication, pdc.get().getClassGroupId());
+    }
+
+    /** Read side of {@link #canWritePdc}: the secretariat reads, a Teacher stays in their own plans. */
+    public boolean canReadPdc(Authentication authentication, UUID pdcId) {
+        if (isReadOnlyStaff(authentication)) {
+            return true;
+        }
+        return canWritePdc(authentication, pdcId);
+    }
+
+    /**
+     * Which plans a listing may span. The PDC list carries no mandatory class group filter, so
+     * without a scope a Teacher would page through the whole school's plans. Director and the
+     * secretariat legitimately see everything, which is what {@code null} means here; a Teacher is
+     * narrowed to their own. A token with no usable subject resolves to an id no plan can carry,
+     * because widening on a broken token is exactly the failure this closes.
+     */
+    public UUID pdcListScopeTeacherId(Authentication authentication) {
+        if (authentication == null) {
+            return NO_MATCH_COURSE_ID;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication)) {
+            return null;
+        }
+        UUID teacherId = userId(authentication);
+        return teacherId != null ? teacherId : NO_MATCH_COURSE_ID;
+    }
+
+    /**
+     * Ownership of a curricular adaptation, resolved through the plan it hangs off. An adaptation
+     * names the student it was written for, so reading one is disclosure, not just metadata.
+     */
+    public boolean canWriteAdaptation(Authentication authentication, UUID adaptationId) {
+        if (authentication == null || adaptationId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        Optional<Adaptation> adaptation = adaptationDomain.findById(adaptationId);
+        if (adaptation.isEmpty() || adaptation.get().planId() == null) {
+            return false;
+        }
+        return canWritePdc(authentication, adaptation.get().planId());
+    }
+
+    /** Read side of {@link #canWriteAdaptation}. */
+    public boolean canReadAdaptation(Authentication authentication, UUID adaptationId) {
+        if (isReadOnlyStaff(authentication)) {
+            return true;
+        }
+        return canWriteAdaptation(authentication, adaptationId);
+    }
+
+    /**
+     * A notification is personal: only its receiver may mark it read or delete it. Not even the
+     * Director bypasses this one — acting on someone else's inbox is not an act of authority.
+     */
+    public boolean canActOnNotification(Authentication authentication, UUID notificationId) {
+        if (authentication == null || notificationId == null) {
+            return false;
+        }
+        UUID callerId = userId(authentication);
+        if (callerId == null) {
+            return false;
+        }
+        return notificationDomain.findById(notificationId)
+            .map(n -> callerId.equals(n.receiverId()))
+            .orElse(false);
     }
 
     private boolean ownsEnrollmentCourse(Authentication authentication, UUID courseEnrollmentId) {

@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.grade;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.CreateGradeCommand;
@@ -7,8 +10,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.UpdateGradeCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade.IGradeDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade.IGradeService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +30,7 @@ public class GradeService implements IGradeService {
     @Transactional
     public Grade create(CreateGradeCommand c) {
         if (gradeDomain.countTotal() >= MAX_GRADES) {
-            throw new IllegalStateException("Limite alcanzado: solo se permiten " + MAX_GRADES + " grados (nivel primaria)");
+            throw new ConflictException("Limite alcanzado: solo se permiten " + MAX_GRADES + " grados (nivel primaria)");
         }
         if (!gradeDomain.levelExists(c.levelId())) {
             throw new ResourceNotFoundException("Level", c.levelId());
@@ -45,8 +48,9 @@ public class GradeService implements IGradeService {
         if (!gradeDomain.levelExists(c.levelId())) {
             throw new ResourceNotFoundException("Level", c.levelId());
         }
-        boolean changed = !current.name().equals(c.name())
-            || !current.levelId().equals(c.levelId());
+        // A grade can carry a null level, so comparing it directly turned an edit into a 500.
+        boolean changed = !Objects.equals(current.name(), c.name())
+            || !Objects.equals(current.levelId(), c.levelId());
         if (changed && gradeDomain.existsByNameAndLevel(c.name(), c.levelId())) {
             throw new DuplicateResourceException("grade name", c.name());
         }
@@ -62,8 +66,8 @@ public class GradeService implements IGradeService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Grade> list(Pageable pageable) {
-        return gradeDomain.list(pageable);
+    public PageResult<Grade> list(PageQuery pageQuery) {
+        return gradeDomain.list(pageQuery);
     }
 
     @Override
@@ -71,7 +75,7 @@ public class GradeService implements IGradeService {
     public void delete(Integer id) {
         getById(id);
         if (gradeDomain.hasClassGroups(id)) {
-            throw new IllegalStateException("No se puede eliminar: el grado tiene class_groups asociados");
+            throw new ConflictException("No se puede eliminar: el grado tiene class_groups asociados");
         }
         gradeDomain.deleteById(id);
     }

@@ -14,8 +14,8 @@ public class Pdc {
     private UUID classGroupId;
     private String subjectName;
     private String teacherName;
-    private java.util.UUID createdById;
-    private java.util.UUID updatedById;
+    private UUID createdById;
+    private UUID updatedById;
     private String updatedByName;
     private Integer trimester;
     private String status;

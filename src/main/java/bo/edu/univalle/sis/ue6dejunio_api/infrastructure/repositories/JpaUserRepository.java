@@ -23,7 +23,7 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
     List<UserEntity> findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(String roleName, boolean technical);
 
     @Query("SELECT u FROM UserEntity u WHERE (:excludeId IS NULL OR u.id <> :excludeId)")
-    Page<UserEntity> listExcluding(@Param("excludeId") java.util.UUID excludeId, Pageable pageable);
+    Page<UserEntity> listExcluding(@Param("excludeId") UUID excludeId, Pageable pageable);
 
     @Query("""
         SELECT u FROM UserEntity u
@@ -31,5 +31,5 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
               AND (LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
                           OR LOWER(u.names) LIKE LOWER(CONCAT('%', :q, '%')))
         """)
-    Page<UserEntity> search(@Param("q") String q, @Param("excludeId") java.util.UUID excludeId, Pageable pageable);
+    Page<UserEntity> search(@Param("q") String q, @Param("excludeId") UUID excludeId, Pageable pageable);
 }

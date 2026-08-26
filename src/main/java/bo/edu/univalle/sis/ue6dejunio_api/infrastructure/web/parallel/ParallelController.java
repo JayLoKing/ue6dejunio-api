@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.parallel;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortDirection;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.CreateParallelCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.Parallel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.UpdateParallelCommand;
@@ -15,9 +18,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -63,8 +63,8 @@ public class ParallelController {
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
         @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort
     ) {
-        Sort.Direction dir = "desc".equalsIgnoreCase(sort) ? Sort.Direction.DESC : Sort.Direction.ASC;
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by(dir, "name"));
+        SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
+        PageQuery p = PageQuery.of(offset - 1, limit, new SortField("name", dir));
         return ResponseEntity.ok(PagedResponse.of(parallelService.list(p).map(ParallelResponse::from)));
     }
 

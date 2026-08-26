@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlanEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,9 +19,13 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
         WHERE (:classGroupId IS NULL OR p.classGroup.id = :classGroupId)
               AND (:trimester IS NULL OR p.trimester = :trimester)
               AND (:status IS NULL OR p.status = :status)
+              AND (:teacherId IS NULL OR p.classGroup.teacher.id = :teacherId)
         """)
+    @EntityGraph(attributePaths = {
+        "classGroup", "classGroup.subject", "classGroup.teacher", "createdBy", "updatedBy"})
     Page<CurriculumPlanEntity> search(@Param("classGroupId") UUID classGroupId,
                                       @Param("trimester") Integer trimester,
                                       @Param("status") String status,
+                                      @Param("teacherId") UUID teacherId,
                                       Pageable pageable);
 }

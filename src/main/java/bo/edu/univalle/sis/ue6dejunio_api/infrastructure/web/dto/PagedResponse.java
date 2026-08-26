@@ -1,6 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
-import org.springframework.data.domain.Page;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 
 import java.util.List;
 
@@ -11,13 +11,13 @@ public record PagedResponse<T>(
     long total,
     int totalPages
 ) {
-    public static <T> PagedResponse<T> of(Page<T> p) {
+    public static <T> PagedResponse<T> of(PageResult<T> p) {
         return new PagedResponse<>(
-            p.getContent(),
-            p.getNumber(),
-            p.getSize(),
-            p.getTotalElements(),
-            p.getTotalPages()
+            p.content(),
+            p.page(),
+            p.size(),
+            p.totalElements(),
+            p.totalPages()
         );
     }
 }

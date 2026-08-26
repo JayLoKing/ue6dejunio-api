@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.course;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.course.CourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -72,7 +73,7 @@ class CourseServiceTest {
         when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(false);
         when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(false);
         assertThatThrownBy(() -> courseService.create(cmd(t)))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test
@@ -89,6 +90,6 @@ class CourseServiceTest {
         when(courseDomain.findById(id)).thenReturn(Optional.of(course(id)));
         when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(false);
         assertThatThrownBy(() -> courseService.setHomeroomTeacher(id, t))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(ConflictException.class);
     }
 }

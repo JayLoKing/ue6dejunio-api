@@ -1,13 +1,16 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.user;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortDirection;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateUserRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateUserRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UserListResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -16,10 +19,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -69,17 +69,18 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "Listar usuarios paginados. offset=pagina (1-indexed), limit=cantidad")
-    public ResponseEntity<PagedResponse<UsersList>> list(
+    public ResponseEntity<PagedResponse<UserListResponse>> list(
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
         @RequestParam(required = false) String search,
         @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort,
         JwtAuthenticationToken token
     ) {
-        Sort.Direction dir = "desc".equalsIgnoreCase(sort) ? Sort.Direction.DESC : Sort.Direction.ASC;
-        Pageable pageable = PageRequest.of(offset - 1, limit, Sort.by(dir, "lastNames", "names"));
+        SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
+        PageQuery pageQuery = PageQuery.of(offset - 1, limit, new SortField("lastNames", dir), new SortField("names", dir));
         UUID currentUserId = UUID.fromString(token.getToken().getSubject());
-        return ResponseEntity.ok(PagedResponse.of(userService.list(pageable, search, currentUserId)));
+        return ResponseEntity.ok(PagedResponse.of(
+            userService.list(pageQuery, search, currentUserId).map(UserListResponse::from)));
     }
 
     @PutMapping("/{id}")

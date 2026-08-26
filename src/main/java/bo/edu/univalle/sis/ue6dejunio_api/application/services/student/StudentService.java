@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.student;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -9,8 +11,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawa
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,8 +38,8 @@ public class StudentService implements IStudentService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<StudentDirectoryItem> search(String q, UUID courseId, Pageable pageable) {
-        return studentDomain.searchDirectory(q, courseId, pageable);
+    public PageResult<StudentDirectoryItem> search(String q, UUID courseId, PageQuery pageQuery) {
+        return studentDomain.searchDirectory(q, courseId, pageQuery);
     }
 
     @Override

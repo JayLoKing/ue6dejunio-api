@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
+import java.util.Collection;
+import java.util.List;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import org.springframework.data.domain.Page;
@@ -8,14 +10,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID> {
-    boolean existsByRudeCode(String rudeCode);
-    boolean existsByIdentityCard(String identityCard);
-    Optional<StudentEntity> findByRudeCode(String rudeCode);
-    Optional<StudentEntity> findByIdentityCard(String identityCard);
+
+    List<StudentEntity> findByRudeCodeIn(Collection<String> rudeCodes);
+
+    List<StudentEntity> findByIdentityCardIn(Collection<String> identityCards);
 
     @Query(value = """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(

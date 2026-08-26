@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
@@ -9,7 +11,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -92,15 +93,11 @@ public class PdcRepositoryAdapter implements IPdcDomain {
     }
 
     @Override
-    public UUID teacherIdOfClassGroup(UUID classGroupId) {
-        return classGroupRepo.findById(classGroupId)
-            .map(cg -> cg.getTeacher() != null ? cg.getTeacher().getId() : null)
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
-    }
-
-    @Override
-    public Page<Pdc> list(UUID classGroupId, Integer trimester, String status, Pageable pageable) {
-        return pdcRepo.search(classGroupId, trimester, status, pageable).map(this::toDomain);
+    public PageResult<Pdc> list(UUID classGroupId, Integer trimester, String status, UUID teacherId,
+                                PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(
+            pdcRepo.search(classGroupId, trimester, status, teacherId, pageable).map(this::toDomain));
     }
 
     @Override

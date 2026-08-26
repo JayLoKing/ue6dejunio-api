@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.adaptation;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
@@ -14,8 +15,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
@@ -27,6 +26,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -49,6 +49,11 @@ public class AdaptationController {
     }
 
     @PostMapping
+    // Owning the plan is not enough: the body also names a student, and the response echoes their
+    // full name back. Both halves of the claim are checked, or a teacher writes an adaptation
+    // against a student from another course and learns their name doing it.
+    @PreAuthorize("@authz.canWritePdc(authentication, #r.planId())"
+        + " and @authz.canReadStudent(authentication, #r.studentId())")
     @Operation(summary = "Crear adaptacion curricular (unica por plan + estudiante)")
     public ResponseEntity<AdaptationResponse> create(@Valid @RequestBody CreateAdaptationRequest r,
                                                      JwtAuthenticationToken token) {
@@ -59,24 +64,27 @@ public class AdaptationController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@authz.canReadAdaptation(authentication, #id)")
     @Operation(summary = "Obtener adaptacion por id")
     public ResponseEntity<AdaptationResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(AdaptationResponse.from(adaptationService.getById(id)));
     }
 
     @GetMapping
+    @PreAuthorize("@authz.canReadPdc(authentication, #planId)")
     @Operation(summary = "Listar adaptaciones de un PDC")
     public ResponseEntity<PagedResponse<AdaptationResponse>> list(
         @RequestParam("id_curriculum_plan") UUID planId,
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit);
+        PageQuery p = PageQuery.of(offset - 1, limit);
         return ResponseEntity.ok(PagedResponse.of(
             adaptationService.listByPlan(planId, p).map(AdaptationResponse::from)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@authz.canWriteAdaptation(authentication, #id)")
     @Operation(summary = "Actualizar adaptacion")
     public ResponseEntity<AdaptationResponse> update(@PathVariable UUID id,
                                                     @Valid @RequestBody UpdateAdaptationRequest r,
@@ -87,6 +95,7 @@ public class AdaptationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@authz.canWriteAdaptation(authentication, #id)")
     @Operation(summary = "Eliminar adaptacion")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         adaptationService.delete(id);

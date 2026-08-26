@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade.IGradeDomain;
@@ -8,7 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.LevelEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaLevelRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,8 +81,9 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     }
 
     @Override
-    public Page<Grade> list(Pageable pageable) {
-        return gradeRepo.findAll(pageable).map(this::toDomain);
+    public PageResult<Grade> list(PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(gradeRepo.findAll(pageable).map(this::toDomain));
     }
 
     @Override

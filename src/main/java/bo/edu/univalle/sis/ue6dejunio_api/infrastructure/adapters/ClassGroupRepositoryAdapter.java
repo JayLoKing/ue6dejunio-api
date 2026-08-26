@@ -14,6 +14,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRep
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -84,6 +85,15 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     }
 
     @Override
+    public boolean teachesInAnyCourse(UUID teacherId, Collection<UUID> courseIds) {
+        // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
+        if (teacherId == null || courseIds == null || courseIds.isEmpty()) {
+            return false;
+        }
+        return classGroupRepo.existsByTeacher_IdAndCourse_IdIn(teacherId, courseIds);
+    }
+
+    @Override
     @Transactional
     public ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId) {
         CourseEntity course = courseRepo.findById(courseId)
@@ -103,11 +113,6 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Override
     public Optional<ClassGroup> findById(UUID id) {
         return classGroupRepo.findById(id).map(this::toDomain);
-    }
-
-    @Override
-    public List<UUID> classGroupIdsByCourse(UUID courseId) {
-        return classGroupRepo.findIdsByCourse(courseId);
     }
 
     @Override

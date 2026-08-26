@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.classgroup;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -35,7 +36,7 @@ public class ClassGroupService implements IClassGroupService {
                 throw new ResourceNotFoundException("Materia", a.subjectId());
             }
             if (a.teacherId() == null) {
-                throw new IllegalArgumentException("Cada materia requiere un docente asignado");
+                throw new ValidationException("Cada materia requiere un docente asignado");
             }
             validateTeacherMatchesSubject(a.subjectId(), a.teacherId());
             if (classGroupDomain.existsByCourseAndSubject(command.courseId(), a.subjectId())) {

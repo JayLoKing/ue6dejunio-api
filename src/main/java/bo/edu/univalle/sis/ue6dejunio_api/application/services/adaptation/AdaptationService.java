@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.adaptation;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
@@ -7,8 +9,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptat
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,8 +55,8 @@ public class AdaptationService implements IAdaptationService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Adaptation> listByPlan(UUID planId, Pageable pageable) {
-        return adaptationDomain.listByPlan(planId, pageable);
+    public PageResult<Adaptation> listByPlan(UUID planId, PageQuery pageQuery) {
+        return adaptationDomain.listByPlan(planId, pageQuery);
     }
 
     @Override

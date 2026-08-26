@@ -1,13 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.notification;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +32,8 @@ public class NotificationService implements INotificationService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Notification> inbox(UUID userId, boolean unreadOnly, Pageable pageable) {
-        return notificationDomain.listReceived(userId, unreadOnly, pageable);
+    public PageResult<Notification> inbox(UUID userId, boolean unreadOnly, PageQuery pageQuery) {
+        return notificationDomain.listReceived(userId, unreadOnly, pageQuery);
     }
 
     @Override
@@ -45,14 +44,15 @@ public class NotificationService implements INotificationService {
 
     @Override
     @Transactional
-    public Notification markRead(UUID id, UUID userId) {
+    public Notification markRead(UUID id) {
+        // Only the receiver reaches this: @PreAuthorize resolves that before the call.
         Notification n = notificationDomain.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Notificacion", id));
-        if (!userId.equals(n.receiverId())) {
-            throw new AccessDeniedException("No es el receptor de esta notificacion");
-        }
         notificationDomain.markAsRead(id);
-        return notificationDomain.findById(id).orElseThrow();
+        // Read once and report what the row now is. Fetching it again cost a round trip and, if
+        // the receiver deleted it from another tab meanwhile, answered 500 instead of 404.
+        return new Notification(n.id(), n.senderId(), n.senderName(), n.receiverId(),
+            n.receiverName(), n.message(), true, n.createdAt());
     }
 
     @Override
@@ -63,12 +63,9 @@ public class NotificationService implements INotificationService {
 
     @Override
     @Transactional
-    public void delete(UUID id, UUID userId) {
-        Notification n = notificationDomain.findById(id)
+    public void delete(UUID id) {
+        notificationDomain.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Notificacion", id));
-        if (!userId.equals(n.receiverId())) {
-            throw new AccessDeniedException("No es el receptor de esta notificacion");
-        }
         notificationDomain.deleteById(id);
     }
 }

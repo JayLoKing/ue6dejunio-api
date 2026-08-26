@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.notification;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
@@ -13,9 +15,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
@@ -26,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -64,7 +64,7 @@ public class NotificationController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.desc("createdAt"));
         return ResponseEntity.ok(PagedResponse.of(
             notificationService.inbox(currentUser(token), unreadOnly, p)
                 .map(NotificationResponse::from)));
@@ -78,11 +78,10 @@ public class NotificationController {
     }
 
     @PostMapping("/{id}/read")
+    @PreAuthorize("@authz.canActOnNotification(authentication, #id)")
     @Operation(summary = "Marcar notificacion como leida (solo receptor)")
-    public ResponseEntity<NotificationResponse> markRead(@PathVariable UUID id,
-                                                        JwtAuthenticationToken token) {
-        return ResponseEntity.ok(NotificationResponse.from(
-            notificationService.markRead(id, currentUser(token))));
+    public ResponseEntity<NotificationResponse> markRead(@PathVariable UUID id) {
+        return ResponseEntity.ok(NotificationResponse.from(notificationService.markRead(id)));
     }
 
     @PostMapping("/read-all")
@@ -93,9 +92,10 @@ public class NotificationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@authz.canActOnNotification(authentication, #id)")
     @Operation(summary = "Eliminar notificacion (solo receptor)")
-    public ResponseEntity<Void> delete(@PathVariable UUID id, JwtAuthenticationToken token) {
-        notificationService.delete(id, currentUser(token));
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        notificationService.delete(id);
         return ResponseEntity.noContent().build();
     }
 }

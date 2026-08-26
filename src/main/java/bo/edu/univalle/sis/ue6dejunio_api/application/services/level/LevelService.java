@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.level;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.CreateLevelCommand;
@@ -7,8 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.Level;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.UpdateLevelCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.level.ILevelDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.level.ILevelService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,8 +50,8 @@ public class LevelService implements ILevelService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Level> list(Pageable pageable) {
-        return levelDomain.list(pageable);
+    public PageResult<Level> list(PageQuery pageQuery) {
+        return levelDomain.list(pageQuery);
     }
 
     @Override
@@ -58,7 +59,7 @@ public class LevelService implements ILevelService {
     public void delete(Integer id) {
         getById(id);
         if (levelDomain.hasGrades(id)) {
-            throw new IllegalStateException("No se puede eliminar: el nivel tiene grados asociados");
+            throw new ConflictException("No se puede eliminar: el nivel tiene grados asociados");
         }
         levelDomain.deleteById(id);
     }

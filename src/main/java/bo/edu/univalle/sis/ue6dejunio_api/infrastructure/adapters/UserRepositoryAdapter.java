@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
@@ -8,7 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.UserMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import jakarta.annotation.Nullable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,12 +30,15 @@ public class UserRepositoryAdapter implements IUserDomain {
     }
 
     @Override
-    public Page<UsersList> getUsers(Pageable pageable, @Nullable String search,
-                                    java.util.UUID excludeUserId) {
+    public PageResult<UsersList> getUsers(PageQuery pageQuery, @Nullable String search,
+                                          UUID excludeUserId) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
         if (search == null || search.isBlank()) {
-            return repo.listExcluding(excludeUserId, pageable).map(mapper::toListItem);
+            return SpringPaging.toPageResult(
+                repo.listExcluding(excludeUserId, pageable).map(mapper::toListItem));
         }
-        return repo.search(search, excludeUserId, pageable).map(mapper::toListItem);
+        return SpringPaging.toPageResult(
+            repo.search(search, excludeUserId, pageable).map(mapper::toListItem));
     }
 
     @Override

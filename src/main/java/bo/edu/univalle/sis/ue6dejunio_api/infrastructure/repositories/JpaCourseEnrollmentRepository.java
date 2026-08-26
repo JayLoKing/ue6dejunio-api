@@ -10,12 +10,16 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrollmentEntity, UUID> {
-    boolean existsByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
-    Optional<CourseEnrollmentEntity> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
+
+    @Query("""
+        SELECT e.student.id FROM CourseEnrollmentEntity e
+        WHERE e.course.id = :courseId AND e.student.id IN :studentIds
+        """)
+    List<UUID> enrolledStudentIds(@Param("courseId") UUID courseId,
+                                            @Param("studentIds") Collection<UUID> studentIds);
     @EntityGraph(attributePaths = "student")
     Page<CourseEnrollmentEntity> findByCourse_Id(UUID courseId, Pageable pageable);
 

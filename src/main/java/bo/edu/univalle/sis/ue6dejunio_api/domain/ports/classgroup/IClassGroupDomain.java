@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,9 +19,15 @@ public interface IClassGroupDomain {
     /** Whether the teacher runs at least one class group in the course. A technical teacher has no
      * homeroom, so this is what ties them to the course's roster. */
     boolean teachesInCourse(UUID teacherId, UUID courseId);
+
+    /**
+     * Same tie as {@link #teachesInCourse}, asked once for a whole set of courses. An ownership
+     * guard spanning every course a student is enrolled in must not query them one by one.
+     */
+    boolean teachesInAnyCourse(UUID teacherId, Collection<UUID> courseIds);
+
     ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId);
     Optional<ClassGroup> findById(UUID id);
-    List<UUID> classGroupIdsByCourse(UUID courseId);
     List<ClassGroup> byCourse(UUID courseId);
     List<ClassGroup> byTeacher(UUID teacherId);
     UUID courseIdOfClassGroup(UUID classGroupId);

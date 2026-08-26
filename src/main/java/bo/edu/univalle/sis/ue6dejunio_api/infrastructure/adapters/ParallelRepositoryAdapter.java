@@ -1,11 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.Parallel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.parallel.IParallelDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ParallelEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,8 +53,9 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
     }
 
     @Override
-    public Page<Parallel> list(Pageable pageable) {
-        return parallelRepo.findAll(pageable).map(this::toDomain);
+    public PageResult<Parallel> list(PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(parallelRepo.findAll(pageable).map(this::toDomain));
     }
 
     @Override

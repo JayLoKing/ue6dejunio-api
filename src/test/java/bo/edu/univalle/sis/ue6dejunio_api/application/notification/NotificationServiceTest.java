@@ -10,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -53,30 +52,29 @@ class NotificationServiceTest {
     }
 
     @Test
-    void markRead_notReceiver_throwsAccessDenied() {
-        UUID id = UUID.randomUUID();
-        UUID receiver = UUID.randomUUID();
-        UUID other = UUID.randomUUID();
-        when(notificationDomain.findById(id)).thenReturn(Optional.of(notif(id, receiver)));
-        assertThatThrownBy(() -> notificationService.markRead(id, other))
-            .isInstanceOf(AccessDeniedException.class);
-    }
-
-    @Test
     void markRead_receiver_marks() {
         UUID id = UUID.randomUUID();
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.findById(id)).thenReturn(Optional.of(notif(id, receiver)));
-        notificationService.markRead(id, receiver);
+        notificationService.markRead(id);
         verify(notificationDomain).markAsRead(id);
     }
 
     @Test
-    void delete_notReceiver_throws() {
+    void markRead_unknownNotification_throwsNotFound() {
         UUID id = UUID.randomUUID();
-        UUID receiver = UUID.randomUUID();
-        when(notificationDomain.findById(id)).thenReturn(Optional.of(notif(id, receiver)));
-        assertThatThrownBy(() -> notificationService.delete(id, UUID.randomUUID()))
-            .isInstanceOf(AccessDeniedException.class);
+        when(notificationDomain.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> notificationService.markRead(id))
+            .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void delete_unknownNotification_throwsNotFound() {
+        UUID id = UUID.randomUUID();
+        when(notificationDomain.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> notificationService.delete(id))
+            .isInstanceOf(ResourceNotFoundException.class);
     }
 }

@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
@@ -35,51 +37,57 @@ class StudentRepositoryAdapterTest {
     @Mock private StudentMapper mapper;
     @InjectMocks private StudentRepositoryAdapter adapter;
 
+    // El adaptador se pide en las palabras del dominio y debe aterrizar exactamente en este
+    // Pageable: si la traduccion cambiara la pagina o el orden, el repositorio no coincide.
+    private final PageQuery pageQuery = PageQuery.of(0, 30);
     private final Pageable pageable = PageRequest.of(0, 30);
 
     @Test
     void searchDirectory_blankQ_routesToListDirectory() {
         UUID courseId = UUID.randomUUID();
-        Page<StudentDirectoryItem> expected = new PageImpl<>(java.util.List.of());
-        when(repo.listDirectory(eq(courseId), eq(pageable))).thenReturn(expected);
+        Page<StudentDirectoryItem> stored = new PageImpl<>(java.util.List.of(), pageable, 0);
+        when(repo.listDirectory(eq(courseId), eq(pageable))).thenReturn(stored);
 
-        Page<StudentDirectoryItem> result = adapter.searchDirectory("", courseId, pageable);
+        PageResult<StudentDirectoryItem> result = adapter.searchDirectory("", courseId, pageQuery);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(result.content()).isEmpty();
+        assertThat(result.size()).isEqualTo(30);
         verify(repo, times(1)).listDirectory(courseId, pageable);
         verify(repo, never()).searchDirectory(any(), any(), any());
     }
 
     @Test
     void searchDirectory_nullQ_routesToListDirectory() {
-        Page<StudentDirectoryItem> expected = new PageImpl<>(java.util.List.of());
-        when(repo.listDirectory(isNull(), eq(pageable))).thenReturn(expected);
+        Page<StudentDirectoryItem> stored = new PageImpl<>(java.util.List.of(), pageable, 0);
+        when(repo.listDirectory(isNull(), eq(pageable))).thenReturn(stored);
 
-        Page<StudentDirectoryItem> result = adapter.searchDirectory(null, null, pageable);
+        PageResult<StudentDirectoryItem> result = adapter.searchDirectory(null, null, pageQuery);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(result.content()).isEmpty();
+        assertThat(result.size()).isEqualTo(30);
         verify(repo, times(1)).listDirectory(null, pageable);
         verify(repo, never()).searchDirectory(any(), any(), any());
     }
 
     @Test
     void searchDirectory_nonBlankQ_routesToLikeSearch() {
-        Page<StudentDirectoryItem> expected = new PageImpl<>(java.util.List.of());
-        when(repo.searchDirectory(eq("Lopez"), isNull(), eq(pageable))).thenReturn(expected);
+        Page<StudentDirectoryItem> stored = new PageImpl<>(java.util.List.of(), pageable, 0);
+        when(repo.searchDirectory(eq("Lopez"), isNull(), eq(pageable))).thenReturn(stored);
 
-        Page<StudentDirectoryItem> result = adapter.searchDirectory("Lopez", null, pageable);
+        PageResult<StudentDirectoryItem> result = adapter.searchDirectory("Lopez", null, pageQuery);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(result.content()).isEmpty();
+        assertThat(result.size()).isEqualTo(30);
         verify(repo, times(1)).searchDirectory("Lopez", null, pageable);
         verify(repo, never()).listDirectory(any(), any());
     }
 
     @Test
     void searchDirectory_whitespaceOnlyQ_routesToListDirectory() {
-        Page<StudentDirectoryItem> expected = new PageImpl<>(java.util.List.of());
-        when(repo.listDirectory(isNull(), eq(pageable))).thenReturn(expected);
+        Page<StudentDirectoryItem> stored = new PageImpl<>(java.util.List.of(), pageable, 0);
+        when(repo.listDirectory(isNull(), eq(pageable))).thenReturn(stored);
 
-        adapter.searchDirectory("   ", null, pageable);
+        adapter.searchDirectory("   ", null, pageQuery);
 
         verify(repo, times(1)).listDirectory(null, pageable);
         verify(repo, never()).searchDirectory(any(), any(), any());

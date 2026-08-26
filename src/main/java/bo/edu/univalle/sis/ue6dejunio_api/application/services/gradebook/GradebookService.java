@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -16,8 +18,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,9 +62,9 @@ public class GradebookService implements IGradebookService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, Pageable pageable) {
-        Page<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageable);
-        List<UUID> ids = page.getContent().stream().map(CourseStudent::courseEnrollmentId).toList();
+    public PageResult<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, PageQuery pageQuery) {
+        PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
+        List<UUID> ids = page.content().stream().map(CourseStudent::courseEnrollmentId).toList();
         Map<UUID, List<AcademicScore>> grouped = ids.isEmpty()
             ? Map.of()
             : scoreDomain.findByCourseEnrollmentIn(ids).stream()
@@ -75,27 +75,27 @@ public class GradebookService implements IGradebookService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, Pageable pageable) {
-        Page<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageable);
+    public PageResult<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, PageQuery pageQuery) {
+        PageResult<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
         return attendanceRows(page, date, attendanceDomain::dailyByCourseEnrollmentIn);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseAttendanceRow> classGroupAttendance(UUID classGroupId, LocalDate date,
-                                                          Pageable pageable) {
+    public PageResult<CourseAttendanceRow> classGroupAttendance(UUID classGroupId, LocalDate date,
+                                                          PageQuery pageQuery) {
         // The roster is the course's, but the rows are the subject's: a technical teacher marks the
         // same students the homeroom teacher does, only for their own class group.
         UUID courseId = attendanceDomain.courseOfClassGroup(classGroupId);
-        Page<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageable);
+        PageResult<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
         return attendanceRows(page, date,
             ids -> attendanceDomain.sessionByClassGroupAndCourseEnrollmentIn(classGroupId, ids));
     }
 
     /** One batched load for the whole page, then in-memory grouping — never a query per student. */
-    private Page<CourseAttendanceRow> attendanceRows(Page<CourseStudent> page, LocalDate date,
+    private PageResult<CourseAttendanceRow> attendanceRows(PageResult<CourseStudent> page, LocalDate date,
                                                      Function<List<UUID>, List<Attendance>> loader) {
-        List<UUID> ids = page.getContent().stream().map(CourseStudent::courseEnrollmentId).toList();
+        List<UUID> ids = page.content().stream().map(CourseStudent::courseEnrollmentId).toList();
         Map<UUID, List<Attendance>> grouped = ids.isEmpty()
             ? Map.of()
             : loader.apply(ids).stream()
@@ -111,10 +111,10 @@ public class GradebookService implements IGradebookService {
 
     @Override
     @Transactional(readOnly = true)
-    public CourseOverview courseOverview(UUID courseId, Integer trimester, Pageable pageable) {
+    public CourseOverview courseOverview(UUID courseId, Integer trimester, PageQuery pageQuery) {
         Course course = courseService.getById(courseId);
         List<ClassGroup> classGroups = classGroupDomain.byCourse(courseId);
-        Page<StudentTrimesterSummary> students = centralizer(courseId, trimester, pageable);
+        PageResult<StudentTrimesterSummary> students = centralizer(courseId, trimester, pageQuery);
         return new CourseOverview(course, classGroups, students);
     }
 

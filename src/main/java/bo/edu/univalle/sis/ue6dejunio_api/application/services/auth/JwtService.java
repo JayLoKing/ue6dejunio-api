@@ -51,7 +51,7 @@ public class JwtService implements IJwtService {
     }
 
     @Override
-    public AuthenticatedUser issueToken(User user, String gradeName, String parallelName, java.util.UUID courseId, Boolean technical) {
+    public AuthenticatedUser issueToken(User user, String gradeName, String parallelName, UUID courseId, Boolean technical) {
         Instant now = Instant.now();
         Instant exp = now.plus(ttlMinutes, ChronoUnit.MINUTES);
         String role = user.getRole() != null ? user.getRole().name() : "";

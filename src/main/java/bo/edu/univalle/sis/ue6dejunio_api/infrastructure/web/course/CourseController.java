@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.course;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
@@ -25,9 +27,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -88,7 +87,7 @@ public class CourseController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit);
+        PageQuery p = PageQuery.of(offset - 1, limit);
         return ResponseEntity.ok(PagedResponse.of(
             courseService.list(academicYearId, p).map(CourseResponse::from)));
     }
@@ -126,7 +125,7 @@ public class CourseController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(CourseOverviewResponse.from(
             gradebookService.courseOverview(id, trimester, p)));
     }

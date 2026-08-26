@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
@@ -8,7 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseEnrollmentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,8 +47,12 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
-    public boolean existsEnrollment(UUID studentId, UUID courseId) {
-        return enrollmentRepo.existsByStudent_IdAndCourse_Id(studentId, courseId);
+    public List<UUID> enrolledStudentIds(UUID courseId, Collection<UUID> studentIds) {
+        // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
+        if (courseId == null || studentIds == null || studentIds.isEmpty()) {
+            return List.of();
+        }
+        return enrollmentRepo.enrolledStudentIds(courseId, studentIds);
     }
 
     @Override
@@ -62,14 +67,10 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
-    public Optional<UUID> findByStudentAndCourse(UUID studentId, UUID courseId) {
-        return enrollmentRepo.findByStudent_IdAndCourse_Id(studentId, courseId)
-            .map(CourseEnrollmentEntity::getId);
-    }
-
-    @Override
-    public Page<CourseStudent> studentsByCourse(UUID courseId, Pageable pageable) {
-        return enrollmentRepo.findByCourse_Id(courseId, pageable).map(this::toCourseStudent);
+    public PageResult<CourseStudent> studentsByCourse(UUID courseId, PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(
+            enrollmentRepo.findByCourse_Id(courseId, pageable).map(this::toCourseStudent));
     }
 
     @Override
@@ -79,7 +80,7 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
 
     @Override
     public Map<UUID, UUID> courseIdsByEnrollment(Collection<UUID> courseEnrollmentIds) {
-        if (courseEnrollmentIds.isEmpty()) {
+        if (courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
             return Map.of();
         }
         Map<UUID, UUID> byEnrollment = new HashMap<>();
@@ -90,9 +91,11 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
-    public Page<CourseStudent> activeStudentsByCourse(UUID courseId, Pageable pageable) {
-        return enrollmentRepo.findByCourse_IdAndStatus(courseId, STATUS_EFFECTIVE, pageable)
-            .map(this::toCourseStudent);
+    public PageResult<CourseStudent> activeStudentsByCourse(UUID courseId, PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(
+            enrollmentRepo.findByCourse_IdAndStatus(courseId, STATUS_EFFECTIVE, pageable)
+                .map(this::toCourseStudent));
     }
 
     @Override

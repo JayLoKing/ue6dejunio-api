@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.gradebook;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook.GradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
@@ -16,10 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -59,7 +57,7 @@ class GradebookServiceGroupingTest {
     private UUID studentB;
     private UUID classGroupMath;
     private UUID classGroupLang;
-    private Pageable pageable;
+    private PageQuery pageQuery;
 
     @BeforeEach
     void setUp() {
@@ -72,7 +70,7 @@ class GradebookServiceGroupingTest {
         studentB = UUID.randomUUID();
         classGroupMath = UUID.randomUUID();
         classGroupLang = UUID.randomUUID();
-        pageable = PageRequest.of(0, 30);
+        pageQuery = PageQuery.of(0, 30);
     }
 
     private CourseStudent courseStudent(UUID enrollmentId, UUID studentId, String names, String lastNames) {
@@ -87,11 +85,11 @@ class GradebookServiceGroupingTest {
 
     @Test
     void centralizer_groupsBatchedScoresPerEnrollment_matchesPerStudentBaseline() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez"),
             courseStudent(enrollmentB, studentB, "Luis", "Gomez")
-        ), pageable, 2);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
 
         List<AcademicScore> batched = List.of(
             score(enrollmentA, classGroupLang, "Lenguaje", 1, new BigDecimal("80.00")),
@@ -100,11 +98,11 @@ class GradebookServiceGroupingTest {
         );
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(batched);
 
-        Page<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageable);
+        PageResult<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageQuery);
 
-        assertThat(result.getContent()).hasSize(2);
-        StudentTrimesterSummary rowA = result.getContent().get(0);
-        StudentTrimesterSummary rowB = result.getContent().get(1);
+        assertThat(result.content()).hasSize(2);
+        StudentTrimesterSummary rowA = result.content().get(0);
+        StudentTrimesterSummary rowB = result.content().get(1);
 
         // No cross-student bleed: row A only has its own two subjects, row B only its one.
         assertThat(rowA.subjects()).hasSize(2);
@@ -121,37 +119,37 @@ class GradebookServiceGroupingTest {
 
     @Test
     void centralizer_emptyScoresEnrollment_keepsNullAverageShape() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
-        ), pageable, 1);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
-        Page<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageable);
+        PageResult<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageQuery);
 
-        StudentTrimesterSummary row = result.getContent().get(0);
+        StudentTrimesterSummary row = result.content().get(0);
         assertThat(row.subjects()).isEmpty();
         assertThat(row.generalAverage()).isNull();
     }
 
     @Test
     void centralizer_emptyPage_skipsBatchQuery() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(), pageable, 0);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        PageResult<CourseStudent> page = page(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
 
-        Page<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageable);
+        PageResult<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageQuery);
 
-        assertThat(result.getContent()).isEmpty();
+        assertThat(result.content()).isEmpty();
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());
     }
 
     @Test
     void courseAttendance_groupsBatchedAttendancePerEnrollment_noBleed() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez"),
             courseStudent(enrollmentB, studentB, "Luis", "Gomez")
-        ), pageable, 2);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery)).thenReturn(page);
 
         Attendance attA1 = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 1), "Present");
         Attendance attA2 = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 2), "Absent");
@@ -159,10 +157,10 @@ class GradebookServiceGroupingTest {
         when(attendanceDomain.dailyByCourseEnrollmentIn(anyCollection()))
             .thenReturn(List.of(attA1, attA2, attB1));
 
-        Page<CourseAttendanceRow> result = service.courseAttendance(courseId, null, pageable);
+        PageResult<CourseAttendanceRow> result = service.courseAttendance(courseId, null, pageQuery);
 
-        CourseAttendanceRow rowA = result.getContent().get(0);
-        CourseAttendanceRow rowB = result.getContent().get(1);
+        CourseAttendanceRow rowA = result.content().get(0);
+        CourseAttendanceRow rowB = result.content().get(1);
         assertThat(rowA.attendances()).containsExactly(attA1, attA2);
         assertThat(rowB.attendances()).containsExactly(attB1);
         verify(attendanceDomain, never()).dailyByCourseEnrollment(any());
@@ -170,43 +168,43 @@ class GradebookServiceGroupingTest {
 
     @Test
     void courseAttendance_emptyAttendanceEnrollment_keepsEmptyListShape() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
-        ), pageable, 1);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery)).thenReturn(page);
         when(attendanceDomain.dailyByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
-        Page<CourseAttendanceRow> result = service.courseAttendance(courseId, null, pageable);
+        PageResult<CourseAttendanceRow> result = service.courseAttendance(courseId, null, pageQuery);
 
-        assertThat(result.getContent().get(0).attendances()).isEmpty();
+        assertThat(result.content().get(0).attendances()).isEmpty();
     }
 
     @Test
     void courseAttendance_dateFilter_appliedAfterGrouping() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
-        ), pageable, 1);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery)).thenReturn(page);
 
         Attendance attMatch = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 1), "Present");
         Attendance attOther = new Attendance(UUID.randomUUID(), enrollmentA, null, LocalDate.of(2026, 3, 2), "Absent");
         when(attendanceDomain.dailyByCourseEnrollmentIn(anyCollection()))
             .thenReturn(List.of(attMatch, attOther));
 
-        Page<CourseAttendanceRow> result =
-            service.courseAttendance(courseId, LocalDate.of(2026, 3, 1), pageable);
+        PageResult<CourseAttendanceRow> result =
+            service.courseAttendance(courseId, LocalDate.of(2026, 3, 1), pageQuery);
 
-        assertThat(result.getContent().get(0).attendances()).containsExactly(attMatch);
+        assertThat(result.content().get(0).attendances()).containsExactly(attMatch);
     }
 
     @Test
     void classGroupAttendance_loadsActiveRosterOfTheClassGroupCourse_withItsSessionRows() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez"),
             courseStudent(enrollmentB, studentB, "Luis", "Gomez")
-        ), pageable, 2);
+        ));
         when(attendanceDomain.courseOfClassGroup(classGroupMath)).thenReturn(courseId);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery)).thenReturn(page);
 
         Attendance sessionA = new Attendance(UUID.randomUUID(), enrollmentA, classGroupMath,
             LocalDate.of(2026, 3, 1), "Present");
@@ -216,22 +214,22 @@ class GradebookServiceGroupingTest {
             org.mockito.ArgumentMatchers.eq(classGroupMath), anyCollection()))
             .thenReturn(List.of(sessionA, sessionB));
 
-        Page<CourseAttendanceRow> result =
-            service.classGroupAttendance(classGroupMath, null, pageable);
+        PageResult<CourseAttendanceRow> result =
+            service.classGroupAttendance(classGroupMath, null, pageQuery);
 
-        assertThat(result.getContent().get(0).attendances()).containsExactly(sessionA);
-        assertThat(result.getContent().get(1).attendances()).containsExactly(sessionB);
+        assertThat(result.content().get(0).attendances()).containsExactly(sessionA);
+        assertThat(result.content().get(1).attendances()).containsExactly(sessionB);
         // The subject sheet must never fall back to the course-wide daily rows.
         verify(attendanceDomain, never()).dailyByCourseEnrollmentIn(anyCollection());
     }
 
     @Test
     void classGroupAttendance_dateFilter_appliedAfterGrouping() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
-        ), pageable, 1);
+        ));
         when(attendanceDomain.courseOfClassGroup(classGroupMath)).thenReturn(courseId);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery)).thenReturn(page);
 
         Attendance match = new Attendance(UUID.randomUUID(), enrollmentA, classGroupMath,
             LocalDate.of(2026, 3, 1), "Present");
@@ -241,35 +239,35 @@ class GradebookServiceGroupingTest {
             org.mockito.ArgumentMatchers.eq(classGroupMath), anyCollection()))
             .thenReturn(List.of(match, other));
 
-        Page<CourseAttendanceRow> result =
-            service.classGroupAttendance(classGroupMath, LocalDate.of(2026, 3, 1), pageable);
+        PageResult<CourseAttendanceRow> result =
+            service.classGroupAttendance(classGroupMath, LocalDate.of(2026, 3, 1), pageQuery);
 
-        assertThat(result.getContent().get(0).attendances()).containsExactly(match);
+        assertThat(result.content().get(0).attendances()).containsExactly(match);
     }
 
     @Test
     void classGroupAttendance_emptyRoster_skipsTheAttendanceQuery() {
         when(attendanceDomain.courseOfClassGroup(classGroupMath)).thenReturn(courseId);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable))
-            .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery))
+            .thenReturn(page(List.of()));
 
-        Page<CourseAttendanceRow> result =
-            service.classGroupAttendance(classGroupMath, null, pageable);
+        PageResult<CourseAttendanceRow> result =
+            service.classGroupAttendance(classGroupMath, null, pageQuery);
 
-        assertThat(result.getContent()).isEmpty();
+        assertThat(result.content()).isEmpty();
         verify(attendanceDomain, never())
             .sessionByClassGroupAndCourseEnrollmentIn(any(), anyCollection());
     }
 
     @Test
     void courseAttendance_usesActiveRoster_soWithdrawnStudentsNeverReachTheSheet() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
-        ), pageable, 1);
-        when(enrollmentDomain.activeStudentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.activeStudentsByCourse(courseId, pageQuery)).thenReturn(page);
         when(attendanceDomain.dailyByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
-        service.courseAttendance(courseId, null, pageable);
+        service.courseAttendance(courseId, null, pageQuery);
 
         // The unfiltered roster still backs the centralizer, but the daily sheet must never use it:
         // a withdrawn enrollment would otherwise keep showing up for marking every day.
@@ -278,13 +276,13 @@ class GradebookServiceGroupingTest {
 
     @Test
     void centralizer_keepsUnfilteredRoster_soWithdrawnStudentsKeepTheirRecord() {
-        Page<CourseStudent> page = new PageImpl<>(List.of(
+        PageResult<CourseStudent> page = page(List.of(
             courseStudent(enrollmentA, studentA, "Ana", "Perez")
-        ), pageable, 1);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        ));
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
-        service.centralizer(courseId, 1, pageable);
+        service.centralizer(courseId, 1, pageQuery);
 
         verify(enrollmentDomain, never()).activeStudentsByCourse(any(), any());
     }
@@ -300,5 +298,9 @@ class GradebookServiceGroupingTest {
 
         assertThat(result.generalAverage()).isEqualByComparingTo("90.00");
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());
+    }
+    /** One full page of these rows, the shape a domain port returns. */
+    private static <T> PageResult<T> page(List<T> rows) {
+        return new PageResult<>(rows, 0, 30, rows.size());
     }
 }

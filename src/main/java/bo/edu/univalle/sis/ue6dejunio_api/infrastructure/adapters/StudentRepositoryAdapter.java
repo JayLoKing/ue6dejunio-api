@@ -1,5 +1,9 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import java.util.List;
+import java.util.Collection;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
@@ -7,7 +11,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.StudentMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,31 +43,29 @@ public class StudentRepositoryAdapter implements IStudentDomain {
     }
 
     @Override
-    public java.util.Optional<Student> findByRudeCode(String rudeCode) {
-        return repo.findByRudeCode(rudeCode).map(mapper::toDomain);
-    }
-
-    @Override
-    public java.util.Optional<Student> findByIdentityCard(String identityCard) {
-        return repo.findByIdentityCard(identityCard).map(mapper::toDomain);
-    }
-
-    @Override
-    public boolean existsByRudeCode(String rudeCode) {
-        return repo.existsByRudeCode(rudeCode);
-    }
-
-    @Override
-    public boolean existsByIdentityCard(String identityCard) {
-        return repo.existsByIdentityCard(identityCard);
-    }
-
-    @Override
-    public Page<StudentDirectoryItem> searchDirectory(String q, UUID courseId, Pageable pageable) {
-        if (q == null || q.isBlank()) {
-            return repo.listDirectory(courseId, pageable);
+    public List<Student> findByRudeCodeIn(Collection<String> rudeCodes) {
+        if (rudeCodes == null || rudeCodes.isEmpty()) {
+            return List.of();
         }
-        return repo.searchDirectory(q, courseId, pageable);
+        return repo.findByRudeCodeIn(rudeCodes).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Student> findByIdentityCardIn(Collection<String> identityCards) {
+        if (identityCards == null || identityCards.isEmpty()) {
+            return List.of();
+        }
+        return repo.findByIdentityCardIn(identityCards).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public PageResult<StudentDirectoryItem> searchDirectory(String q, UUID courseId,
+                                                            PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        if (q == null || q.isBlank()) {
+            return SpringPaging.toPageResult(repo.listDirectory(courseId, pageable));
+        }
+        return SpringPaging.toPageResult(repo.searchDirectory(q, courseId, pageable));
     }
 
     @Override

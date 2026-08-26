@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.gradebook;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
@@ -9,9 +11,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,7 +56,7 @@ public class GradebookController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.centralizer(courseId, trimester, p).map(StudentSummaryResponse::from)));
     }
@@ -71,13 +70,13 @@ public class GradebookController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.courseAttendance(courseId, date, p).map(CourseAttendanceResponse::from)));
     }
 
     @GetMapping("/attendance/session")
-    @PreAuthorize("@authz.canWriteClassGroup(authentication, #classGroupId)")
+    @PreAuthorize("@authz.canReadClassGroup(authentication, #classGroupId)")
     @Operation(summary = "Asistencia de una materia. Lista de estudiantes del curso con las "
         + "sesiones de esa materia. date opcional filtra una fecha")
     public ResponseEntity<PagedResponse<CourseAttendanceResponse>> classGroupAttendance(
@@ -86,7 +85,7 @@ public class GradebookController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.classGroupAttendance(classGroupId, date, p)
                 .map(CourseAttendanceResponse::from)));

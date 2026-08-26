@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.level;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.level.LevelService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -54,7 +55,7 @@ class LevelServiceTest {
         when(levelDomain.findById(1)).thenReturn(Optional.of(new Level(1, "Primaria")));
         when(levelDomain.hasGrades(1)).thenReturn(true);
         assertThatThrownBy(() -> levelService.delete(1))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test

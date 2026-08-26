@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.user;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,7 +16,6 @@ public class User {
     private String lastNames;
     private String phone;
     private String email;
-    @JsonIgnore
     private String password;
     private boolean mustChangePassword;
     private boolean technical;

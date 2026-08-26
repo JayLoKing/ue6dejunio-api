@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.gradebook;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook.GradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -18,10 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -54,7 +52,7 @@ class GradebookServiceCourseOverviewTest {
     private UUID enrollmentA;
     private UUID studentA;
     private UUID classGroupMath;
-    private Pageable pageable;
+    private PageQuery pageQuery;
 
     @BeforeEach
     void setUp() {
@@ -64,7 +62,7 @@ class GradebookServiceCourseOverviewTest {
         enrollmentA = UUID.randomUUID();
         studentA = UUID.randomUUID();
         classGroupMath = UUID.randomUUID();
-        pageable = PageRequest.of(0, 30);
+        pageQuery = PageQuery.of(0, 30);
     }
 
     private CourseStudent courseStudent(UUID enrollmentId, UUID studentId, String names, String lastNames) {
@@ -82,22 +80,22 @@ class GradebookServiceCourseOverviewTest {
                 "Matematicas", UUID.randomUUID(), "Prof. Lopez", true));
         when(classGroupDomain.byCourse(courseId)).thenReturn(classGroups);
 
-        Page<CourseStudent> page = new PageImpl<>(
-            List.of(courseStudent(enrollmentA, studentA, "Ana", "Perez")), pageable, 1);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(page);
+        PageResult<CourseStudent> page = page(
+            List.of(courseStudent(enrollmentA, studentA, "Ana", "Perez")));
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
         List<AcademicScore> batched = List.of(
             new AcademicScore(UUID.randomUUID(), enrollmentA, classGroupMath, "Matematicas", 1,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("90.00"), null, null));
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(batched);
 
-        CourseOverview overview = service.courseOverview(courseId, 1, pageable);
+        CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
 
         assertThat(overview.course()).isEqualTo(course);
         assertThat(overview.classGroups()).isEqualTo(classGroups);
-        Page<StudentTrimesterSummary> students = overview.students();
-        assertThat(students.getContent()).hasSize(1);
-        assertThat(students.getContent().get(0).generalAverage()).isEqualByComparingTo("90.00");
+        PageResult<StudentTrimesterSummary> students = overview.students();
+        assertThat(students.content()).hasSize(1);
+        assertThat(students.content().get(0).generalAverage()).isEqualByComparingTo("90.00");
 
         // N+1 guard: batch path used, never a per-enrollment lookup.
         verify(scoreDomain, never()).findByCourseEnrollment(any());
@@ -108,7 +106,7 @@ class GradebookServiceCourseOverviewTest {
         when(courseService.getById(courseId))
             .thenThrow(new ResourceNotFoundException("Course", courseId));
 
-        assertThatThrownBy(() -> service.courseOverview(courseId, 1, pageable))
+        assertThatThrownBy(() -> service.courseOverview(courseId, 1, pageQuery))
             .isInstanceOf(ResourceNotFoundException.class);
 
         verify(classGroupDomain, never()).byCourse(any());
@@ -121,13 +119,17 @@ class GradebookServiceCourseOverviewTest {
             UUID.randomUUID(), "Ana", true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
-        Page<CourseStudent> emptyPage = new PageImpl<>(List.of(), pageable, 0);
-        when(enrollmentDomain.studentsByCourse(courseId, pageable)).thenReturn(emptyPage);
+        PageResult<CourseStudent> emptyPage = page(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(emptyPage);
 
-        CourseOverview overview = service.courseOverview(courseId, 1, pageable);
+        CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
 
-        assertThat(overview.students().getContent()).isEmpty();
-        assertThat(overview.students().getTotalElements()).isZero();
+        assertThat(overview.students().content()).isEmpty();
+        assertThat(overview.students().totalElements()).isZero();
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());
+    }
+    /** One full page of these rows, the shape a domain port returns. */
+    private static <T> PageResult<T> page(List<T> rows) {
+        return new PageResult<>(rows, 0, 30, rows.size());
     }
 }

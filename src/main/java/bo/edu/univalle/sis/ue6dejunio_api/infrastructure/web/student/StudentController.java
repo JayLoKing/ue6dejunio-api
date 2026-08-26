@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.student;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
@@ -14,9 +16,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -63,9 +62,9 @@ public class StudentController {
         Authentication authentication
     ) {
         UUID effectiveCourseId = authz.effectiveDirectoryCourseId(authentication, courseId);
-        Pageable pageable = PageRequest.of(offset - 1, limit, Sort.by("id"));
+        PageQuery pageQuery = PageQuery.of(offset - 1, limit, SortField.asc("id"));
         return ResponseEntity.ok(PagedResponse.of(
-            studentService.search(q, effectiveCourseId, pageable).map(StudentDirectoryResponse::from)));
+            studentService.search(q, effectiveCourseId, pageQuery).map(StudentDirectoryResponse::from)));
     }
 
     @PostMapping("/{id}/withdraw")

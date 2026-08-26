@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
@@ -14,6 +14,6 @@ public interface IGradeDomain {
     boolean existsByNameAndLevel(String name, Integer levelId);
     boolean hasClassGroups(Integer gradeId);
     long countTotal();
-    Page<Grade> list(Pageable pageable);
+    PageResult<Grade> list(PageQuery pageQuery);
     void deleteById(Integer id);
 }

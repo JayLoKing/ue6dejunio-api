@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.grade;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.grade.GradeService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -44,7 +45,7 @@ class GradeServiceTest {
     void create_sixthLimitReached_throws() {
         when(gradeDomain.countTotal()).thenReturn(6L);
         assertThatThrownBy(() -> gradeService.create(cmd()))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(ConflictException.class)
             .hasMessageContaining("6");
     }
 
@@ -70,7 +71,7 @@ class GradeServiceTest {
         when(gradeDomain.findById(3)).thenReturn(Optional.of(new Grade(3, "3ro", 1, "Primaria")));
         when(gradeDomain.hasClassGroups(3)).thenReturn(true);
         assertThatThrownBy(() -> gradeService.delete(3))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test

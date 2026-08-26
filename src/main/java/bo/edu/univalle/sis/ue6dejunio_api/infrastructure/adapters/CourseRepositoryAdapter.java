@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
@@ -11,12 +13,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseR
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -49,11 +53,6 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     @Override
     public boolean parallelExists(Integer parallelId) {
         return parallelRepo.existsById(parallelId);
-    }
-
-    @Override
-    public boolean academicYearExists(Integer academicYearId) {
-        return yearRepo.existsById(academicYearId);
     }
 
     @Override
@@ -120,8 +119,31 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     }
 
     @Override
-    public Page<Course> list(Integer academicYearId, Pageable pageable) {
-        return courseRepo.search(academicYearId, pageable).map(this::toDomain);
+    public boolean isHomeroomTeacherOfAny(UUID teacherId, Collection<UUID> courseIds) {
+        // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
+        if (teacherId == null || courseIds == null || courseIds.isEmpty()) {
+            return false;
+        }
+        return courseRepo.existsByHomeroomTeacher_IdAndIdIn(teacherId, courseIds);
+    }
+
+    @Override
+    public boolean isHomeroomTeacherOfAll(UUID teacherId, Collection<UUID> courseIds) {
+        // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
+        if (teacherId == null || courseIds == null || courseIds.isEmpty()) {
+            return false;
+        }
+        Set<UUID> distinct = new HashSet<>(courseIds);
+        // Counting rather than fetching also answers for ids that resolve to nothing: they are
+        // never counted, so a batch spanning a stale course id is refused as a whole.
+        return courseRepo.countByHomeroomTeacher_IdAndIdIn(teacherId, distinct) == distinct.size();
+    }
+
+    @Override
+    public PageResult<Course> list(Integer academicYearId, PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(
+            courseRepo.search(academicYearId, pageable).map(this::toDomain));
     }
 
     @Override

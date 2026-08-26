@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.course;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -11,12 +14,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseComma
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -45,7 +47,7 @@ public class CourseService implements ICourseService {
                 c.gradeId() + "/" + c.parallelId() + "/" + yearId);
         }
         if (c.homeroomTeacherId() != null && !courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
-            throw new IllegalArgumentException("El docente de aula debe ser Teacher NO tecnico");
+            throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
         }
 
         Course course = courseDomain.create(c.gradeId(), c.parallelId(), yearId, c.homeroomTeacherId());
@@ -68,7 +70,7 @@ public class CourseService implements ICourseService {
         Course result = null;
         if (c.homeroomTeacherId() != null) {
             if (!courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
-                throw new IllegalArgumentException("El docente de aula debe ser Teacher NO tecnico");
+                throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
             }
             result = courseDomain.setHomeroomTeacher(id, c.homeroomTeacherId());
         }
@@ -83,9 +85,15 @@ public class CourseService implements ICourseService {
     public Course setHomeroomTeacher(UUID id, UUID teacherId) {
         getById(id);
         if (!courseDomain.userIsNonTechnicalTeacher(teacherId)) {
-            throw new IllegalArgumentException("El docente de aula debe ser Teacher NO tecnico");
+            throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
         }
         return courseDomain.setHomeroomTeacher(id, teacherId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Course> homeroomCourseOf(UUID teacherId) {
+        return courseDomain.homeroomCourseOf(teacherId);
     }
 
     @Override
@@ -97,8 +105,8 @@ public class CourseService implements ICourseService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Course> list(Integer academicYearId, Pageable pageable) {
-        return courseDomain.list(academicYearId, pageable);
+    public PageResult<Course> list(Integer academicYearId, PageQuery pageQuery) {
+        return courseDomain.list(academicYearId, pageQuery);
     }
 
     @Override

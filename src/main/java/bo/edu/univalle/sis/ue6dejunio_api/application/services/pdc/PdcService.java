@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.pdc;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
@@ -8,8 +11,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,7 +69,7 @@ public class PdcService implements IPdcService {
     public Pdc update(UUID id, UpdatePdcCommand c, UUID currentUserId) {
         Pdc pdc = getById(id);
         if (!EDITABLE.contains(pdc.getStatus())) {
-            throw new IllegalStateException("Solo se puede editar en estado Draft o With Observations. Actual: " + pdc.getStatus());
+            throw new ConflictException("Solo se puede editar en estado Draft o With Observations. Actual: " + pdc.getStatus());
         }
         if (c.title() != null) pdc.setTitle(c.title());
         if (c.holisticObjective() != null) pdc.setHolisticObjective(c.holisticObjective());
@@ -98,8 +99,9 @@ public class PdcService implements IPdcService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Pdc> list(UUID classGroupId, Integer trimester, String status, Pageable pageable) {
-        return pdcDomain.list(classGroupId, trimester, status, pageable);
+    public PageResult<Pdc> list(UUID classGroupId, Integer trimester, String status, UUID teacherId,
+                                PageQuery pageQuery) {
+        return pdcDomain.list(classGroupId, trimester, status, teacherId, pageQuery);
     }
 
     @Override
@@ -107,7 +109,7 @@ public class PdcService implements IPdcService {
     public Pdc publish(UUID id, UUID currentUserId) {
         Pdc pdc = getById(id);
         if (!EDITABLE.contains(pdc.getStatus())) {
-            throw new IllegalStateException("Solo se puede publicar desde Draft o With Observations. Actual: " + pdc.getStatus());
+            throw new ConflictException("Solo se puede publicar desde Draft o With Observations. Actual: " + pdc.getStatus());
         }
         pdc.setStatus(PdcStatus.PUBLISHED);
         pdc.setReviewObservations(null);
@@ -120,7 +122,7 @@ public class PdcService implements IPdcService {
     public Pdc approve(UUID id) {
         Pdc pdc = getById(id);
         if (!REVIEWABLE.contains(pdc.getStatus())) {
-            throw new IllegalStateException("Solo se puede aprobar PDC Published o Under Review. Actual: " + pdc.getStatus());
+            throw new ConflictException("Solo se puede aprobar PDC Published o Under Review. Actual: " + pdc.getStatus());
         }
         pdc.setStatus(PdcStatus.APPROVED);
         pdc.setReviewObservations(null);
@@ -132,7 +134,7 @@ public class PdcService implements IPdcService {
     public Pdc observe(UUID id, String observations) {
         Pdc pdc = getById(id);
         if (!REVIEWABLE.contains(pdc.getStatus())) {
-            throw new IllegalStateException("Solo se puede observar PDC Published o Under Review. Actual: " + pdc.getStatus());
+            throw new ConflictException("Solo se puede observar PDC Published o Under Review. Actual: " + pdc.getStatus());
         }
         pdc.setStatus(PdcStatus.WITH_OBSERVATIONS);
         pdc.setReviewObservations(observations);
@@ -141,10 +143,10 @@ public class PdcService implements IPdcService {
 
     @Override
     @Transactional
-    public void delete(UUID id, UUID currentUserId) {
+    public void delete(UUID id) {
         Pdc pdc = getById(id);
         if (!PdcStatus.DRAFT.equals(pdc.getStatus())) {
-            throw new IllegalStateException("Solo se puede eliminar un PDC en Draft. Actual: " + pdc.getStatus());
+            throw new ConflictException("Solo se puede eliminar un PDC en Draft. Actual: " + pdc.getStatus());
         }
         pdcDomain.deleteById(id);
     }

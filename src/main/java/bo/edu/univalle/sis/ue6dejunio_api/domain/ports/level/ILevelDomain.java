@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.level;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.Level;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
@@ -11,6 +11,6 @@ public interface ILevelDomain {
     Optional<Level> findById(Integer id);
     boolean existsByName(String name);
     boolean hasGrades(Integer levelId);
-    Page<Level> list(Pageable pageable);
+    PageResult<Level> list(PageQuery pageQuery);
     void deleteById(Integer id);
 }

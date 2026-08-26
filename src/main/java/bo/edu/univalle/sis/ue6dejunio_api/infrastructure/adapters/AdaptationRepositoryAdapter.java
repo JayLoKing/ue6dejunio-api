@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
@@ -12,7 +14,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurricu
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -95,8 +96,10 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
     }
 
     @Override
-    public Page<Adaptation> listByPlan(UUID planId, Pageable pageable) {
-        return adaptationRepo.findByCurriculumPlan_Id(planId, pageable).map(this::toDomain);
+    public PageResult<Adaptation> listByPlan(UUID planId, PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
+        return SpringPaging.toPageResult(
+            adaptationRepo.findByCurriculumPlan_Id(planId, pageable).map(this::toDomain));
     }
 
     @Override

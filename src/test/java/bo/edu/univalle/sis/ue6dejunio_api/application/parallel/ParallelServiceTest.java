@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.parallel;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.parallel.ParallelService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.CreateParallelCommand;
@@ -44,6 +45,6 @@ class ParallelServiceTest {
         when(parallelDomain.findById(1)).thenReturn(Optional.of(new Parallel(1, "A")));
         when(parallelDomain.hasClassGroups(1)).thenReturn(true);
         assertThatThrownBy(() -> parallelService.delete(1))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ConflictException.class);
     }
 }

@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.subject;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
@@ -7,8 +9,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.UpdateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,8 +45,8 @@ public class SubjectService implements ISubjectService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Subject> list(Pageable pageable) {
-        return subjectDomain.list(pageable);
+    public PageResult<Subject> list(PageQuery pageQuery) {
+        return subjectDomain.list(pageQuery);
     }
 
     @Override

@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.user;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
@@ -11,9 +13,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserService;
-import jakarta.annotation.Nullable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,8 +98,8 @@ public class UserService implements IUserService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<UsersList> list(Pageable pageable, @Nullable String search, java.util.UUID excludeUserId) {
-        return userDomain.getUsers(pageable, search, excludeUserId);
+    public PageResult<UsersList> list(PageQuery pageQuery, String search, UUID excludeUserId) {
+        return userDomain.getUsers(pageQuery, search, excludeUserId);
     }
 
     @Override

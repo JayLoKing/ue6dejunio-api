@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.auth;
 
+import java.util.UUID;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidCredentialsException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
@@ -46,6 +47,7 @@ public class AuthService implements IAuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AuthenticatedUser login(LoginCommand command) {
         User user = userDomain.findByEmail(command.email())
             .orElseThrow(InvalidCredentialsException::new);
@@ -59,7 +61,7 @@ public class AuthService implements IAuthService {
 
         String gradeName = null;
         String parallelName = null;
-        java.util.UUID courseId = null;
+        UUID courseId = null;
         Boolean technical = null;
         if (user.getRole() != null && TEACHER_ROLE.equals(user.getRole().name())) {
             technical = user.isTechnical();
@@ -91,6 +93,7 @@ public class AuthService implements IAuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void forgotPassword(String email) {
         Optional<User> maybeUser = userDomain.findByEmail(email);
         if (maybeUser.isPresent() && maybeUser.get().isActive()) {
@@ -105,7 +108,7 @@ public class AuthService implements IAuthService {
     @Override
     @Transactional
     public void resetPassword(String token, String newPassword) {
-        java.util.UUID userId = jwtService.validatePasswordResetToken(token);
+        UUID userId = jwtService.validatePasswordResetToken(token);
         User user = userDomain.findById(userId)
             .orElseThrow(InvalidResetTokenException::new);
 

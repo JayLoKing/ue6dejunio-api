@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.pdc;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.pdc.PdcService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
@@ -72,7 +73,7 @@ class PdcServiceTest {
         UUID id = UUID.randomUUID();
         when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.APPROVED)));
         assertThatThrownBy(() -> pdcService.publish(id, user))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test
@@ -89,7 +90,7 @@ class PdcServiceTest {
         UUID id = UUID.randomUUID();
         when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
         assertThatThrownBy(() -> pdcService.approve(id))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test
@@ -111,15 +112,15 @@ class PdcServiceTest {
         assertThatThrownBy(() -> pdcService.update(id,
             bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand.builder()
                 .title("X").build(), user))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test
     void delete_nonDraft_throws() {
         UUID id = UUID.randomUUID();
         when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.PUBLISHED)));
-        assertThatThrownBy(() -> pdcService.delete(id, user))
-            .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> pdcService.delete(id))
+            .isInstanceOf(ConflictException.class);
     }
 
     @Test

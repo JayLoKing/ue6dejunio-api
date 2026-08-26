@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.student;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.student.StudentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -13,10 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -39,11 +37,11 @@ class StudentServiceTest {
     @Test
     void search_delegatesToDomain() {
         UUID courseId = UUID.randomUUID();
-        Pageable pageable = PageRequest.of(0, 30);
-        Page<StudentDirectoryItem> expected = new PageImpl<>(List.of());
-        when(studentDomain.searchDirectory("Lopez", courseId, pageable)).thenReturn(expected);
+        PageQuery pageQuery = PageQuery.of(0, 30);
+        PageResult<StudentDirectoryItem> expected = new PageResult<>(List.of(), 0, 30, 0);
+        when(studentDomain.searchDirectory("Lopez", courseId, pageQuery)).thenReturn(expected);
 
-        Page<StudentDirectoryItem> result = studentService.search("Lopez", courseId, pageable);
+        PageResult<StudentDirectoryItem> result = studentService.search("Lopez", courseId, pageQuery);
 
         assertThat(result).isSameAs(expected);
     }

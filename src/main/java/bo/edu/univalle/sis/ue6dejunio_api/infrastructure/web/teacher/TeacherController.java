@@ -1,9 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.teacher;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ClassGroupResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseStudentResponse;
@@ -13,11 +16,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -39,13 +37,13 @@ import java.util.UUID;
 public class TeacherController {
 
     private final IClassGroupService classGroupService;
-    private final ICourseDomain courseDomain;
+    private final ICourseService courseService;
     private final ICourseEnrollmentService enrollmentService;
 
-    public TeacherController(IClassGroupService classGroupService, ICourseDomain courseDomain,
+    public TeacherController(IClassGroupService classGroupService, ICourseService courseService,
                              ICourseEnrollmentService enrollmentService) {
         this.classGroupService = classGroupService;
-        this.courseDomain = courseDomain;
+        this.courseService = courseService;
         this.enrollmentService = enrollmentService;
     }
 
@@ -65,10 +63,10 @@ public class TeacherController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
     ) {
-        Pageable p = PageRequest.of(offset - 1, limit, Sort.by("student.lastNames", "student.names"));
-        Optional<Course> homeroom = courseDomain.homeroomCourseOf(userId);
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
+        Optional<Course> homeroom = courseService.homeroomCourseOf(userId);
         if (homeroom.isEmpty()) {
-            Page<CourseStudentResponse> empty = new PageImpl<>(List.of(), p, 0);
+            PageResult<CourseStudentResponse> empty = PageResult.empty(p);
             return ResponseEntity.ok(PagedResponse.of(empty));
         }
         return ResponseEntity.ok(PagedResponse.of(

@@ -1,5 +1,16 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment;
 
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.util.Set;
+import java.util.Objects;
+import java.util.Map;
+import java.util.List;
+import java.util.HashSet;
+import java.util.HashMap;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
@@ -9,12 +20,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -36,24 +44,42 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         if (!enrollmentDomain.courseExists(command.courseId())) {
             throw new ResourceNotFoundException("Course", command.courseId());
         }
+        // A roster is imported whole, so the three lookups it needs are done once for the whole
+        // batch. Asking per student turned a class of forty into a hundred-odd round trips.
+        Map<String, Student> byRude = indexBy(
+            studentDomain.findByRudeCodeIn(valuesOf(command.students(), CreateStudentCommand::rudeCode)),
+            Student::getRudeCode);
+        Map<String, Student> byIdentityCard = indexBy(
+            studentDomain.findByIdentityCardIn(valuesOf(command.students(), CreateStudentCommand::identityCard)),
+            Student::getIdentityCard);
+        Set<UUID> seatedInCourse = new HashSet<>(enrollmentDomain.enrolledStudentIds(
+            command.courseId(),
+            Stream.concat(byRude.values().stream(), byIdentityCard.values().stream())
+                .map(Student::getId).collect(Collectors.toSet())));
+
         int created = 0;
         int existing = 0;
         int enrolled = 0;
         int skipped = 0;
 
         for (CreateStudentCommand sc : command.students()) {
-            Student student = findExisting(sc);
+            Student student = resolve(sc, byRude, byIdentityCard);
             if (student == null) {
                 student = studentDomain.save(buildStudent(sc));
                 created++;
+                // Index what was just created: a PDF that repeats a row must not create it twice.
+                index(byRude, student.getRudeCode(), student);
+                index(byIdentityCard, student.getIdentityCard(), student);
             } else {
                 existing++;
             }
-            if (enrollmentDomain.existsEnrollment(student.getId(), command.courseId())) {
-                skipped++;
-            } else {
+            // add() is false when the id is already there, which covers both a seat taken in an
+            // earlier import and the same student appearing twice in this one.
+            if (seatedInCourse.add(student.getId())) {
                 enrollmentDomain.saveEnrollment(student.getId(), command.courseId());
                 enrolled++;
+            } else {
+                skipped++;
             }
         }
         return new EnrollResult(command.students().size(), created, existing, enrolled, skipped);
@@ -61,16 +87,38 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseStudent> studentsOfCourse(UUID courseId, Pageable pageable) {
-        return enrollmentDomain.studentsByCourse(courseId, pageable);
+    public PageResult<CourseStudent> studentsOfCourse(UUID courseId, PageQuery pageQuery) {
+        return enrollmentDomain.studentsByCourse(courseId, pageQuery);
     }
 
-    private Student findExisting(CreateStudentCommand sc) {
-        Optional<Student> byRude = studentDomain.findByRudeCode(sc.rudeCode());
-        if (byRude.isPresent()) {
-            return byRude.get();
+    /** The RUDE code identifies the student; the identity card is the fallback the ministry allows. */
+    private static Student resolve(CreateStudentCommand sc, Map<String, Student> byRude,
+                                   Map<String, Student> byIdentityCard) {
+        Student student = sc.rudeCode() == null ? null : byRude.get(sc.rudeCode());
+        if (student != null) {
+            return student;
         }
-        return studentDomain.findByIdentityCard(sc.identityCard()).orElse(null);
+        return sc.identityCard() == null ? null : byIdentityCard.get(sc.identityCard());
+    }
+
+    private static Set<String> valuesOf(List<CreateStudentCommand> students,
+                                        Function<CreateStudentCommand, String> field) {
+        return students.stream().map(field).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private static Map<String, Student> indexBy(List<Student> students,
+                                                Function<Student, String> key) {
+        Map<String, Student> index = new HashMap<>();
+        for (Student s : students) {
+            index(index, key.apply(s), s);
+        }
+        return index;
+    }
+
+    private static void index(Map<String, Student> index, String key, Student student) {
+        if (key != null) {
+            index.putIfAbsent(key, student);
+        }
     }
 
     private Student buildStudent(CreateStudentCommand sc) {

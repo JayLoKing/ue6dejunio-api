@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
@@ -55,11 +57,13 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     }
 
     @Override
-    public Page<Notification> listReceived(UUID receiverId, boolean unreadOnly, Pageable pageable) {
+    public PageResult<Notification> listReceived(UUID receiverId, boolean unreadOnly,
+                                                 PageQuery pageQuery) {
+        Pageable pageable = SpringPaging.toPageable(pageQuery);
         Page<NotificationEntity> page = unreadOnly
             ? notificationRepo.findByReceiver_IdAndReadFalse(receiverId, pageable)
             : notificationRepo.findByReceiver_Id(receiverId, pageable);
-        return page.map(this::toDomain);
+        return SpringPaging.toPageResult(page.map(this::toDomain));
     }
 
     @Override
