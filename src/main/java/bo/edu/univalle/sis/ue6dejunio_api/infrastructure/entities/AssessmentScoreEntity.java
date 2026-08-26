@@ -35,15 +35,18 @@ public class AssessmentScoreEntity {
     @JoinColumn(name = "id_course_enrollment", nullable = false)
     private CourseEnrollmentEntity courseEnrollment;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_assessment_event", nullable = false)
+    // Exactly one of event / criterion is set. Enforced in the database by chk_score_target and,
+    // before the write reaches it, by AssessmentScoreService.
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_assessment_event")
     private AssessmentEventEntity event;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_criterion")
+    private EvaluationCriterionEntity criterion;
 
     @Column(name = "score", nullable = false)
     private BigDecimal score;
-
-    @Column(name = "digital_signature_hash")
-    private String digitalSignatureHash;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

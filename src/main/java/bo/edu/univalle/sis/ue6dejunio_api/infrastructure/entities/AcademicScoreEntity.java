@@ -58,9 +58,6 @@ public class AcademicScoreEntity {
     @Column(name = "created_by")
     private UUID createdBy;
 
-    @Column(name = "digital_signature_hash")
-    private String digitalSignatureHash;
-
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

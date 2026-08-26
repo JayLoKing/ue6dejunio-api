@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS evaluation_criteria (
     trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
     dimension varchar(20) NOT NULL CHECK (dimension IN ('Being','Knowing','Doing','Deciding')),
     name varchar(150) NOT NULL,
+    activity_name varchar(150),
     id_curriculum_plan uuid REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE SET NULL,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_criterion UNIQUE (id_class_group, trimester, dimension, name)
@@ -133,20 +134,34 @@ CREATE TABLE IF NOT EXISTS assessment_events (
     id_assessment_event uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_criterion uuid NOT NULL REFERENCES evaluation_criteria(id_criterion) ON DELETE CASCADE,
     title varchar(150) NOT NULL,
-    description text,
-    max_score numeric(5,2) NOT NULL DEFAULT 100,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
+-- A score targets an activity item or a criterion, never both. Because id_assessment_event is
+-- nullable now, the old two-column UNIQUE no longer protects direct scores: PostgreSQL treats
+-- every NULL as distinct, so duplicates would slip through. Two partial unique indexes replace it.
 CREATE TABLE IF NOT EXISTS assessment_scores (
     id_assessment_score uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_course_enrollment uuid NOT NULL REFERENCES course_enrollments(id_course_enrollment) ON DELETE CASCADE,
-    id_assessment_event uuid NOT NULL REFERENCES assessment_events(id_assessment_event) ON DELETE CASCADE,
+    id_assessment_event uuid REFERENCES assessment_events(id_assessment_event) ON DELETE CASCADE,
+    id_criterion uuid REFERENCES evaluation_criteria(id_criterion) ON DELETE CASCADE,
     score numeric(5,2) NOT NULL DEFAULT 0,
-    digital_signature_hash text,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_assessment_score UNIQUE (id_course_enrollment, id_assessment_event)
+    CONSTRAINT chk_score_target CHECK (
+        (id_criterion IS NOT NULL AND id_assessment_event IS NULL)
+     OR (id_criterion IS NULL     AND id_assessment_event IS NOT NULL)
+    )
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_score_event
+    ON assessment_scores (id_course_enrollment, id_assessment_event)
+    WHERE id_assessment_event IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_score_criterion
+    ON assessment_scores (id_course_enrollment, id_criterion)
+    WHERE id_criterion IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_scores_enrollment ON assessment_scores (id_course_enrollment);
+CREATE INDEX IF NOT EXISTS ix_events_criterion ON assessment_events (id_criterion);
+CREATE INDEX IF NOT EXISTS ix_criteria_group_trimester
+    ON evaluation_criteria (id_class_group, trimester);
 
 CREATE TABLE IF NOT EXISTS academic_scores (
     id_academic_score uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -159,7 +174,6 @@ CREATE TABLE IF NOT EXISTS academic_scores (
     score_deciding numeric(5,2) DEFAULT 0 CHECK (score_deciding <= 5),
     total_score numeric(5,2) GENERATED ALWAYS AS (score_being + score_knowing + score_doing + score_deciding) STORED,
     created_by uuid REFERENCES users(id_user) ON DELETE RESTRICT,
-    digital_signature_hash text,
     updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_academic_score UNIQUE (id_course_enrollment, id_class_group, trimester)
 );

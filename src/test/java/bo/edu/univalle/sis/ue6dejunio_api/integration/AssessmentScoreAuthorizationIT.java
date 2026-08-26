@@ -39,8 +39,9 @@ class AssessmentScoreAuthorizationIT extends AbstractIntegrationTest {
         classGroupA = seedClassGroup(courseA, teacherA, "Matematicas");
         UUID student = seedStudent();
         studentEnrollment = seedEnrollment(student, courseA);
-        UUID criterionId = seedCriterion(classGroupA, 1, "Knowing", "Prueba 1");
-        eventId = seedEvent(criterionId, "Actividad 1", 100.0);
+        UUID criterionId = seedActivityCriterion(
+            classGroupA, 1, "Knowing", "Prueba 1", "Evaluacion escrita");
+        eventId = seedEvent(criterionId, "Tema 1");
     }
 
     @Test
@@ -80,6 +81,25 @@ class AssessmentScoreAuthorizationIT extends AbstractIntegrationTest {
         mvc.perform(delete("/api/assessment-scores/{id}", scoreId)
                 .header("Authorization", "Bearer " + tokenFor(director, "Director")))
             .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void ownerTeacher_byCriterion_returnsDirectScores() throws Exception {
+        UUID direct = seedCriterion(classGroupA, 1, "Doing", "Participacion");
+        seedCriterionScore(studentEnrollment, direct, 30);
+
+        mvc.perform(get("/api/assessment-scores/criterion/{criterionId}", direct)
+                .header("Authorization", "Bearer " + tokenFor(teacherA, "Teacher")))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void nonOwnerTeacher_byCriterion_forbidden() throws Exception {
+        UUID direct = seedCriterion(classGroupA, 1, "Doing", "Participacion");
+
+        mvc.perform(get("/api/assessment-scores/criterion/{criterionId}", direct)
+                .header("Authorization", "Bearer " + tokenFor(teacherB, "Teacher")))
+            .andExpect(status().isForbidden());
     }
 
     @Test

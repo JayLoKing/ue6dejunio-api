@@ -4,14 +4,16 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
-import org.springframework.security.core.Authentication;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -49,6 +51,7 @@ public class AuthorizationComponent {
     private final IClassGroupDomain classGroupDomain;
     private final IAssessmentEventDomain assessmentEventDomain;
     private final IAssessmentScoreDomain assessmentScoreDomain;
+    private final ICriterionDomain criterionDomain;
     private final ICourseEnrollmentDomain courseEnrollmentDomain;
     private final ICourseDomain courseDomain;
 
@@ -56,12 +59,14 @@ public class AuthorizationComponent {
         IClassGroupDomain classGroupDomain,
         IAssessmentEventDomain assessmentEventDomain,
         IAssessmentScoreDomain assessmentScoreDomain,
+        ICriterionDomain criterionDomain,
         ICourseEnrollmentDomain courseEnrollmentDomain,
         ICourseDomain courseDomain
     ) {
         this.classGroupDomain = classGroupDomain;
         this.assessmentEventDomain = assessmentEventDomain;
         this.assessmentScoreDomain = assessmentScoreDomain;
+        this.criterionDomain = criterionDomain;
         this.courseEnrollmentDomain = courseEnrollmentDomain;
         this.courseDomain = courseDomain;
     }
@@ -77,7 +82,7 @@ public class AuthorizationComponent {
         UUID owner;
         try {
             owner = classGroupDomain.teacherIdOfClassGroup(classGroupId);
-        } catch (ResourceNotFoundException ex) {
+        } catch (ResourceNotFoundException ignored) {
             // Same rule as ownsEnrollmentCourse: an id that resolves to nothing denies with 403
             // rather than surfacing as 404 from inside the guard.
             return false;
@@ -99,6 +104,38 @@ public class AuthorizationComponent {
         return canWriteClassGroup(authentication, event.get().classGroupId());
     }
 
+    /**
+     * Ownership of a criterion scored directly. It resolves through the criterion's own class
+     * group, because such a score has no activity item to walk through.
+     */
+    public boolean canWriteScoreCriterion(Authentication authentication, UUID criterionId) {
+        if (authentication == null || criterionId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        Optional<EvaluationCriterion> criterion = criterionDomain.findById(criterionId);
+        if (criterion.isEmpty() || criterion.get().classGroupId() == null) {
+            return false;
+        }
+        return canWriteClassGroup(authentication, criterion.get().classGroupId());
+    }
+
+    /**
+     * Entry guard for the scoring endpoint, where the body carries one target or the other. A body
+     * naming both, or neither, is denied here rather than reaching the service: {@code @PreAuthorize}
+     * runs first, so an ambiguous target must not be allowed to pick a branch.
+     */
+    public boolean canWriteScoreTarget(Authentication authentication, UUID eventId, UUID criterionId) {
+        if ((eventId == null) == (criterionId == null)) {
+            return false;
+        }
+        return eventId != null
+            ? canWriteScoreEvent(authentication, eventId)
+            : canWriteScoreCriterion(authentication, criterionId);
+    }
+
     public boolean canWriteScore(Authentication authentication, UUID scoreId) {
         if (authentication == null || scoreId == null) {
             return false;
@@ -110,7 +147,7 @@ public class AuthorizationComponent {
         if (score.isEmpty()) {
             return false;
         }
-        return canWriteScoreEvent(authentication, score.get().eventId());
+        return canWriteScoreTarget(authentication, score.get().eventId(), score.get().criterionId());
     }
 
     public boolean canReadScoreEvent(Authentication authentication, UUID eventId) {
@@ -118,6 +155,24 @@ public class AuthorizationComponent {
             return true;
         }
         return canWriteScoreEvent(authentication, eventId);
+    }
+
+    public boolean canReadScoreCriterion(Authentication authentication, UUID criterionId) {
+        if (isReadOnlyStaff(authentication)) {
+            return true;
+        }
+        return canWriteScoreCriterion(authentication, criterionId);
+    }
+
+    /**
+     * Read side of {@link #canWriteClassGroup}. Listing a class group's criteria is a read, so the
+     * secretariat reaches it; a Teacher stays inside the subjects they run.
+     */
+    public boolean canReadClassGroup(Authentication authentication, UUID classGroupId) {
+        if (isReadOnlyStaff(authentication)) {
+            return true;
+        }
+        return canWriteClassGroup(authentication, classGroupId);
     }
 
     public boolean canReadEnrollmentScope(Authentication authentication, UUID courseEnrollmentId) {
@@ -302,7 +357,7 @@ public class AuthorizationComponent {
         UUID courseId;
         try {
             courseId = courseEnrollmentDomain.courseOfEnrollment(courseEnrollmentId);
-        } catch (ResourceNotFoundException ex) {
+        } catch (ResourceNotFoundException ignored) {
             // An id that resolves to nothing is a denial, not an error. Anything else — a dropped
             // connection, say — must keep propagating instead of being reported as "not owner".
             return false;
@@ -341,7 +396,7 @@ public class AuthorizationComponent {
             }
             try {
                 return UUID.fromString(subject);
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException ignored) {
                 log.debug("Rejecting token with non-UUID subject");
                 return null;
             }

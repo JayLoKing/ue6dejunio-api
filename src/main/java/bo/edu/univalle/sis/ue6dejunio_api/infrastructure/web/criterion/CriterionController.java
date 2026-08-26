@@ -32,7 +32,7 @@ import java.util.UUID;
 @RestController
 @Validated
 @RequestMapping("/api/criteria")
-@Tag(name = "Criteria", description = "Criterios de evaluacion (solo nombre)")
+@Tag(name = "Criteria", description = "Criterios de evaluacion. Directos, o agrupadores de una actividad")
 @SecurityRequirement(name = "bearerAuth")
 public class CriterionController {
 
@@ -44,20 +44,23 @@ public class CriterionController {
 
     @PostMapping
     @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
-    @Operation(summary = "Crear criterio")
+    @Operation(summary = "Crear criterio. Con 'activity' crea tambien sus criterios en la misma transaccion")
     public ResponseEntity<CriterionResponse> create(@Valid @RequestBody CreateCriterionRequest r) {
         EvaluationCriterion c = criterionService.create(new CreateCriterionCommand(
-            r.classGroupId(), r.trimester(), r.dimension(), r.name(), r.curriculumPlanId()));
+            r.classGroupId(), r.trimester(), r.dimension(), r.name(),
+            r.activityTitle(), r.activityItems(), r.curriculumPlanId()));
         return ResponseEntity.ok(CriterionResponse.from(c));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@authz.canReadScoreCriterion(authentication, #id)")
     @Operation(summary = "Obtener criterio por id")
     public ResponseEntity<CriterionResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(CriterionResponse.from(criterionService.getById(id)));
     }
 
     @GetMapping
+    @PreAuthorize("@authz.canReadClassGroup(authentication, #classGroupId)")
     @Operation(summary = "Listar criterios de una materia+trimestre. dimension opcional")
     public ResponseEntity<List<CriterionResponse>> list(
         @RequestParam("id_class_group") UUID classGroupId,
@@ -69,6 +72,7 @@ public class CriterionController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@authz.canWriteScoreCriterion(authentication, #id)")
     @Operation(summary = "Actualizar criterio (nombre)")
     public ResponseEntity<CriterionResponse> update(@PathVariable UUID id,
                                                     @Valid @RequestBody UpdateCriterionRequest r) {
@@ -77,6 +81,7 @@ public class CriterionController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@authz.canWriteScoreCriterion(authentication, #id)")
     @Operation(summary = "Eliminar criterio (borra sus actividades en cascada)")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         criterionService.delete(id);

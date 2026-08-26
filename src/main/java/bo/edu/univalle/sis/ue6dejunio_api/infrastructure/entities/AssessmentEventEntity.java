@@ -11,7 +11,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -32,12 +31,6 @@ public class AssessmentEventEntity {
 
     @Column(name = "title", nullable = false, length = 150)
     private String title;
-
-    @Column(name = "description")
-    private String description;
-
-    @Column(name = "max_score", nullable = false)
-    private BigDecimal maxScore;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

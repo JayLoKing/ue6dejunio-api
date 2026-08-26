@@ -10,10 +10,12 @@ public record CriterionResponse(
     Integer trimester,
     String dimension,
     String name,
+    String activityName,
     UUID curriculumPlanId
 ) {
     public static CriterionResponse from(EvaluationCriterion c) {
         return new CriterionResponse(
-            c.id(), c.classGroupId(), c.trimester(), c.dimension(), c.name(), c.curriculumPlanId());
+            c.id(), c.classGroupId(), c.trimester(), c.dimension(), c.name(),
+            c.activityName(), c.curriculumPlanId());
     }
 }

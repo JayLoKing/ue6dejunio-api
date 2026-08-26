@@ -191,21 +191,47 @@ public abstract class AbstractIntegrationTest {
         return id;
     }
 
+    /** A criterion scored directly: no activity, so its score lands on the criterion itself. */
     protected UUID seedCriterion(UUID classGroupId, int trimester, String dimension, String name) {
+        return insertCriterion(classGroupId, trimester, dimension, name, null);
+    }
+
+    /** A criterion fed by an activity: its score is the average of the items seeded under it. */
+    protected UUID seedActivityCriterion(UUID classGroupId, int trimester, String dimension,
+                                         String name, String activityName) {
+        return insertCriterion(classGroupId, trimester, dimension, name, activityName);
+    }
+
+    private UUID insertCriterion(UUID classGroupId, int trimester, String dimension,
+                                 String name, String activityName) {
         UUID id = UUID.randomUUID();
         jdbc.update(
-            "INSERT INTO evaluation_criteria (id_criterion, id_class_group, trimester, dimension, name) "
-                + "VALUES (?,?,?,?,?)",
-            id, classGroupId, trimester, dimension, name);
+            "INSERT INTO evaluation_criteria "
+                + "(id_criterion, id_class_group, trimester, dimension, name, activity_name) "
+                + "VALUES (?,?,?,?,?,?)",
+            id, classGroupId, trimester, dimension, name, activityName);
         return id;
     }
 
-    protected UUID seedEvent(UUID criterionId, String title, double maxScore) {
+    protected UUID seedEvent(UUID criterionId, String title) {
         UUID id = UUID.randomUUID();
         jdbc.update(
-            "INSERT INTO assessment_events (id_assessment_event, id_criterion, title, max_score) "
-                + "VALUES (?,?,?,?)",
-            id, criterionId, title, maxScore);
+            "INSERT INTO assessment_events (id_assessment_event, id_criterion, title) VALUES (?,?,?)",
+            id, criterionId, title);
         return id;
+    }
+
+    protected void seedEventScore(UUID courseEnrollmentId, UUID eventId, double score) {
+        jdbc.update(
+            "INSERT INTO assessment_scores (id_course_enrollment, id_assessment_event, score) "
+                + "VALUES (?,?,?)",
+            courseEnrollmentId, eventId, score);
+    }
+
+    protected void seedCriterionScore(UUID courseEnrollmentId, UUID criterionId, double score) {
+        jdbc.update(
+            "INSERT INTO assessment_scores (id_course_enrollment, id_criterion, score) "
+                + "VALUES (?,?,?)",
+            courseEnrollmentId, criterionId, score);
     }
 }

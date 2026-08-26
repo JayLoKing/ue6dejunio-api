@@ -41,14 +41,20 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     }
 
     @Override
+    public boolean curriculumPlanExists(UUID curriculumPlanId) {
+        return planRepo.existsById(curriculumPlanId);
+    }
+
+    @Override
     @Transactional
     public EvaluationCriterion create(UUID classGroupId, Integer trimester, String dimension,
-                                      String name, UUID curriculumPlanId) {
+                                      String name, String activityName, UUID curriculumPlanId) {
         EvaluationCriterionEntity e = new EvaluationCriterionEntity();
         e.setClassGroup(classGroupRepo.getReferenceById(classGroupId));
         e.setTrimester(trimester);
         e.setDimension(dimension);
         e.setName(name);
+        e.setActivityName(activityName);
         if (curriculumPlanId != null) {
             e.setCurriculumPlan(planRepo.getReferenceById(curriculumPlanId));
         }
@@ -83,12 +89,13 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
 
     @Override
     public boolean hasScoresForCriterion(UUID id) {
-        return assessmentScoreRepo.existsByEvent_Criterion_Id(id);
+        return assessmentScoreRepo.existsByCriterion(id);
     }
 
     private EvaluationCriterion toDomain(EvaluationCriterionEntity e) {
         return new EvaluationCriterion(
             e.getId(), e.getClassGroup().getId(), e.getTrimester(), e.getDimension(), e.getName(),
+            e.getActivityName(),
             e.getCurriculumPlan() != null ? e.getCurriculumPlan().getId() : null);
     }
 }

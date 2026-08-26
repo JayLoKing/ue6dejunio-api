@@ -38,6 +38,10 @@ public class EvaluationCriterionEntity {
     @Column(name = "name", nullable = false, length = 150)
     private String name;
 
+    // Null marks a criterion scored directly; set, it names the activity whose items feed it.
+    @Column(name = "activity_name", length = 150)
+    private String activityName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_curriculum_plan")
     private CurriculumPlanEntity curriculumPlan;

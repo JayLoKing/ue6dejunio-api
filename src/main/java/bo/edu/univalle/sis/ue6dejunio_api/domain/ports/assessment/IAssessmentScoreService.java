@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface IAssessmentScoreService {
     AssessmentScore setScore(SetScoreCommand command);
     List<AssessmentScore> listByEvent(UUID eventId);
+
+    List<AssessmentScore> listByCriterion(UUID criterionId);
     List<AssessmentScore> listByCourseEnrollment(UUID courseEnrollmentId);
     void delete(UUID id);
 }

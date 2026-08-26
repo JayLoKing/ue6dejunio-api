@@ -3,11 +3,13 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +38,7 @@ class AuthorizationComponentTest {
     @Mock private IClassGroupDomain classGroupDomain;
     @Mock private IAssessmentEventDomain assessmentEventDomain;
     @Mock private IAssessmentScoreDomain assessmentScoreDomain;
+    @Mock private ICriterionDomain criterionDomain;
     @Mock private ICourseEnrollmentDomain courseEnrollmentDomain;
     @Mock private ICourseDomain courseDomain;
 
@@ -63,7 +66,7 @@ class AuthorizationComponentTest {
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t", null, BigDecimal.TEN)));
+            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScoreEvent(token(teacherA, "Teacher"), eventId)).isTrue();
@@ -76,7 +79,7 @@ class AuthorizationComponentTest {
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t", null, BigDecimal.TEN)));
+            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScoreEvent(token(teacherB, "Teacher"), eventId)).isFalse();
@@ -117,9 +120,9 @@ class AuthorizationComponentTest {
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(assessmentScoreDomain.findById(scoreId)).thenReturn(
-            Optional.of(new AssessmentScore(scoreId, UUID.randomUUID(), eventId, BigDecimal.TEN, null, null)));
+            Optional.of(new AssessmentScore(scoreId, UUID.randomUUID(), eventId, null, BigDecimal.TEN, null, null)));
         when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t", null, BigDecimal.TEN)));
+            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScore(token(teacherA, "Teacher"), scoreId)).isTrue();
@@ -133,6 +136,73 @@ class AuthorizationComponentTest {
         when(assessmentScoreDomain.findById(scoreId)).thenReturn(Optional.empty());
 
         assertThat(authz.canWriteScore(token(teacherA, "Teacher"), scoreId)).isFalse();
+    }
+
+    // ---- canWriteScoreCriterion / canWriteScoreTarget (direct criterion scoring) ----
+
+    private EvaluationCriterion criterion(UUID id, UUID classGroupId) {
+        return new EvaluationCriterion(id, classGroupId, 1, "Doing", "Participacion", null, null);
+    }
+
+    @Test
+    void canWriteScoreCriterion_ownerOfTheClassGroup_true() {
+        UUID teacherA = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+            .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
+
+        assertThat(authz.canWriteScoreCriterion(token(teacherA, "Teacher"), criterionId)).isTrue();
+    }
+
+    @Test
+    void canWriteScoreCriterion_nonOwner_false() {
+        UUID teacherA = UUID.randomUUID();
+        UUID teacherB = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+            .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
+
+        assertThat(authz.canWriteScoreCriterion(token(teacherB, "Teacher"), criterionId)).isFalse();
+    }
+
+    @Test
+    void canWriteScoreCriterion_unknownCriterionId_deniesNotThrows() {
+        UUID teacherA = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId)).thenReturn(Optional.empty());
+
+        assertThat(authz.canWriteScoreCriterion(token(teacherA, "Teacher"), criterionId)).isFalse();
+    }
+
+    @Test
+    void canWriteScoreTarget_bothTargets_deniesEvenForDirector() {
+        UUID director = UUID.randomUUID();
+
+        assertThat(authz.canWriteScoreTarget(
+            token(director, "Director"), UUID.randomUUID(), UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void canWriteScoreTarget_noTarget_denies() {
+        UUID director = UUID.randomUUID();
+
+        assertThat(authz.canWriteScoreTarget(token(director, "Director"), null, null)).isFalse();
+    }
+
+    @Test
+    void canWriteScoreTarget_criterionOnly_resolvesThroughTheCriterion() {
+        UUID teacherA = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+            .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
+
+        assertThat(authz.canWriteScoreTarget(token(teacherA, "Teacher"), null, criterionId)).isTrue();
     }
 
     // ---- canReadEnrollmentScope / canWriteDailyAttendance (homeroom) ----
@@ -466,7 +536,7 @@ class AuthorizationComponentTest {
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t", null, BigDecimal.TEN)));
+            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
 
         assertThat(authz.canWriteScoreEvent(

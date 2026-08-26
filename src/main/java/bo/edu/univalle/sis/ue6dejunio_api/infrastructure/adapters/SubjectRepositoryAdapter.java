@@ -77,7 +77,7 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
 
     @Override
     public boolean hasScoresForSubject(UUID id) {
-        return assessmentScoreRepo.existsByEvent_Criterion_ClassGroup_Subject_Id(id);
+        return assessmentScoreRepo.existsBySubject(id);
     }
 
     private Subject toDomain(SubjectEntity e) {

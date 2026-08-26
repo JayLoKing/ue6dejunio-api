@@ -50,3 +50,5 @@ src/test/resources/keys/private.pem
 ### Agent / review tooling (personal, machine-specific) ###
 .atl/
 .gga
+# Local AI runtime state
+.codegraph/

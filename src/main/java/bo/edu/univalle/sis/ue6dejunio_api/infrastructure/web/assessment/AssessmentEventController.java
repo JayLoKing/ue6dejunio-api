@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,7 +28,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessment-events")
-@Tag(name = "AssessmentEvents", description = "Actividades/columnas que cuelgan de un criterio")
+@Tag(name = "AssessmentEvents", description = "Criterios de una actividad. Su promedio es la nota del criterio")
 @SecurityRequirement(name = "bearerAuth")
 public class AssessmentEventController {
 
@@ -38,36 +39,40 @@ public class AssessmentEventController {
     }
 
     @PostMapping
-    @Operation(summary = "Crear actividad bajo un criterio. maxScore default 100")
+    @PreAuthorize("@authz.canWriteScoreCriterion(authentication, #r.criterionId())")
+    @Operation(summary = "Agregar un criterio a una actividad ya existente")
     public ResponseEntity<EventResponse> create(@Valid @RequestBody CreateEventRequest r) {
-        AssessmentEvent e = eventService.create(new CreateEventCommand(
-            r.criterionId(), r.title(), r.description(), r.maxScore()));
+        AssessmentEvent e = eventService.create(new CreateEventCommand(r.criterionId(), r.title()));
         return ResponseEntity.ok(EventResponse.from(e));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener actividad por id")
+    @PreAuthorize("@authz.canReadScoreEvent(authentication, #id)")
+    @Operation(summary = "Obtener criterio de actividad por id")
     public ResponseEntity<EventResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(EventResponse.from(eventService.getById(id)));
     }
 
     @GetMapping
-    @Operation(summary = "Listar actividades de un criterio")
+    @PreAuthorize("@authz.canReadScoreCriterion(authentication, #criterionId)")
+    @Operation(summary = "Listar los criterios de la actividad de un criterio")
     public ResponseEntity<List<EventResponse>> list(@RequestParam("id_criterion") UUID criterionId) {
         return ResponseEntity.ok(eventService.listByCriterion(criterionId).stream()
             .map(EventResponse::from).toList());
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar actividad")
+    @PreAuthorize("@authz.canWriteScoreEvent(authentication, #id)")
+    @Operation(summary = "Renombrar un criterio de actividad")
     public ResponseEntity<EventResponse> update(@PathVariable UUID id,
                                                @Valid @RequestBody UpdateEventRequest r) {
-        AssessmentEvent e = eventService.update(id, new UpdateEventCommand(r.title(), r.description(), r.maxScore()));
+        AssessmentEvent e = eventService.update(id, new UpdateEventCommand(r.title()));
         return ResponseEntity.ok(EventResponse.from(e));
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar actividad (borra sus notas)")
+    @PreAuthorize("@authz.canWriteScoreEvent(authentication, #id)")
+    @Operation(summary = "Eliminar un criterio de actividad (solo si no tiene notas)")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         eventService.delete(id);
         return ResponseEntity.noContent().build();
