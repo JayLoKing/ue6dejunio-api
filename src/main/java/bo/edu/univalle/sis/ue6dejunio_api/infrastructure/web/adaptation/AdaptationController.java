@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.adaptation;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
@@ -78,7 +79,11 @@ public class AdaptationController {
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit
     ) {
-        PageQuery p = PageQuery.of(offset - 1, limit);
+        // Ordered by the student it adapts, the same criterion the rest of the system lists people
+        // by. Without an ORDER BY the LIMIT/OFFSET walks an undefined order, so a second page can
+        // repeat a row the first one already returned and skip another one entirely.
+        PageQuery p = PageQuery.of(offset - 1, limit,
+            SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             adaptationService.listByPlan(planId, p).map(AdaptationResponse::from)));
     }

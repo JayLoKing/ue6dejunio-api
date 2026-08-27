@@ -11,7 +11,6 @@ import java.util.UUID;
 public interface ICourseDomain {
     boolean gradeExists(Integer gradeId);
     boolean parallelExists(Integer parallelId);
-    boolean userIsTeacher(UUID userId);
     boolean userIsNonTechnicalTeacher(UUID userId);
     Integer currentAcademicYearId();
     boolean existsByGradeParallelYear(Integer gradeId, Integer parallelId, Integer academicYearId);

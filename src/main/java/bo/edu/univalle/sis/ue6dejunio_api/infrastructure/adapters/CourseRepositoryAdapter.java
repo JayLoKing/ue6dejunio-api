@@ -56,13 +56,6 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     }
 
     @Override
-    public boolean userIsTeacher(UUID userId) {
-        return userRepo.findById(userId)
-            .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()))
-            .orElse(false);
-    }
-
-    @Override
     public boolean userIsNonTechnicalTeacher(UUID userId) {
         return userRepo.findById(userId)
             .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()) && !u.isTechnical())
