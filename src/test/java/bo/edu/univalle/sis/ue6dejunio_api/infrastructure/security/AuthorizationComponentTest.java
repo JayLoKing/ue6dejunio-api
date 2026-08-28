@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcSubject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
@@ -635,19 +636,34 @@ class AuthorizationComponentTest {
     }
     // ---- canReadPdc / canWritePdc ----
 
-    private Pdc pdc(UUID id, UUID classGroupId) {
-        return Pdc.builder().id(id).classGroupId(classGroupId).build();
+    /** A plan of a course whose homeroom teacher is given, holding one block per teacher listed. */
+    private Pdc pdc(UUID id, UUID homeroomTeacherId, UUID... blockTeacherIds) {
+        List<PdcSubject> blocks = new java.util.ArrayList<>();
+        for (UUID blockTeacherId : blockTeacherIds) {
+            blocks.add(new PdcSubject(UUID.randomUUID(), UUID.randomUUID(), null, null,
+                blockTeacherId, null, null, null, null, List.of()));
+        }
+        return Pdc.builder().id(id).homeroomTeacherId(homeroomTeacherId).subjects(blocks).build();
     }
 
     @Test
-    void canWritePdc_teacherOfTheClassGroup_true() {
+    void canWritePdc_homeroomTeacherOfTheCourse_true() {
         UUID teacher = UUID.randomUUID();
         UUID pdcId = UUID.randomUUID();
-        UUID classGroupId = UUID.randomUUID();
-        when(pdcDomain.findById(pdcId)).thenReturn(Optional.of(pdc(pdcId, classGroupId)));
-        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacher);
+        when(pdcDomain.writerIdsOf(pdcId)).thenReturn(Set.of(teacher));
 
         assertThat(authz.canWritePdc(token(teacher, "Teacher"), pdcId)).isTrue();
+    }
+
+    // A specialist teaches one subject of a course they do not run. They still have to reach the
+    // plan, or they could never write the block that is theirs.
+    @Test
+    void canWritePdc_specialistWithABlockInThePlan_true() {
+        UUID specialist = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        when(pdcDomain.writerIdsOf(pdcId)).thenReturn(Set.of(UUID.randomUUID(), specialist));
+
+        assertThat(authz.canWritePdc(token(specialist, "Teacher"), pdcId)).isTrue();
     }
 
     @Test
@@ -655,18 +671,111 @@ class AuthorizationComponentTest {
         UUID owner = UUID.randomUUID();
         UUID intruder = UUID.randomUUID();
         UUID pdcId = UUID.randomUUID();
-        UUID classGroupId = UUID.randomUUID();
-        when(pdcDomain.findById(pdcId)).thenReturn(Optional.of(pdc(pdcId, classGroupId)));
-        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(owner);
+        when(pdcDomain.writerIdsOf(pdcId)).thenReturn(Set.of(owner));
 
         assertThat(authz.canWritePdc(token(intruder, "Teacher"), pdcId)).isFalse();
+    }
+
+    // ---- canWritePdcSubject ----
+
+    // Reaching a plan is not the same as owning every block of it: without this a specialist could
+    // rewrite the homeroom teacher's subjects too.
+    @Test
+    void canWritePdcSubject_specialistWritesOnlyTheirOwnBlock() {
+        UUID specialist = UUID.randomUUID();
+        UUID homeroom = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        UUID ownBlock = UUID.randomUUID();
+        UUID otherBlock = UUID.randomUUID();
+        when(pdcDomain.subjectWriterIdsOf(pdcId, ownBlock)).thenReturn(Set.of(homeroom, specialist));
+        // The other block belongs to another teacher, so the specialist is simply not among its writers.
+        when(pdcDomain.subjectWriterIdsOf(pdcId, otherBlock))
+            .thenReturn(Set.of(homeroom, UUID.randomUUID()));
+
+        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, ownBlock)).isTrue();
+        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, otherBlock)).isFalse();
+    }
+
+    @Test
+    void canWritePdcSubject_homeroomTeacherWritesAnyBlock() {
+        UUID homeroom = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        UUID block = UUID.randomUUID();
+        when(pdcDomain.subjectWriterIdsOf(pdcId, block))
+            .thenReturn(Set.of(homeroom, UUID.randomUUID()));
+
+        assertThat(authz.canWritePdcSubject(token(homeroom, "Teacher"), pdcId, block)).isTrue();
+    }
+
+    // A block id from another plan contributes nobody, so it denies instead of resolving to
+    // someone else's block.
+    @Test
+    void canWritePdcSubject_blockFromAnotherPlan_false() {
+        UUID specialist = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        UUID foreignBlock = UUID.randomUUID();
+        when(pdcDomain.subjectWriterIdsOf(pdcId, foreignBlock)).thenReturn(Set.of());
+
+        assertThat(authz.canWritePdcSubject(
+            token(specialist, "Teacher"), pdcId, foreignBlock)).isFalse();
+    }
+
+    // ---- canAdministerPdc ----
+
+    // Reaching a plan and running it are different things. A specialist holding one block of a
+    // course-wide plan writes their subject; publishing, deleting or fanning it to the parallels
+    // acts on the whole document and is not theirs to do.
+    @Test
+    void canAdministerPdc_specialistWithABlock_false() {
+        UUID specialist = UUID.randomUUID();
+        UUID homeroom = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        when(pdcDomain.writerIdsOf(pdcId)).thenReturn(Set.of(homeroom, specialist));
+        when(pdcDomain.administratorIdsOf(pdcId)).thenReturn(Set.of(homeroom));
+
+        assertThat(authz.canWritePdc(token(specialist, "Teacher"), pdcId)).isTrue();
+        assertThat(authz.canAdministerPdc(token(specialist, "Teacher"), pdcId)).isFalse();
+    }
+
+    @Test
+    void canAdministerPdc_homeroomTeacher_true() {
+        UUID homeroom = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        when(pdcDomain.administratorIdsOf(pdcId)).thenReturn(Set.of(homeroom));
+
+        assertThat(authz.canAdministerPdc(token(homeroom, "Teacher"), pdcId)).isTrue();
+    }
+
+    // A specialist's own single-subject plan is theirs to publish: they opened it.
+    @Test
+    void canAdministerPdc_authorOfTheirOwnPlan_true() {
+        UUID specialist = UUID.randomUUID();
+        UUID pdcId = UUID.randomUUID();
+        when(pdcDomain.administratorIdsOf(pdcId))
+            .thenReturn(Set.of(specialist, UUID.randomUUID()));
+
+        assertThat(authz.canAdministerPdc(token(specialist, "Teacher"), pdcId)).isTrue();
+    }
+
+    @Test
+    void canAdministerPdc_directorAndSecretary() {
+        assertThat(authz.canAdministerPdc(
+            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canAdministerPdc(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void canWritePdcSubject_secretary_false() {
+        assertThat(authz.canWritePdcSubject(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID(), UUID.randomUUID())).isFalse();
     }
 
     @Test
     void canWritePdc_unknownPlan_deniesNotThrows() {
         UUID teacher = UUID.randomUUID();
         UUID pdcId = UUID.randomUUID();
-        when(pdcDomain.findById(pdcId)).thenReturn(Optional.empty());
+        when(pdcDomain.writerIdsOf(pdcId)).thenReturn(Set.of());
 
         assertThat(authz.canWritePdc(token(teacher, "Teacher"), pdcId)).isFalse();
     }
@@ -692,9 +801,7 @@ class AuthorizationComponentTest {
         UUID owner = UUID.randomUUID();
         UUID intruder = UUID.randomUUID();
         UUID pdcId = UUID.randomUUID();
-        UUID classGroupId = UUID.randomUUID();
-        when(pdcDomain.findById(pdcId)).thenReturn(Optional.of(pdc(pdcId, classGroupId)));
-        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(owner);
+        when(pdcDomain.writerIdsOf(pdcId)).thenReturn(Set.of(owner));
 
         assertThat(authz.canReadPdc(token(intruder, "Teacher"), pdcId)).isFalse();
     }
@@ -724,16 +831,14 @@ class AuthorizationComponentTest {
     // ---- canReadAdaptation / canWriteAdaptation ----
 
     @Test
-    void canWriteAdaptation_teacherOfThePlansClassGroup_true() {
+    void canWriteAdaptation_teacherOfThePlansCourse_true() {
         UUID teacher = UUID.randomUUID();
         UUID adaptationId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
-        UUID classGroupId = UUID.randomUUID();
         when(adaptationDomain.findById(adaptationId)).thenReturn(Optional.of(
             new Adaptation(adaptationId, planId, UUID.randomUUID(), "Ana Perez",
                 null, null, null, null, null, null, null)));
-        when(pdcDomain.findById(planId)).thenReturn(Optional.of(pdc(planId, classGroupId)));
-        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacher);
+        when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(teacher));
 
         assertThat(authz.canWriteAdaptation(token(teacher, "Teacher"), adaptationId)).isTrue();
     }
@@ -744,12 +849,10 @@ class AuthorizationComponentTest {
         UUID intruder = UUID.randomUUID();
         UUID adaptationId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
-        UUID classGroupId = UUID.randomUUID();
         when(adaptationDomain.findById(adaptationId)).thenReturn(Optional.of(
             new Adaptation(adaptationId, planId, UUID.randomUUID(), "Ana Perez",
                 null, null, null, null, null, null, null)));
-        when(pdcDomain.findById(planId)).thenReturn(Optional.of(pdc(planId, classGroupId)));
-        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(owner);
+        when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(owner));
 
         // The adaptation carries the student's full name, so reading it is disclosure.
         assertThat(authz.canWriteAdaptation(token(intruder, "Teacher"), adaptationId)).isFalse();

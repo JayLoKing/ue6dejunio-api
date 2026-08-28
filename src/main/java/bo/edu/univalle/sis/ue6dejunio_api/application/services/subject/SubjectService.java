@@ -26,14 +26,26 @@ public class SubjectService implements ISubjectService {
     @Override
     @Transactional
     public Subject create(CreateSubjectCommand c) {
-        return subjectDomain.create(c.name(), c.technical() != null && c.technical());
+        if (!subjectDomain.areaExists(c.areaId())) {
+            throw new ResourceNotFoundException("KnowledgeArea", c.areaId());
+        }
+        return subjectDomain.create(c.name(), c.areaId(), c.technical() != null && c.technical());
     }
 
     @Override
     @Transactional
     public Subject update(UUID id, UpdateSubjectCommand c) {
         getById(id);
-        return subjectDomain.update(id, c.name(), c.technical(), c.active());
+        if (c.areaId() != null && !subjectDomain.areaExists(c.areaId())) {
+            throw new ResourceNotFoundException("KnowledgeArea", c.areaId());
+        }
+        // Deactivating through update is the same act as deleting, and academic history says no the
+        // same way. Guarding only delete left the rule open on the other path.
+        if (Boolean.FALSE.equals(c.active()) && subjectDomain.hasScoresForSubject(id)) {
+            throw new ConflictException(
+                "no se pudo desactivar la materia porque tiene calificaciones registradas");
+        }
+        return subjectDomain.update(id, c.name(), c.areaId(), c.technical(), c.active());
     }
 
     @Override

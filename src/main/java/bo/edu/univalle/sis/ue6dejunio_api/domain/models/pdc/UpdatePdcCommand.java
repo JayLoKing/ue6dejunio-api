@@ -1,24 +1,16 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc;
 
-import lombok.Builder;
-
 import java.time.LocalDate;
 
-@Builder
+/**
+ * Edits the header of a plan. Every field is optional: a null one is left alone, so the form can
+ * save one step at a time without carrying the steps the teacher has not reached yet.
+ */
 public record UpdatePdcCommand(
-    String title,
+    Integer planNumber,
+    LocalDate periodStart,
+    LocalDate periodEnd,
     String holisticObjective,
-    String learningObjective,
-    String contents,
-    String practiceActivities,
-    String theoryActivities,
-    String valuationActivities,
-    String productionActivities,
-    String resources,
-    LocalDate startDate,
-    LocalDate endDate,
-    String criteriaBeing,
-    String criteriaKnowing,
-    String criteriaDoing,
-    String criteriaDeciding
+    String finalProduct,
+    String bibliography
 ) {}

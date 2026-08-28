@@ -33,6 +33,22 @@ public class CurriculumAdaptationEntity {
     @JoinColumn(name = "id_student", nullable = false)
     private StudentEntity student;
 
+    /**
+     * Which subject's block the adaptation is printed under. Null on adaptations recorded before
+     * the plan carried subject blocks, and on ones that span the whole plan.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_plan_subject")
+    private CurriculumPlanSubjectEntity planSubject;
+
+    /**
+     * What the adaptation answers to — a disability, an extraordinary talent, ADHD, ASD or another
+     * condition. The form asks for it by name, and the same adapted content means different things
+     * depending on it.
+     */
+    @Column(name = "condition_type", length = 120)
+    private String conditionType;
+
     @Column(name = "adapted_contents")
     private String adaptedContents;
 

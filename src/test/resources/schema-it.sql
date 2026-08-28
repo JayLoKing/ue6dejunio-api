@@ -32,9 +32,16 @@ CREATE TABLE IF NOT EXISTS grades (
     CONSTRAINT uq_grade_per_level UNIQUE (id_level, name)
 );
 CREATE TABLE IF NOT EXISTS parallels (id_parallel SERIAL PRIMARY KEY, name char(1) NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS knowledge_areas (
+    id_area SERIAL PRIMARY KEY,
+    name varchar(80) NOT NULL UNIQUE,
+    display_order integer NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS subjects (
     id_subject uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name varchar(100) NOT NULL,
+    id_area integer NOT NULL REFERENCES knowledge_areas(id_area) ON DELETE RESTRICT,
     is_technical boolean DEFAULT false,
     is_active boolean DEFAULT true,
     CONSTRAINT uq_subject_name UNIQUE (name)
@@ -83,18 +90,44 @@ CREATE TABLE IF NOT EXISTS class_groups (
 
 CREATE TABLE IF NOT EXISTS curriculum_plans (
     id_curriculum_plan uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_class_group uuid REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
-    trimester integer CHECK (trimester BETWEEN 1 AND 3),
-    status varchar(30) DEFAULT 'Draft',
+    id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE CASCADE,
+    plan_number integer NOT NULL CHECK (plan_number BETWEEN 1 AND 12),
+    trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
+    period_start date NOT NULL,
+    period_end date NOT NULL,
+    status varchar(30) NOT NULL DEFAULT 'Draft',
     review_observations text,
-    title varchar(200) NOT NULL,
-    holistic_objective text, learning_objective text, contents text,
-    practice_activities text, theory_activities text, valuation_activities text, production_activities text,
-    resources text, start_date date, end_date date,
-    criteria_being text, criteria_knowing text, criteria_doing text, criteria_deciding text,
+    holistic_objective text,
+    final_product text,
+    bibliography text,
+    source_plan_id uuid REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE SET NULL,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
     created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
-    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    CONSTRAINT uq_plan_course_number UNIQUE (id_course, trimester, plan_number),
+    CONSTRAINT check_plan_period CHECK (period_end >= period_start)
+);
+
+CREATE TABLE IF NOT EXISTS curriculum_plan_subjects (
+    id_plan_subject uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
+    id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
+    learning_objective text,
+    general_adaptations text,
+    display_order integer NOT NULL DEFAULT 0,
+    CONSTRAINT uq_plan_subject UNIQUE (id_curriculum_plan, id_class_group)
+);
+
+CREATE TABLE IF NOT EXISTS curriculum_plan_entries (
+    id_plan_entry uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_plan_subject uuid NOT NULL REFERENCES curriculum_plan_subjects(id_plan_subject) ON DELETE CASCADE,
+    week_label varchar(60) NOT NULL,
+    contents text,
+    practice text, theory text, valuation text, production text,
+    resources text,
+    periods integer CHECK (periods IS NULL OR periods >= 0),
+    criteria_being text, criteria_knowing text, criteria_doing text, criteria_deciding text,
+    display_order integer NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS curriculum_plan_progress (
@@ -112,6 +145,8 @@ CREATE TABLE IF NOT EXISTS curriculum_adaptations (
     id_curriculum_adaptation uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
     id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE CASCADE,
+    id_plan_subject uuid REFERENCES curriculum_plan_subjects(id_plan_subject) ON DELETE CASCADE,
+    condition_type varchar(120),
     adapted_contents text, adapted_methodology text, adapted_criteria text,
     created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
     updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
@@ -227,7 +262,19 @@ INSERT INTO grades (id_level, name)
     ON CONFLICT DO NOTHING;
 INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C') ON CONFLICT DO NOTHING;
 INSERT INTO academic_years (year) VALUES (2026) ON CONFLICT DO NOTHING;
-INSERT INTO subjects (name) VALUES ('Matematicas'), ('Lenguaje') ON CONFLICT DO NOTHING;
+INSERT INTO knowledge_areas (name, display_order) VALUES
+    ('Cosmos y Pensamiento', 1),
+    ('Comunidad y Sociedad', 2),
+    ('Vida Tierra y Territorio', 3),
+    ('Ciencia Tecnología y Producción', 4)
+    ON CONFLICT DO NOTHING;
+-- Fixture names, deliberately the short ones the tests look up by. The production rename to the
+-- curriculum's wording is a data migration, not a change to what these fixtures are called.
+INSERT INTO subjects (name, id_area)
+    SELECT 'Matematicas', id_area FROM knowledge_areas WHERE name = 'Ciencia Tecnología y Producción'
+    UNION ALL
+    SELECT 'Lenguaje', id_area FROM knowledge_areas WHERE name = 'Comunidad y Sociedad'
+    ON CONFLICT DO NOTHING;
 INSERT INTO academic_trimesters (id_academic_year, trimester, start_date, end_date)
     SELECT id_academic_year, 1, DATE '2026-02-01', DATE '2026-05-31' FROM academic_years WHERE year = 2026
     UNION ALL

@@ -48,7 +48,7 @@ public class SubjectController {
     @PostMapping
     @Operation(summary = "Crear materia")
     public ResponseEntity<SubjectResponse> create(@Valid @RequestBody CreateSubjectRequest r) {
-        Subject s = subjectService.create(new CreateSubjectCommand(r.name(), r.technical()));
+        Subject s = subjectService.create(new CreateSubjectCommand(r.name(), r.areaId(), r.technical()));
         return ResponseEntity.ok(SubjectResponse.from(s));
     }
 
@@ -74,7 +74,7 @@ public class SubjectController {
     @Operation(summary = "Actualizar materia")
     public ResponseEntity<SubjectResponse> update(@PathVariable UUID id,
                                                   @Valid @RequestBody UpdateSubjectRequest r) {
-        Subject s = subjectService.update(id, new UpdateSubjectCommand(r.name(), r.technical(), r.active()));
+        Subject s = subjectService.update(id, new UpdateSubjectCommand(r.name(), r.areaId(), r.technical(), r.active()));
         return ResponseEntity.ok(SubjectResponse.from(s));
     }
 

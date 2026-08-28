@@ -1,11 +1,15 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.pdc;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.pdc.PdcService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpsertPdcSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,12 +18,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,112 +40,412 @@ class PdcServiceTest {
     @InjectMocks private PdcService pdcService;
 
     private final UUID user = UUID.randomUUID();
+    private final UUID courseId = UUID.randomUUID();
+    private final LocalDate august1 = LocalDate.of(2026, 8, 3);
+    private final LocalDate september4 = LocalDate.of(2026, 9, 4);
+
+    private CreatePdcCommand command(Integer planNumber, LocalDate start, LocalDate end, List<UUID> groups) {
+        return new CreatePdcCommand(courseId, planNumber, 2, start, end, null, null, null, groups);
+    }
+
+    private CreatePdcCommand command() {
+        return command(4, august1, september4, null);
+    }
 
     private Pdc pdcWithStatus(UUID id, String status) {
-        return Pdc.builder().id(id).status(status).title("T").trimester(1)
-            .classGroupId(UUID.randomUUID()).build();
+        return Pdc.builder().id(id).courseId(courseId).status(status)
+            .planNumber(4).trimester(2).periodStart(august1).periodEnd(september4).build();
+    }
+
+    // ---- create -------------------------------------------------------------------------------
+
+    @Test
+    void create_setsDraftAndOpensABlockPerSubjectOfTheCourse() {
+        UUID planId = UUID.randomUUID();
+        List<UUID> classGroups = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(classGroups);
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+
+        pdcService.create(command(), user, true);
+
+        ArgumentCaptor<Pdc> saved = ArgumentCaptor.forClass(Pdc.class);
+        verify(pdcDomain).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(PdcStatus.DRAFT);
+        // Omitting the subjects means the whole course, which is the homeroom teacher's plan.
+        verify(pdcDomain).addSubjects(planId, classGroups);
     }
 
     @Test
-    void create_setsDraft() {
-        UUID cg = UUID.randomUUID();
-        when(pdcDomain.classGroupExists(cg)).thenReturn(true);
-        when(pdcDomain.existsByClassGroupAndTrimester(cg, 1)).thenReturn(false);
-        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
+    void create_withNamedSubjects_keepsOnlyThose() {
+        UUID planId = UUID.randomUUID();
+        UUID onlySubject = UUID.randomUUID();
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of(onlySubject));
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        Pdc r = pdcService.create(CreatePdcCommand.builder()
-            .classGroupId(cg).trimester(1).title("Plan").build(), user);
+        pdcService.create(command(4, august1, september4, List.of(onlySubject)), user, false);
 
-        assertThat(r.getStatus()).isEqualTo(PdcStatus.DRAFT);
+        verify(pdcDomain).addSubjects(planId, List.of(onlySubject));
+        // A specialist plans what they teach, not the whole course.
+        verify(pdcDomain, never()).activeClassGroupIdsOf(any());
     }
 
     @Test
-    void create_duplicate_throws() {
-        UUID cg = UUID.randomUUID();
-        when(pdcDomain.classGroupExists(cg)).thenReturn(true);
-        when(pdcDomain.existsByClassGroupAndTrimester(cg, 1)).thenReturn(true);
-        assertThatThrownBy(() -> pdcService.create(CreatePdcCommand.builder()
-            .classGroupId(cg).trimester(1).title("Plan").build(), user))
+    void create_subjectFromAnotherCourse_isRefused() {
+        UUID foreign = UUID.randomUUID();
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of(UUID.randomUUID()));
+
+        assertThatThrownBy(() ->
+            pdcService.create(command(4, august1, september4, List.of(foreign)), user, false))
+            .isInstanceOf(ValidationException.class);
+        verify(pdcDomain, never()).save(any());
+    }
+
+    // The plan is monthly. A trimester legitimately holds three or four of them, so only the same
+    // numbered plan of the same course may not repeat.
+    @Test
+    void create_secondPlanOfTheSameTrimester_isAllowed() {
+        UUID planId = UUID.randomUUID();
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 5)).thenReturn(false);
+        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(List.of(UUID.randomUUID()));
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+
+        pdcService.create(command(5, august1, september4, null), user, true);
+
+        verify(pdcDomain).save(any(Pdc.class));
+    }
+
+    @Test
+    void create_samePlanNumberTwice_throwsDuplicate() {
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(true);
+
+        assertThatThrownBy(() -> pdcService.create(command(), user, true))
             .isInstanceOf(DuplicateResourceException.class);
     }
 
     @Test
-    void publish_fromDraft_setsPublished() {
-        UUID id = UUID.randomUUID();
-        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
-        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
-        Pdc r = pdcService.publish(id, user);
-        assertThat(r.getStatus()).isEqualTo(PdcStatus.PUBLISHED);
+    void create_unknownCourse_throwsNotFound() {
+        when(pdcDomain.courseExists(courseId)).thenReturn(false);
+
+        assertThatThrownBy(() -> pdcService.create(command(), user, true))
+            .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void publish_fromApproved_throws() {
-        UUID id = UUID.randomUUID();
-        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.APPROVED)));
-        assertThatThrownBy(() -> pdcService.publish(id, user))
+    void create_periodEndingBeforeItStarts_isRefused() {
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+
+        assertThatThrownBy(() ->
+            pdcService.create(command(4, september4, august1, null), user, true))
+            .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void create_courseWithoutActiveSubjects_isRefused() {
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> pdcService.create(command(), user, true))
             .isInstanceOf(ConflictException.class);
     }
 
+    // Repeating an id passed a distinct-count check and then collided with the index that allows
+    // one block per subject, turning a fixable request into a 500.
     @Test
-    void approve_fromPublished_setsApproved() {
-        UUID id = UUID.randomUUID();
-        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.PUBLISHED)));
-        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
-        Pdc r = pdcService.approve(id);
-        assertThat(r.getStatus()).isEqualTo(PdcStatus.APPROVED);
+    void create_repeatedSubject_isOpenedOnce() {
+        UUID planId = UUID.randomUUID();
+        UUID subject = UUID.randomUUID();
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of(subject));
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+
+        pdcService.create(command(4, august1, september4, List.of(subject, subject)), user, false);
+
+        verify(pdcDomain).addSubjects(planId, List.of(subject));
+    }
+
+    // A specialist could otherwise open a plan covering every subject of someone else's course —
+    // and because one plan per course and month is allowed, take the slot the homeroom teacher's
+    // own plan was going to fill.
+    @Test
+    void create_specialistWithoutNamingSubjects_getsOnlyTheirOwn() {
+        UUID planId = UUID.randomUUID();
+        UUID ownSubject = UUID.randomUUID();
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of(ownSubject));
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+
+        // false: this caller is not the homeroom teacher and not the Director.
+        pdcService.create(command(), user, false);
+
+        verify(pdcDomain).addSubjects(planId, List.of(ownSubject));
+        verify(pdcDomain, never()).activeClassGroupIdsOf(any());
+    }
+
+    // The Director passes the reach guard and teaches nothing. Deriving authority from an empty
+    // subject list made every Director create answer 409 on every course.
+    @Test
+    void create_directorPlansTheWholeCourse() {
+        UUID planId = UUID.randomUUID();
+        List<UUID> everySubject = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(everySubject);
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+
+        pdcService.create(command(), user, true);
+
+        verify(pdcDomain).addSubjects(planId, everySubject);
+        verify(pdcDomain, never()).classGroupIdsTaughtBy(any(), any());
     }
 
     @Test
-    void approve_fromDraft_throws() {
+    void create_teacherWithNoActiveSubjectInTheCourse_isRefused() {
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> pdcService.create(command(), user, false))
+            .isInstanceOf(ConflictException.class);
+        verify(pdcDomain, never()).save(any());
+    }
+
+    // ---- update -------------------------------------------------------------------------------
+
+    // Renumbering onto a month the course already planned collides with the unique index. Caught
+    // here it is a conflict; left to the database it surfaced as a 500.
+    @Test
+    void update_renumberingOntoAnExistingMonth_throwsDuplicate() {
         UUID id = UUID.randomUUID();
         when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
-        assertThatThrownBy(() -> pdcService.approve(id))
-            .isInstanceOf(ConflictException.class);
-    }
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 5)).thenReturn(true);
 
-    @Test
-    void observe_fromPublished_setsObservationsAndText() {
-        UUID id = UUID.randomUUID();
-        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.PUBLISHED)));
-        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
-
-        Pdc r = pdcService.observe(id, "Falta objetivo holistico");
-
-        assertThat(r.getStatus()).isEqualTo(PdcStatus.WITH_OBSERVATIONS);
-        assertThat(r.getReviewObservations()).isEqualTo("Falta objetivo holistico");
-    }
-
-    @Test
-    void update_onApproved_throws() {
-        UUID id = UUID.randomUUID();
-        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.APPROVED)));
         assertThatThrownBy(() -> pdcService.update(id,
-            bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand.builder()
-                .title("X").build(), user))
+            new UpdatePdcCommand(5, null, null, null, null, null), user))
+            .isInstanceOf(DuplicateResourceException.class);
+        verify(pdcDomain, never()).save(any());
+    }
+
+    @Test
+    void update_keepingTheSameNumber_doesNotCollideWithItself() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
+        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
+
+        Pdc updated = pdcService.update(id,
+            new UpdatePdcCommand(4, null, null, "Nuevo objetivo", null, null), user);
+
+        assertThat(updated.getHolisticObjective()).isEqualTo("Nuevo objetivo");
+        verify(pdcDomain, never()).existsByCoursePlanNumber(any(), any(), any());
+    }
+
+    // ---- writing a subject block --------------------------------------------------------------
+
+    @Test
+    void writeSubject_rowWithoutAWeek_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.statusOf(id)).thenReturn(Optional.of(PdcStatus.DRAFT));
+
+        UpsertPdcSubjectCommand c = new UpsertPdcSubjectCommand(null, null,
+            List.of(new UpsertPdcSubjectCommand.PdcEntryCommand(
+                "  ", "T34", null, null, null, null, null, null, null, null, null, null)));
+
+        assertThatThrownBy(() -> pdcService.writeSubject(id, UUID.randomUUID(), c, user))
+            .isInstanceOf(ValidationException.class);
+        verify(pdcDomain, never()).writeSubject(any(), any(), any(), any());
+    }
+
+    @Test
+    void writeSubject_negativePeriods_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.statusOf(id)).thenReturn(Optional.of(PdcStatus.DRAFT));
+
+        UpsertPdcSubjectCommand c = new UpsertPdcSubjectCommand(null, null,
+            List.of(new UpsertPdcSubjectCommand.PdcEntryCommand(
+                "Semana 1", null, null, null, null, null, null, -1, null, null, null, null)));
+
+        assertThatThrownBy(() -> pdcService.writeSubject(id, UUID.randomUUID(), c, user))
+            .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void writeSubject_onApprovedPlan_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.statusOf(id)).thenReturn(Optional.of(PdcStatus.APPROVED));
+
+        assertThatThrownBy(() -> pdcService.writeSubject(id, UUID.randomUUID(),
+            new UpsertPdcSubjectCommand(null, null, List.of()), user))
+            .isInstanceOf(ConflictException.class);
+    }
+
+    // The guard reads the status alone rather than the whole plan, so a plan that is not there has
+    // to answer 404 from that read instead of falling through to the write.
+    @Test
+    void writeSubject_onAPlanThatDoesNotExist_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.statusOf(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pdcService.writeSubject(id, UUID.randomUUID(),
+            new UpsertPdcSubjectCommand(null, null, List.of()), user))
+            .isInstanceOf(ResourceNotFoundException.class);
+        verify(pdcDomain, never()).writeSubject(any(), any(), any(), any());
+    }
+
+    // ---- the rotation -------------------------------------------------------------------------
+
+    @Test
+    void copyToSiblingCourses_copiesIntoEveryParallelThatLacksTheMonth() {
+        UUID id = UUID.randomUUID();
+        UUID parallelB = UUID.randomUUID();
+        UUID parallelC = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.APPROVED)));
+        when(pdcDomain.siblingCourseIdsOf(courseId)).thenReturn(List.of(parallelB, parallelC));
+        // C already wrote its own August plan, so the rotation leaves it alone.
+        when(pdcDomain.courseIdsWithPlan(List.of(parallelB, parallelC), 2, 4))
+            .thenReturn(Set.of(parallelC));
+        when(pdcDomain.copyTo(id, List.of(parallelB), user))
+            .thenReturn(List.of(pdcWithStatus(UUID.randomUUID(), PdcStatus.DRAFT)));
+
+        List<Pdc> copies = pdcService.copyToSiblingCourses(id, user);
+
+        assertThat(copies).hasSize(1);
+        // C is left out of the call entirely, not copied and discarded.
+        verify(pdcDomain).copyTo(id, List.of(parallelB), user);
+    }
+
+    @Test
+    void copyToSiblingCourses_fromADraft_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
+
+        assertThatThrownBy(() -> pdcService.copyToSiblingCourses(id, user))
+            .isInstanceOf(ConflictException.class);
+        verify(pdcDomain, never()).copyTo(any(), anyList(), any());
+    }
+
+    // A plan the Director sent back is one nobody stands behind yet. Handing it to the other
+    // parallels would spread work that was already refused.
+    @Test
+    void copyToSiblingCourses_fromAPlanWithObservations_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id))
+            .thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.WITH_OBSERVATIONS)));
+
+        assertThatThrownBy(() -> pdcService.copyToSiblingCourses(id, user))
+            .isInstanceOf(ConflictException.class);
+        verify(pdcDomain, never()).copyTo(any(), anyList(), any());
+    }
+
+    // ---- review ------------------------------------------------------------------------------
+
+    @Test
+    void publish_fromDraft_movesToPublished() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
+        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(pdcService.publish(id, user).getStatus()).isEqualTo(PdcStatus.PUBLISHED);
+    }
+
+    @Test
+    void approve_fromPublished_movesToApprovedAndClearsObservations() {
+        UUID id = UUID.randomUUID();
+        Pdc stored = pdcWithStatus(id, PdcStatus.PUBLISHED);
+        stored.setReviewObservations("faltaba el producto final");
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(stored));
+        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
+
+        Pdc approved = pdcService.approve(id, user);
+
+        assertThat(approved.getStatus()).isEqualTo(PdcStatus.APPROVED);
+        assertThat(approved.getReviewObservations()).isNull();
+    }
+
+    @Test
+    void approve_aDraft_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
+
+        assertThatThrownBy(() -> pdcService.approve(id, user))
             .isInstanceOf(ConflictException.class);
     }
 
     @Test
-    void delete_nonDraft_throws() {
+    void observe_recordsWhatMustBeCorrected() {
         UUID id = UUID.randomUUID();
         when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.PUBLISHED)));
+        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
+
+        Pdc observed = pdcService.observe(id, "Falta el producto final del mes", user);
+
+        assertThat(observed.getStatus()).isEqualTo(PdcStatus.WITH_OBSERVATIONS);
+        assertThat(observed.getReviewObservations()).isEqualTo("Falta el producto final del mes");
+    }
+
+    // Sending a plan back without saying why leaves the teacher guessing, and the status alone
+    // carries no instruction.
+    @Test
+    void observe_withoutSayingWhat_isRefused() {
+        UUID id = UUID.randomUUID();
+
+        assertThatThrownBy(() -> pdcService.observe(id, "   ", user))
+            .isInstanceOf(ValidationException.class);
+        verify(pdcDomain, never()).save(any());
+    }
+
+    // ---- delete ------------------------------------------------------------------------------
+
+    @Test
+    void delete_aDraftNobodyCopied_removesIt() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
+        when(pdcDomain.hasCopies(id)).thenReturn(false);
+
+        pdcService.delete(id);
+
+        verify(pdcDomain).deleteById(id);
+    }
+
+    @Test
+    void delete_anOriginalAlreadyCopied_isRefused() {
+        UUID id = UUID.randomUUID();
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.DRAFT)));
+        when(pdcDomain.hasCopies(id)).thenReturn(true);
+
         assertThatThrownBy(() -> pdcService.delete(id))
             .isInstanceOf(ConflictException.class);
+        verify(pdcDomain, never()).deleteById(any());
     }
 
     @Test
-    void publish_clearsObservations() {
+    void delete_aPublishedPlan_isRefused() {
         UUID id = UUID.randomUUID();
-        Pdc obs = pdcWithStatus(id, PdcStatus.WITH_OBSERVATIONS);
-        obs.setReviewObservations("prev");
-        when(pdcDomain.findById(id)).thenReturn(Optional.of(obs));
-        when(pdcDomain.save(any(Pdc.class))).thenAnswer(i -> i.getArgument(0));
+        when(pdcDomain.findById(id)).thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.PUBLISHED)));
 
-        pdcService.publish(id, user);
-
-        ArgumentCaptor<Pdc> cap = ArgumentCaptor.forClass(Pdc.class);
-        verify(pdcDomain).save(cap.capture());
-        assertThat(cap.getValue().getReviewObservations()).isNull();
-        assertThat(cap.getValue().getStatus()).isEqualTo(PdcStatus.PUBLISHED);
+        assertThatThrownBy(() -> pdcService.delete(id))
+            .isInstanceOf(ConflictException.class);
     }
 }

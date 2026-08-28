@@ -35,7 +35,11 @@ class ClassGroupReassignTeacherIT extends AbstractIntegrationTest {
         courseB = seedCourse(aulaTeacher, "B");
 
         UUID technicalSubjectId = UUID.randomUUID();
-        jdbc.update("INSERT INTO subjects (id_subject, name, is_technical) VALUES (?,?,true)",
+        // Every subject belongs to a knowledge area since the curriculum plan groups them by it,
+        // so a fixture subject has to name one too.
+        jdbc.update("INSERT INTO subjects (id_subject, name, id_area, is_technical) "
+                + "VALUES (?,?,(SELECT id_area FROM knowledge_areas "
+                + "WHERE name = 'Ciencia Tecnología y Producción'),true)",
             technicalSubjectId, "Robotica-" + technicalSubjectId.toString().substring(0, 8));
 
         classGroupTechnical = UUID.randomUUID();
