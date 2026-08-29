@@ -206,6 +206,21 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         assertThat(published.getTeacherNames()).containsExactly(fullNameOf(teacher));
     }
 
+    // The subjects somebody else runs are that teacher's to plan. Opening them here would file
+    // their month under this teacher's name, and the printed heading would claim they teach it.
+    @Test
+    void leavesOutTheSubjectsTheAuthorDoesNotTeach() {
+        UUID specialist = seedUser("Teacher", true);
+        jdbc.update("UPDATE class_groups SET id_teacher = ? WHERE id_class_group = ?",
+            specialist, languageGroup);
+
+        Pdc plan = pdcService.create(august(), teacher, true);
+
+        assertThat(plan.getSubjects()).hasSize(1);
+        assertThat(plan.getSubjects().get(0).classGroupId()).isEqualTo(mathGroup);
+        assertThat(plan.getTeacherNames()).containsExactly(fullNameOf(teacher));
+    }
+
     // A teacher running several subjects of the course is one name on the form, not one per block.
     @Test
     void namesEachTeacherOnce() {
@@ -233,6 +248,35 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
             .containsExactly(fullNameOf(teacher));
         assertThat(pdcService.getById(copies.get(0).getId()).getTeacherNames())
             .containsExactly(fullNameOf(otherTeacher));
+    }
+
+    // Adaptations answer to the students in front of one teacher: which of them needs the content
+    // broken down, who needs longer. Carrying them into a parallel would hand a teacher strategies
+    // written for children who are not in their classroom.
+    @Test
+    void aCopyDoesNotCarryTheAdaptationsWrittenForAnotherClassroom() {
+        UUID otherTeacher = seedUser("Teacher", false);
+        UUID parallelB = seedCourse(otherTeacher, "B");
+        seedClassGroup(parallelB, otherTeacher, "Matematicas");
+        seedClassGroup(parallelB, otherTeacher, "Lenguaje");
+
+        Pdc original = pdcService.create(august(), teacher, true);
+        UUID block = original.getSubjects().get(0).id();
+        pdcService.writeSubject(original.getId(), block, twoWeeks("Objetivo del mes"), teacher);
+        pdcService.publish(original.getId(), teacher);
+
+        List<Pdc> copies = pdcService.copyToSiblingCourses(original.getId(), teacher);
+        Pdc copy = pdcService.getById(copies.get(0).getId());
+
+        assertThat(pdcService.getById(original.getId()).getSubjects())
+            .anySatisfy(s -> assertThat(s.generalAdaptations()).isNotBlank());
+        assertThat(copy.getSubjects()).allSatisfy(s ->
+            assertThat(s.generalAdaptations()).isNull());
+        // The planning itself does travel — it is the reason the rotation exists.
+        assertThat(copy.getSubjects()).anySatisfy(s -> {
+            assertThat(s.learningObjective()).isEqualTo("Objetivo del mes");
+            assertThat(s.entries()).hasSize(2);
+        });
     }
 
     @Test

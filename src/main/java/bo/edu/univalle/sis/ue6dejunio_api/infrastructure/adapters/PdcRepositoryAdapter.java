@@ -308,7 +308,9 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             block.setCurriculumPlan(copy);
             block.setClassGroup(match.get());
             block.setLearningObjective(sourceBlock.getLearningObjective());
-            block.setGeneralAdaptations(sourceBlock.getGeneralAdaptations());
+            // The adaptations stay behind. They answer to the students in one classroom — who needs
+            // the content broken down, who needs longer — and the teacher receiving the copy has
+            // other children in front of them. The planning travels; the reading of a class does not.
             block.setDisplayOrder(order++);
             for (CurriculumPlanEntryEntity sourceEntry : sourceBlock.getEntries()) {
                 CurriculumPlanEntryEntity entry = new CurriculumPlanEntryEntity();

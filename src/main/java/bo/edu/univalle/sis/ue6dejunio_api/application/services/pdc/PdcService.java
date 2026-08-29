@@ -82,13 +82,24 @@ public class PdcService implements IPdcService {
     /**
      * Which subjects the caller may put in the plan.
      *
-     * <p>Whoever runs the course plans all of it. Anyone else plans only what they actually teach
-     * there, and is refused outright when that is nothing.
+     * <p>Whoever teaches in the course plans what they teach — no more, however wide their reach
+     * over the course is. The heading of the printed form names the subjects the teacher runs, and
+     * the technical subjects somebody else runs belong in that teacher's own plan. Only a caller
+     * who teaches nothing and may plan the course as a whole gets every subject; anyone else with
+     * nothing to teach here is refused.
      */
     private List<UUID> resolveClassGroups(CreatePdcCommand c, UUID currentUserId,
                                           boolean mayPlanEverySubject) {
+        // What the caller teaches here is what their plan is about. A homeroom teacher who also
+        // runs the technical subjects plans those too, and a homeroom teacher who does not leaves
+        // them to the technical teacher's own plan rather than filing them under their name.
+        List<UUID> ownSubjects = pdcDomain.classGroupIdsTaughtBy(c.courseId(), currentUserId);
         List<UUID> allowed;
-        if (mayPlanEverySubject) {
+        if (!ownSubjects.isEmpty()) {
+            allowed = ownSubjects;
+        } else if (mayPlanEverySubject) {
+            // The Director teaches nothing and still opens plans, so an empty list is widened only
+            // for whoever may plan the course as a whole.
             allowed = pdcDomain.activeClassGroupIdsOf(c.courseId());
             if (allowed.isEmpty()) {
                 throw new ConflictException("El curso no tiene materias activas para planificar");
@@ -98,10 +109,7 @@ public class PdcService implements IPdcService {
             // anyone who reached here without an active subject — a teacher whose only class group
             // was deactivated — open a course-wide plan and take the slot the homeroom teacher
             // needed, since one plan per course and month is all there is.
-            allowed = pdcDomain.classGroupIdsTaughtBy(c.courseId(), currentUserId);
-            if (allowed.isEmpty()) {
-                throw new ConflictException("No dictas ninguna materia activa en este curso");
-            }
+            throw new ConflictException("No dictas ninguna materia activa en este curso");
         }
         if (c.classGroupIds() == null || c.classGroupIds().isEmpty()) {
             return allowed;

@@ -59,13 +59,16 @@ class PdcServiceTest {
 
     // ---- create -------------------------------------------------------------------------------
 
+    // The plan covers what its author teaches. A homeroom teacher may reach every subject of the
+    // course, but the subjects a technical teacher runs there are planned by that teacher, in their
+    // own plan — opening them here would file someone else's work under this teacher's name.
     @Test
-    void create_setsDraftAndOpensABlockPerSubjectOfTheCourse() {
+    void create_setsDraftAndOpensABlockPerSubjectTheAuthorTeaches() {
         UUID planId = UUID.randomUUID();
-        List<UUID> classGroups = List.of(UUID.randomUUID(), UUID.randomUUID());
+        List<UUID> ownSubjects = List.of(UUID.randomUUID(), UUID.randomUUID());
         when(pdcDomain.courseExists(courseId)).thenReturn(true);
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
-        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(classGroups);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(ownSubjects);
         when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
@@ -75,8 +78,28 @@ class PdcServiceTest {
         ArgumentCaptor<Pdc> saved = ArgumentCaptor.forClass(Pdc.class);
         verify(pdcDomain).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(PdcStatus.DRAFT);
-        // Omitting the subjects means the whole course, which is the homeroom teacher's plan.
-        verify(pdcDomain).addSubjects(planId, classGroups);
+        verify(pdcDomain).addSubjects(planId, ownSubjects);
+    }
+
+    // A homeroom teacher who also runs the technical subjects plans all of them — the nine blocks
+    // are theirs because they teach nine, not because they run the course.
+    @Test
+    void create_opensTheTechnicalSubjectsTheHomeroomTeacherAlsoRuns() {
+        UUID planId = UUID.randomUUID();
+        List<UUID> nineSubjects = List.of(
+            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+            UUID.randomUUID());
+        when(pdcDomain.courseExists(courseId)).thenReturn(true);
+        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(nineSubjects);
+        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+        when(pdcDomain.addSubjects(eq(planId), anyList()))
+            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
+
+        pdcService.create(command(), user, true);
+
+        verify(pdcDomain).addSubjects(planId, nineSubjects);
     }
 
     @Test
@@ -219,7 +242,6 @@ class PdcServiceTest {
         pdcService.create(command(), user, true);
 
         verify(pdcDomain).addSubjects(planId, everySubject);
-        verify(pdcDomain, never()).classGroupIdsTaughtBy(any(), any());
     }
 
     @Test
