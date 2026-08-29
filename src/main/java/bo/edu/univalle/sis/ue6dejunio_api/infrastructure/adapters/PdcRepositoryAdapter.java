@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -98,8 +99,13 @@ public class PdcRepositoryAdapter implements IPdcDomain {
         // The blocks come back from what the caller already held rather than from a fresh read:
         // this write never touched them, and re-reading them is what made a status flip cost four
         // queries. A plan created here has none yet.
+        List<PdcSubject> blocks = pdc.getSubjects() == null ? List.of() : pdc.getSubjects();
+        // The names come off those same blocks. Deriving them here rather than leaving the builder
+        // default is what keeps a published plan answering with the heading a read of it would
+        // give: the write path and the read path describe one resource, so they agree on it.
         return toHeader(saved).toBuilder()
-            .subjects(pdc.getSubjects() == null ? List.of() : pdc.getSubjects())
+            .subjects(blocks)
+            .teacherNames(teacherNames(blocks))
             .build();
     }
 
@@ -381,6 +387,7 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             .courseId(c != null ? c.getId() : null)
             .gradeName(c != null && c.getGrade() != null ? c.getGrade().getName() : null)
             .parallelName(c != null && c.getParallel() != null ? c.getParallel().getName() : null)
+            .levelName(levelName(c))
             .courseName(courseName(c))
             .homeroomTeacherId(homeroom != null ? homeroom.getId() : null)
             .homeroomTeacherName(fullName(homeroom))
@@ -436,7 +443,29 @@ public class PdcRepositoryAdapter implements IPdcDomain {
                 s.getDisplayOrder(),
                 rows));
         }
-        return toHeader(e).toBuilder().subjects(blocks).build();
+        return toHeader(e).toBuilder()
+            .subjects(blocks)
+            .teacherNames(teacherNames(blocks))
+            .build();
+    }
+
+    /**
+     * The names that head the plan as "Maestro/a", in the order their blocks print and without
+     * repeating the teacher who runs several subjects of the same course.
+     */
+    private static List<String> teacherNames(List<PdcSubject> blocks) {
+        return blocks.stream()
+            .map(PdcSubject::teacherName)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    }
+
+    private static String levelName(CourseEntity c) {
+        if (c == null || c.getGrade() == null || c.getGrade().getLevel() == null) {
+            return null;
+        }
+        return c.getGrade().getLevel().getName();
     }
 
     private static String courseName(CourseEntity c) {

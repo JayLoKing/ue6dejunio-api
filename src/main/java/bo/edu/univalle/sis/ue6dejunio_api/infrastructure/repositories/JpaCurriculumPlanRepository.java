@@ -39,7 +39,8 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
      */
     @Query("SELECT p FROM CurriculumPlanEntity p WHERE p.id = :id")
     @EntityGraph(attributePaths = {
-        "course", "course.grade", "course.parallel", "course.homeroomTeacher",
+        "course", "course.grade", "course.grade.level", "course.parallel",
+        "course.homeroomTeacher",
         "subjects", "subjects.classGroup", "subjects.classGroup.subject",
         "subjects.classGroup.subject.area", "subjects.classGroup.teacher",
         "createdBy", "updatedBy"})
@@ -107,8 +108,8 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
                               WHERE s.curriculumPlan = p AND s.classGroup.teacher.id = :teacherId))
         """)
     @EntityGraph(attributePaths = {
-        "course", "course.grade", "course.parallel", "course.homeroomTeacher",
-        "createdBy", "updatedBy"})
+        "course", "course.grade", "course.grade.level", "course.parallel",
+        "course.homeroomTeacher", "createdBy", "updatedBy"})
     Page<CurriculumPlanEntity> search(@Param("courseId") UUID courseId,
                                       @Param("trimester") Integer trimester,
                                       @Param("status") String status,

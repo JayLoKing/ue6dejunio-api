@@ -37,6 +37,11 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         languageGroup = seedClassGroup(course, teacher, "Lenguaje");
     }
 
+    private String fullNameOf(UUID userId) {
+        return jdbc.queryForObject(
+            "SELECT names || ' ' || last_names FROM users WHERE id_user = ?", String.class, userId);
+    }
+
     private CreatePdcCommand august() {
         return new CreatePdcCommand(course, 4, 2,
             LocalDate.of(2026, 8, 3), LocalDate.of(2026, 9, 4),
@@ -157,6 +162,77 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
             .findFirst()
             .orElseThrow();
         assertThat(written.entries()).isEmpty();
+    }
+
+    // The printed form heads itself with the level, which lives two hops away from the plan
+    // (plan → course → grade → level) and had no way of reaching the document until now.
+    @Test
+    void carriesTheLevelTheCourseBelongsTo() {
+        Pdc created = pdcService.create(august(), teacher, true);
+
+        assertThat(created.getLevelName()).isEqualTo("Primaria Comunitaria Vocacional");
+        assertThat(pdcService.getById(created.getId()).getLevelName())
+            .isEqualTo("Primaria Comunitaria Vocacional");
+    }
+
+    // "Maestro/a" on the form is whoever teaches what the plan covers. It cannot be read from the
+    // plan's author: a copy to the parallels is authored by whoever triggered the copy, which may
+    // be the Director, and every copy would then carry their name instead of the teacher's.
+    // A teacher's plan holds their own subjects, so it names one teacher. The Director's does not:
+    // they teach nothing and open the course whole, so the form names everyone whose block is in it.
+    @Test
+    void namesEveryTeacherWhoseBlockIsInThePlan() {
+        UUID specialist = seedUser("Teacher", true);
+        jdbc.update("UPDATE class_groups SET id_teacher = ? WHERE id_class_group = ?",
+            specialist, languageGroup);
+        UUID director = seedUser("Director", false);
+
+        Pdc plan = pdcService.create(august(), director, true);
+
+        assertThat(plan.getTeacherNames())
+            .containsExactlyInAnyOrder(fullNameOf(teacher), fullNameOf(specialist));
+    }
+
+    // A status flip answers with the plan, and the heading it carries has to be the one a read of
+    // the same plan would give. The write path builds its answer from the blocks the caller already
+    // held instead of re-reading them, so the names have to be derived there too or the printed
+    // "Maestro/a" line comes back empty from a publish and filled from a GET.
+    @Test
+    void aStatusChangeAnswersWithTheTeachersToo() {
+        Pdc created = pdcService.create(august(), teacher, true);
+
+        Pdc published = pdcService.publish(created.getId(), teacher);
+
+        assertThat(published.getTeacherNames()).containsExactly(fullNameOf(teacher));
+    }
+
+    // A teacher running several subjects of the course is one name on the form, not one per block.
+    @Test
+    void namesEachTeacherOnce() {
+        Pdc plan = pdcService.create(august(), teacher, true);
+
+        assertThat(plan.getSubjects()).hasSize(2);
+        assertThat(plan.getTeacherNames()).containsExactly(fullNameOf(teacher));
+    }
+
+    // The rotation: one teacher of the grade writes the month, the parallels copy it. What the copy
+    // carries is the planning; the teacher it lands on is the one who runs that parallel.
+    @Test
+    void aCopyNamesTheTeacherOfTheParallelItLandsOn() {
+        UUID otherTeacher = seedUser("Teacher", false);
+        UUID parallelB = seedCourse(otherTeacher, "B");
+        seedClassGroup(parallelB, otherTeacher, "Matematicas");
+        seedClassGroup(parallelB, otherTeacher, "Lenguaje");
+
+        Pdc original = pdcService.create(august(), teacher, true);
+        pdcService.publish(original.getId(), teacher);
+        List<Pdc> copies = pdcService.copyToSiblingCourses(original.getId(), teacher);
+
+        assertThat(copies).hasSize(1);
+        assertThat(pdcService.getById(original.getId()).getTeacherNames())
+            .containsExactly(fullNameOf(teacher));
+        assertThat(pdcService.getById(copies.get(0).getId()).getTeacherNames())
+            .containsExactly(fullNameOf(otherTeacher));
     }
 
     @Test

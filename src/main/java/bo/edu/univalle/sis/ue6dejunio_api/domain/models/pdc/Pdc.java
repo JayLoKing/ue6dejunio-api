@@ -23,8 +23,19 @@ public class Pdc {
     private String courseName;
     private String gradeName;
     private String parallelName;
+    /** "Primaria Comunitaria Vocacional" — the form heads itself with it. */
+    private String levelName;
     private UUID homeroomTeacherId;
     private String homeroomTeacherName;
+
+    /**
+     * Who signs the plan as "Maestro/a": the teachers of the blocks it covers, each named once.
+     *
+     * <p>Not the author. A copy to the parallels is authored by whoever ran the copy — the Director
+     * more often than not — while the block still belongs to the teacher who runs that class group.
+     */
+    @Builder.Default
+    private List<String> teacherNames = List.of();
 
     /** The "Nº 4" of the heading: which plan of the year this is. */
     private Integer planNumber;

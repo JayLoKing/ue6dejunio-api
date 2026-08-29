@@ -22,6 +22,9 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
     List<UserEntity> findByRole_NameAndActiveTrueOrderByLastNames(String roleName);
     List<UserEntity> findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(String roleName, boolean technical);
 
+    /** The single holder of a role, for the callers that need one rather than the roster. */
+    Optional<UserEntity> findFirstByRole_NameAndActiveTrueOrderByLastNames(String roleName);
+
     @Query("SELECT u FROM UserEntity u WHERE (:excludeId IS NULL OR u.id <> :excludeId)")
     Page<UserEntity> listExcluding(@Param("excludeId") UUID excludeId, Pageable pageable);
 

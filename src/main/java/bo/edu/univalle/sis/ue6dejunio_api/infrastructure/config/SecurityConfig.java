@@ -65,6 +65,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/parallels/**").hasRole("Director")
                 .requestMatchers("/api/trimester-periods/**").hasRole("Director")
                 .requestMatchers("/api/catalog/**").authenticated()
+                // The heading of every printed document: names the school, not anybody's data.
+                .requestMatchers(HttpMethod.GET, "/api/institution").authenticated()
                 .requestMatchers("/api/notifications/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/course-enrollments/**")
                     .hasAnyRole("Director", "Teacher", "Secretary")
