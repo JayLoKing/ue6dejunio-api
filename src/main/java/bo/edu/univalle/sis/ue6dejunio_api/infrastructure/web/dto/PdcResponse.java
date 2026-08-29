@@ -75,7 +75,6 @@ public record PdcResponse(
         String criteriaBeing,
         String criteriaKnowing,
         String criteriaDoing,
-        String criteriaDeciding,
         Integer displayOrder
     ) {
         static Entry from(PdcEntry e) {
@@ -83,7 +82,7 @@ public record PdcResponse(
                 e.id(), e.weekLabel(), e.contents(), e.practice(), e.theory(),
                 e.valuation(), e.production(), e.resources(), e.periods(),
                 e.criteriaBeing(), e.criteriaKnowing(), e.criteriaDoing(),
-                e.criteriaDeciding(), e.displayOrder());
+                e.displayOrder());
         }
     }
 

@@ -34,8 +34,7 @@ public record UpsertPdcSubjectRequest(
         @Min(0) @Max(40) Integer periods,
         @Size(max = 2000) String criteriaBeing,
         @Size(max = 2000) String criteriaKnowing,
-        @Size(max = 2000) String criteriaDoing,
-        @Size(max = 2000) String criteriaDeciding
+        @Size(max = 2000) String criteriaDoing
     ) {}
 
     public UpsertPdcSubjectCommand toCommand() {
@@ -46,7 +45,7 @@ public record UpsertPdcSubjectRequest(
                 .map(e -> new UpsertPdcSubjectCommand.PdcEntryCommand(
                     e.weekLabel(), e.contents(), e.practice(), e.theory(), e.valuation(),
                     e.production(), e.resources(), e.periods(), e.criteriaBeing(),
-                    e.criteriaKnowing(), e.criteriaDoing(), e.criteriaDeciding()))
+                    e.criteriaKnowing(), e.criteriaDoing()))
                 .toList());
     }
 }

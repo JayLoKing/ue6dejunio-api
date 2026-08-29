@@ -218,7 +218,6 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             entry.setCriteriaBeing(row.criteriaBeing());
             entry.setCriteriaKnowing(row.criteriaKnowing());
             entry.setCriteriaDoing(row.criteriaDoing());
-            entry.setCriteriaDeciding(row.criteriaDeciding());
             entry.setDisplayOrder(order++);
             block.getEntries().add(entry);
         }
@@ -326,7 +325,6 @@ public class PdcRepositoryAdapter implements IPdcDomain {
                 entry.setCriteriaBeing(sourceEntry.getCriteriaBeing());
                 entry.setCriteriaKnowing(sourceEntry.getCriteriaKnowing());
                 entry.setCriteriaDoing(sourceEntry.getCriteriaDoing());
-                entry.setCriteriaDeciding(sourceEntry.getCriteriaDeciding());
                 entry.setDisplayOrder(sourceEntry.getDisplayOrder());
                 block.getEntries().add(entry);
             }
@@ -429,7 +427,6 @@ public class PdcRepositoryAdapter implements IPdcDomain {
                     entry.getCriteriaBeing(),
                     entry.getCriteriaKnowing(),
                     entry.getCriteriaDoing(),
-                    entry.getCriteriaDeciding(),
                     entry.getDisplayOrder()))
                 .toList();
             blocks.add(new PdcSubject(

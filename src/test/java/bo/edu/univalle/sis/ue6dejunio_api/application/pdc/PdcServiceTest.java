@@ -293,7 +293,7 @@ class PdcServiceTest {
 
         UpsertPdcSubjectCommand c = new UpsertPdcSubjectCommand(null, null,
             List.of(new UpsertPdcSubjectCommand.PdcEntryCommand(
-                "  ", "T34", null, null, null, null, null, null, null, null, null, null)));
+                "  ", "T34", null, null, null, null, null, null, null, null, null)));
 
         assertThatThrownBy(() -> pdcService.writeSubject(id, UUID.randomUUID(), c, user))
             .isInstanceOf(ValidationException.class);
@@ -307,7 +307,7 @@ class PdcServiceTest {
 
         UpsertPdcSubjectCommand c = new UpsertPdcSubjectCommand(null, null,
             List.of(new UpsertPdcSubjectCommand.PdcEntryCommand(
-                "Semana 1", null, null, null, null, null, null, -1, null, null, null, null)));
+                "Semana 1", null, null, null, null, null, null, -1, null, null, null)));
 
         assertThatThrownBy(() -> pdcService.writeSubject(id, UUID.randomUUID(), c, user))
             .isInstanceOf(ValidationException.class);

@@ -67,9 +67,6 @@ public class CurriculumPlanEntryEntity {
     @Column(name = "criteria_doing")
     private String criteriaDoing;
 
-    @Column(name = "criteria_deciding")
-    private String criteriaDeciding;
-
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 }

@@ -26,7 +26,6 @@ public record UpsertPdcSubjectCommand(
         Integer periods,
         String criteriaBeing,
         String criteriaKnowing,
-        String criteriaDoing,
-        String criteriaDeciding
+        String criteriaDoing
     ) {}
 }

@@ -22,6 +22,5 @@ public record PdcEntry(
     String criteriaBeing,
     String criteriaKnowing,
     String criteriaDoing,
-    String criteriaDeciding,
     Integer displayOrder
 ) {}

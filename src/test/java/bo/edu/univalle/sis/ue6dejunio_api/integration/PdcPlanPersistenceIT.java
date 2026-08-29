@@ -53,10 +53,10 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
             List.of(
                 new UpsertPdcSubjectCommand.PdcEntryCommand("Semana 1", "T34: Conformación",
                     "Leemos", "Explicamos", "Valoramos", "Esquema", "Periódicos", 11,
-                    "Respeta opiniones", "Reconoce la estructura", "Elabora un esquema", null),
+                    "Respeta opiniones", "Reconoce la estructura", "Elabora un esquema"),
                 new UpsertPdcSubjectCommand.PdcEntryCommand("Semanas 3 y 4", "T35: La oración",
                     "Identificamos", "Explicamos", "Valoramos", "Redacción", "Cuaderno", 8,
-                    "Muestra interés", "Reconoce las partes", "Redacta un párrafo", null)));
+                    "Muestra interés", "Reconoce las partes", "Redacta un párrafo")));
     }
 
     // Two subjects, two weeks each: both collections have to come back in one read, which is the
@@ -113,7 +113,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         pdcService.writeSubject(created.getId(), block,
             new UpsertPdcSubjectCommand("Segunda versión", null,
                 List.of(new UpsertPdcSubjectCommand.PdcEntryCommand("Semana 1", "Solo una",
-                    null, null, null, null, null, 2, null, null, null, null))),
+                    null, null, null, null, null, 2, null, null, null))),
             teacher);
 
         Pdc read = pdcService.getById(created.getId());
