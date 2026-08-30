@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS curriculum_plan_entries (
     practice text, theory text, valuation text, production text,
     resources text,
     periods integer CHECK (periods IS NULL OR periods >= 0),
-    criteria_being text, criteria_knowing text, criteria_doing text, criteria_deciding text,
+    criteria_being text, criteria_knowing text, criteria_doing text,
     display_order integer NOT NULL DEFAULT 0
 );
 
@@ -145,12 +145,14 @@ CREATE TABLE IF NOT EXISTS curriculum_adaptations (
     id_curriculum_adaptation uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     id_curriculum_plan uuid NOT NULL REFERENCES curriculum_plans(id_curriculum_plan) ON DELETE CASCADE,
     id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE CASCADE,
-    id_plan_subject uuid REFERENCES curriculum_plan_subjects(id_plan_subject) ON DELETE CASCADE,
     condition_type varchar(120),
     adapted_contents text, adapted_methodology text, adapted_criteria text,
     created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
     updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
-    created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    -- One row per student. The service checks before inserting, but a check and then an act is a
+    -- race: two concurrent creates both read "no row yet" and the plan prints the child twice.
+    CONSTRAINT uq_adaptation_plan_student UNIQUE (id_curriculum_plan, id_student)
 );
 
 CREATE TABLE IF NOT EXISTS evaluation_criteria (

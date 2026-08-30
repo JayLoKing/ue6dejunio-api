@@ -10,11 +10,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The adaptation against a real database. Every test until now mocked the port, so a column the
@@ -86,6 +88,35 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
         Adaptation read = adaptationService.getById(created.id());
         assertThat(read.conditionType()).isEqualTo("TDH");
         assertThat(read.adaptedMethodology()).isEqualTo("Otra metodología");
+    }
+
+    /**
+     * One row per student, held by the database rather than by a look-before-you-write.
+     *
+     * <p>The service asks {@code existsByPlanAndStudent} before inserting, which is a check and
+     * then an act: two concurrent creates both read "no row yet" and both insert, and the plan ends
+     * up printing the same child twice. The insert below goes straight to SQL because that is what
+     * the losing half of that race does — reach the table with the service's blessing already
+     * given.
+     */
+    @Test
+    void theDatabaseItselfRefusesASecondAdaptationForTheSameStudent() {
+        Adaptation first = adaptationFor("Discapacidad");
+
+        assertThatThrownBy(() -> jdbc.update(
+            "INSERT INTO curriculum_adaptations (id_curriculum_adaptation, id_curriculum_plan, "
+                + "id_student, condition_type) VALUES (?,?,?,?)",
+            UUID.randomUUID(), plan, first.studentId(), "TEA"))
+            .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // Another student of the same plan is a different row, and the constraint must not stand in
+    // the way of the ordinary case it exists to protect.
+    @Test
+    void aSecondStudentOfTheSamePlanIsAccepted() {
+        adaptationFor("Discapacidad");
+
+        assertThat(adaptationFor("TEA").id()).isNotNull();
     }
 
     // The listing is what the preview prints, and it rebuilds each row through the same mapping.
