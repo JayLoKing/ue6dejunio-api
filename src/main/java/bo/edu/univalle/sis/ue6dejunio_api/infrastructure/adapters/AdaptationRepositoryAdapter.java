@@ -62,6 +62,7 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
         CurriculumAdaptationEntity e = new CurriculumAdaptationEntity();
         e.setCurriculumPlan(planRepo.getReferenceById(c.planId()));
         e.setStudent(studentRepo.getReferenceById(c.studentId()));
+        e.setConditionType(c.conditionType());
         e.setAdaptedContents(c.adaptedContents());
         e.setAdaptedMethodology(c.adaptedMethodology());
         e.setAdaptedCriteria(c.adaptedCriteria());
@@ -70,16 +71,21 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
             e.setCreatedBy(u);
             e.setUpdatedBy(u);
         }
-        e.setCreatedAt(LocalDateTime.now());
-        e.setUpdatedAt(LocalDateTime.now());
+        // One reading for both stamps: two calls differ by microseconds, and a row that was never
+        // updated would read as having been.
+        LocalDateTime createdAt = LocalDateTime.now();
+        e.setCreatedAt(createdAt);
+        e.setUpdatedAt(createdAt);
         return toDomain(adaptationRepo.save(e));
     }
 
+    /** A null column means "leave it": each step of the form sends only the columns it holds. */
     @Override
     @Transactional
     public Adaptation update(UUID id, UpdateAdaptationCommand c) {
         CurriculumAdaptationEntity e = adaptationRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Adaptacion", id));
+        if (c.conditionType() != null) e.setConditionType(c.conditionType());
         if (c.adaptedContents() != null) e.setAdaptedContents(c.adaptedContents());
         if (c.adaptedMethodology() != null) e.setAdaptedMethodology(c.adaptedMethodology());
         if (c.adaptedCriteria() != null) e.setAdaptedCriteria(c.adaptedCriteria());
@@ -115,6 +121,7 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
             e.getCurriculumPlan() != null ? e.getCurriculumPlan().getId() : null,
             s != null ? s.getId() : null,
             s != null ? s.getNames() + " " + s.getLastNames() : null,
+            e.getConditionType(),
             e.getAdaptedContents(), e.getAdaptedMethodology(), e.getAdaptedCriteria(),
             e.getCreatedBy() != null ? e.getCreatedBy().getId() : null,
             e.getUpdatedBy() != null ? e.getUpdatedBy().getId() : null,

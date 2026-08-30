@@ -887,7 +887,7 @@ class AuthorizationComponentTest {
         UUID planId = UUID.randomUUID();
         when(adaptationDomain.findById(adaptationId)).thenReturn(Optional.of(
             new Adaptation(adaptationId, planId, UUID.randomUUID(), "Ana Perez",
-                null, null, null, null, null, null, null)));
+                null, null, null, null, null, null, null, null)));
         when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(teacher));
 
         assertThat(authz.canWriteAdaptation(token(teacher, "Teacher"), adaptationId)).isTrue();
@@ -901,7 +901,7 @@ class AuthorizationComponentTest {
         UUID planId = UUID.randomUUID();
         when(adaptationDomain.findById(adaptationId)).thenReturn(Optional.of(
             new Adaptation(adaptationId, planId, UUID.randomUUID(), "Ana Perez",
-                null, null, null, null, null, null, null)));
+                null, null, null, null, null, null, null, null)));
         when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(owner));
 
         // The adaptation carries the student's full name, so reading it is disclosure.

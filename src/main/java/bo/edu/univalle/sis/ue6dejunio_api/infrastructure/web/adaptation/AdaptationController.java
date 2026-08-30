@@ -59,8 +59,8 @@ public class AdaptationController {
     public ResponseEntity<AdaptationResponse> create(@Valid @RequestBody CreateAdaptationRequest r,
                                                      JwtAuthenticationToken token) {
         Adaptation a = adaptationService.create(new CreateAdaptationCommand(
-            r.planId(), r.studentId(), r.adaptedContents(), r.adaptedMethodology(),
-            r.adaptedCriteria(), currentUser(token)));
+            r.planId(), r.studentId(), r.conditionType(), r.adaptedContents(),
+            r.adaptedMethodology(), r.adaptedCriteria(), currentUser(token)));
         return ResponseEntity.ok(AdaptationResponse.from(a));
     }
 
@@ -95,7 +95,8 @@ public class AdaptationController {
                                                     @Valid @RequestBody UpdateAdaptationRequest r,
                                                     JwtAuthenticationToken token) {
         Adaptation a = adaptationService.update(id, new UpdateAdaptationCommand(
-            r.adaptedContents(), r.adaptedMethodology(), r.adaptedCriteria(), currentUser(token)));
+            r.conditionType(), r.adaptedContents(), r.adaptedMethodology(), r.adaptedCriteria(),
+            currentUser(token)));
         return ResponseEntity.ok(AdaptationResponse.from(a));
     }
 

@@ -227,7 +227,8 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         pdcService.writeSubject(created.getId(), created.getSubjects().get(0).id(),
             twoWeeks("Objetivo del mes"), teacher);
         adaptationService.create(new CreateAdaptationCommand(created.getId(), seedStudent(),
-            "Contenido adaptado", "Metodología adaptada", "Criterio adaptado", teacher));
+            "Discapacidad", "Contenido adaptado", "Metodología adaptada", "Criterio adaptado",
+            teacher));
 
         Pdc answeredByTheWrite = pdcService.publish(created.getId(), teacher);
         Pdc read = pdcService.getById(created.getId());

@@ -8,6 +8,7 @@ public record Adaptation(
     UUID planId,
     UUID studentId,
     String studentName,
+    String conditionType,
     String adaptedContents,
     String adaptedMethodology,
     String adaptedCriteria,

@@ -5,6 +5,7 @@ import java.util.UUID;
 public record CreateAdaptationCommand(
     UUID planId,
     UUID studentId,
+    String conditionType,
     String adaptedContents,
     String adaptedMethodology,
     String adaptedCriteria,

@@ -10,6 +10,7 @@ public record AdaptationResponse(
     UUID planId,
     UUID studentId,
     String studentName,
+    String conditionType,
     String adaptedContents,
     String adaptedMethodology,
     String adaptedCriteria,
@@ -20,7 +21,7 @@ public record AdaptationResponse(
 ) {
     public static AdaptationResponse from(Adaptation a) {
         return new AdaptationResponse(
-            a.id(), a.planId(), a.studentId(), a.studentName(),
+            a.id(), a.planId(), a.studentId(), a.studentName(), a.conditionType(),
             a.adaptedContents(), a.adaptedMethodology(), a.adaptedCriteria(),
             a.createdById(), a.updatedById(), a.createdAt(), a.updatedAt());
     }
