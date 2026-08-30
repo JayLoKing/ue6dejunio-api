@@ -74,7 +74,7 @@ public class PdcNotificationListener {
         }
         for (UUID director : directors) {
             send(director, event, NotificationType.PDC_PUBLISHED,
-                "Un %s fue entregado para revision.".formatted(planLabel(event)));
+                "Un %s fue entregado para revisión.".formatted(planLabel(event)));
         }
     }
 
