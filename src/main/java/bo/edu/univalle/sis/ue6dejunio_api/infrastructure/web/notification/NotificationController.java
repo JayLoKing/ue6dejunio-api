@@ -48,7 +48,12 @@ public class NotificationController {
     }
 
     @PostMapping
-    @Operation(summary = "Enviar notificacion (sender = usuario autenticado)")
+    // A notification carries the school's authority: it summons someone to the office, it says a
+    // plan was observed. The route only asked for authentication, so any token holder could write
+    // one — a teacher messaging the secretary in the system's own voice, with nothing in the inbox
+    // saying it was not the Director. Sending is the Director's; everyone else reads and answers.
+    @PreAuthorize("hasRole('Director')")
+    @Operation(summary = "Enviar notificacion (solo Director; sender = usuario autenticado)")
     public ResponseEntity<NotificationResponse> send(@Valid @RequestBody SendNotificationRequest request,
                                                      JwtAuthenticationToken token) {
         Notification n = notificationService.send(new SendNotificationCommand(
