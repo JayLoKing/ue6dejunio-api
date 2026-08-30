@@ -24,7 +24,10 @@ public interface JpaNotificationRepository extends JpaRepository<NotificationEnt
 
     long countByReceiver_IdAndReadAtIsNull(UUID receiverId);
 
-    @Modifying(flushAutomatically = true)
+    /** Both flags for the same reason as the statement below: a bulk update leaves the rows it
+     *  changed sitting in the context with their old value, and the next read is served from
+     *  there. Nothing reads after this one today, which is exactly how it would go unnoticed. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE NotificationEntity n SET n.readAt = :now "
         + "WHERE n.receiver.id = :receiverId AND n.readAt IS NULL")
     int markAllRead(@Param("receiverId") UUID receiverId, @Param("now") LocalDateTime now);
