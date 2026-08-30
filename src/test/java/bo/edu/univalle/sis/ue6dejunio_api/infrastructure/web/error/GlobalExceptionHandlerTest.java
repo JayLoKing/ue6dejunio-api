@@ -19,8 +19,10 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.sql.SQLException;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class GlobalExceptionHandlerTest {
 
@@ -124,6 +126,41 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(logged.list).singleElement()
             .satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.ERROR));
+    }
+
+    /**
+     * Java refuses to let an exception cause itself, and stops there: a cycle through two of them
+     * is legal. Walking such a chain looking for a SQL state would spin forever, inside the one
+     * handler whose job is to keep a failure from spreading.
+     */
+    @Test
+    void anIntegrityFailureWhoseCausesLoopStillAnswers() {
+        SQLException first = new SQLException("first", "42P01");
+        SQLException second = new SQLException("second", "42P01");
+        first.initCause(second);
+        second.initCause(first);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
+                new DataIntegrityViolationException("cycle", first), requestTo("/api/students"));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        });
+    }
+
+    // The duplicate line carries no exception on purpose: Postgres spells a unique violation out
+    // as "Key (email)=(...) already exists", and here those values are students and teachers.
+    @Test
+    void doesNotWriteTheCollidingValuesIntoTheLog() {
+        handler.handleDataIntegrity(
+            new DataIntegrityViolationException("could not execute statement",
+                new SQLException("Key (email)=(ana@example.com) already exists", "23505")),
+            requestTo("/api/users"));
+
+        assertThat(logged.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage()).doesNotContain("ana@example.com");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
     }
 
     // An integrity failure with no SQL state to read is not evidence of a conflict. Guessing 409

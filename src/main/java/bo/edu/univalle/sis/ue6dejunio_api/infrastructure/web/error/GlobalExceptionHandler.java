@@ -76,6 +76,9 @@ public class GlobalExceptionHandler {
     /** Postgres for "a unique constraint said no". The one integrity failure the caller caused. */
     private static final String UNIQUE_VIOLATION = "23505";
 
+    /** Far past any real wrapping: Hibernate and Spring together add three or four links. */
+    private static final int MAX_CAUSE_DEPTH = 20;
+
     /**
      * A row the database itself turned away — a conflict if the caller caused it, a bug if we did.
      *
@@ -96,9 +99,11 @@ public class GlobalExceptionHandler {
      * the plain parent. Every write in this application goes through JPA, so a handler keyed on
      * the subclass would answer 500 to every real duplicate. Both paths are pinned by tests.
      *
-     * <p>The duplicate is logged at WARN rather than ERROR — losing a race is not an outage — but
-     * logged, because the body deliberately withholds the constraint name: it tells the caller
-     * nothing they can act on while telling an attacker the shape of the tables.
+     * <p>The duplicate is logged at WARN rather than ERROR — losing a race is not an outage — and
+     * without the exception, unlike every other line this class writes. Postgres spells a unique
+     * violation out as {@code Key (email)=(someone@example.com) already exists}: the values that
+     * collided are in the message, and here those values are students and teachers. The method and
+     * the path say a duplicate happened and where, which is what the line is for.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
@@ -109,7 +114,7 @@ public class GlobalExceptionHandler {
                 "Error interno del servidor", req);
         }
         log.warn("Duplicate rejected by the database on {} {}",
-            req.getMethod(), req.getRequestURI(), ex);
+            req.getMethod(), req.getRequestURI());
         return build(HttpStatus.CONFLICT, "Conflict",
             "El registro entra en conflicto con uno existente", req);
     }
@@ -119,16 +124,22 @@ public class GlobalExceptionHandler {
      *
      * <p>An integrity failure that names no SQL state is not evidence of a conflict, so it is not
      * treated as one: guessing 409 would hand a server bug back as the caller's problem.
+     *
+     * <p>The walk is bounded rather than guarded against a self-cause. Java already refuses to let
+     * an exception cause itself, so that guard covers the case that cannot happen while a cycle
+     * through two exceptions — which nothing here builds, but nothing forbids either — would spin
+     * forever inside the handler that exists to keep failures from spreading.
      */
     private static boolean isDuplicate(DataIntegrityViolationException ex) {
         if (ex instanceof DuplicateKeyException) {
             return true;
         }
-        for (Throwable cause = ex; cause != null && cause.getCause() != cause;
-             cause = cause.getCause()) {
+        Throwable cause = ex;
+        for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
             if (cause instanceof SQLException sql && UNIQUE_VIOLATION.equals(sql.getSQLState())) {
                 return true;
             }
+            cause = cause.getCause();
         }
         return false;
     }
