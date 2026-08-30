@@ -29,6 +29,7 @@ class NotificationAuthorizationIT extends AbstractIntegrationTest {
     private String bodyTo(UUID receiver) throws Exception {
         return json.writeValueAsString(Map.of(
             "receiver_id", receiver.toString(),
+            "type", "SUMMONS",
             "message", "Aproximese a direccion."));
     }
 

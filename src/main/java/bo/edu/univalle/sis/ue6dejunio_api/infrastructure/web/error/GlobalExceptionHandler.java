@@ -18,6 +18,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,7 +45,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({InvalidCredentialsException.class, BadCredentialsException.class})
-    public ResponseEntity<ErrorResponse> handleBadCredentials(RuntimeException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleBadCredentials(HttpServletRequest req) {
         return build(HttpStatus.UNAUTHORIZED, "Unauthorized", "Credenciales inválidas", req);
     }
 
@@ -54,7 +55,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleAccessDenied(HttpServletRequest req) {
         return build(HttpStatus.FORBIDDEN, "Forbidden", "Acceso denegado", req);
     }
 
@@ -152,6 +153,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidResetTokenException.class)
     public ResponseEntity<ErrorResponse> handleInvalidResetToken(InvalidResetTokenException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req);
+    }
+
+    /**
+     * A body the server cannot read at all — malformed JSON, or a name outside an enum's catalog.
+     *
+     * <p>Unlike most of Spring's web exceptions this one does not implement {@code ErrorResponse},
+     * so it reached the catch-all and came back 500: the caller was told the server broke for
+     * sending a value the API never accepted. The parser's own message is left out of the body on
+     * purpose — it names Java classes and packages, which tells the caller nothing and maps the
+     * internals for anyone else.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Bad Request",
+            "El cuerpo de la peticion no se puede leer", req);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

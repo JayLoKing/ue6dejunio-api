@@ -3,17 +3,21 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface INotificationDomain {
     boolean userExists(UUID userId);
-    Notification send(UUID senderId, UUID receiverId, String message);
+    Notification send(SendNotificationCommand command);
     Optional<Notification> findById(UUID id);
+    /** Stamps delivery on whatever it hands back: this is the moment the row reached its reader. */
     PageResult<Notification> listReceived(UUID receiverId, boolean unreadOnly, PageQuery pageQuery);
     long unreadCount(UUID receiverId);
-    void markAsRead(UUID id);
+    /** @return the stamp the row now holds, so the caller reports what was written */
+    LocalDateTime markAsRead(UUID id);
     int markAllRead(UUID receiverId);
     void deleteById(UUID id);
 }

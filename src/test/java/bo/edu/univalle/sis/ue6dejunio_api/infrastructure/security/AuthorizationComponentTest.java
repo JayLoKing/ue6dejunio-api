@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcSubject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
@@ -929,7 +930,8 @@ class AuthorizationComponentTest {
         UUID receiver = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         when(notificationDomain.findById(id)).thenReturn(Optional.of(
-            new Notification(id, UUID.randomUUID(), null, receiver, null, "hola", false, null)));
+            new Notification(id, UUID.randomUUID(), null, receiver, null,
+                NotificationType.SUMMONS, null, "hola", null, null, null, null, null)));
 
         assertThat(authz.canActOnNotification(token(receiver, "Teacher"), id)).isTrue();
     }
@@ -940,7 +942,8 @@ class AuthorizationComponentTest {
         UUID intruder = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         when(notificationDomain.findById(id)).thenReturn(Optional.of(
-            new Notification(id, UUID.randomUUID(), null, receiver, null, "hola", false, null)));
+            new Notification(id, UUID.randomUUID(), null, receiver, null,
+                NotificationType.SUMMONS, null, "hola", null, null, null, null, null)));
 
         assertThat(authz.canActOnNotification(token(intruder, "Teacher"), id)).isFalse();
     }
@@ -951,7 +954,8 @@ class AuthorizationComponentTest {
         UUID director = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         when(notificationDomain.findById(id)).thenReturn(Optional.of(
-            new Notification(id, UUID.randomUUID(), null, receiver, null, "hola", false, null)));
+            new Notification(id, UUID.randomUUID(), null, receiver, null,
+                NotificationType.SUMMONS, null, "hola", null, null, null, null, null)));
 
         // Acting on someone else's inbox is not an act of authority.
         assertThat(authz.canActOnNotification(token(director, "Director"), id)).isFalse();

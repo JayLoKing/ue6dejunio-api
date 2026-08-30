@@ -251,8 +251,18 @@ CREATE TABLE IF NOT EXISTS notifications (
     id_notification uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     sender_id uuid REFERENCES users(id_user) ON DELETE CASCADE,
     receiver_id uuid REFERENCES users(id_user) ON DELETE CASCADE,
-    message text NOT NULL, is_read boolean DEFAULT false, created_at timestamp DEFAULT CURRENT_TIMESTAMP
+    type varchar(40) NOT NULL DEFAULT 'CUSTOM',
+    -- Free text, and only when the type is CUSTOM: every other type is its own subject.
+    subject varchar(150),
+    message text NOT NULL,
+    -- No foreign key on purpose: a notification must outlive what it points at, or deleting a
+    -- plan would erase the record of what the Director said about it.
+    resource_type varchar(40), resource_id uuid,
+    delivered_at timestamp, read_at timestamp, archived_at timestamp,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_notification_inbox ON notifications (receiver_id, created_at DESC);
 
 -- The catalog seed runs once per Spring context, and more than one context is created against the
 -- same shared container (ProdProfileHardeningIT activates a second profile). Every statement here

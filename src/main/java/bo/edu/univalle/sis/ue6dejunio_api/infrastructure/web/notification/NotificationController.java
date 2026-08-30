@@ -57,7 +57,8 @@ public class NotificationController {
     public ResponseEntity<NotificationResponse> send(@Valid @RequestBody SendNotificationRequest request,
                                                      JwtAuthenticationToken token) {
         Notification n = notificationService.send(new SendNotificationCommand(
-            currentUser(token), request.receiverId(), request.message()));
+            currentUser(token), request.receiverId(), request.type(), request.subject(),
+            request.message(), request.resourceType(), request.resourceId()));
         return ResponseEntity.ok(NotificationResponse.from(n));
     }
 
@@ -92,8 +93,11 @@ public class NotificationController {
     @PostMapping("/read-all")
     @Operation(summary = "Marcar todas las notificaciones del usuario como leidas")
     public ResponseEntity<UnreadCountResponse> markAllRead(JwtAuthenticationToken token) {
-        int updated = notificationService.markAllRead(currentUser(token));
-        return ResponseEntity.ok(new UnreadCountResponse(updated));
+        notificationService.markAllRead(currentUser(token));
+        // What the caller asked for is an unread count, and after this there are none. Answering
+        // with the number of rows updated put a 7 in a field named "unread" and left the badge
+        // showing seven unread notifications the receiver had just cleared.
+        return ResponseEntity.ok(new UnreadCountResponse(0));
     }
 
     @DeleteMapping("/{id}")

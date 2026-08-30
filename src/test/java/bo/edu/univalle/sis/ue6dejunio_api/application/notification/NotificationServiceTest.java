@@ -2,7 +2,9 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.notification;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.NotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +31,13 @@ class NotificationServiceTest {
 
     private Notification notif(UUID id, UUID receiver) {
         return new Notification(id, UUID.randomUUID(), "Sender",
-            receiver, "Receiver", "msg", false, LocalDateTime.now());
+            receiver, "Receiver", NotificationType.SUMMONS, null, "msg",
+            null, null, null, null, LocalDateTime.now());
+    }
+
+    private static SendNotificationCommand summons(UUID sender, UUID receiver) {
+        return new SendNotificationCommand(sender, receiver, NotificationType.SUMMONS,
+            null, "hola", null, null);
     }
 
     @Test
@@ -36,9 +45,9 @@ class NotificationServiceTest {
         UUID sender = UUID.randomUUID();
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.userExists(receiver)).thenReturn(true);
-        when(notificationDomain.send(sender, receiver, "hola"))
+        when(notificationDomain.send(any(SendNotificationCommand.class)))
             .thenReturn(notif(UUID.randomUUID(), receiver));
-        Notification r = notificationService.send(new SendNotificationCommand(sender, receiver, "hola"));
+        Notification r = notificationService.send(summons(sender, receiver));
         assertThat(r.message()).isEqualTo("msg");
     }
 
@@ -46,9 +55,30 @@ class NotificationServiceTest {
     void send_receiverMissing_throws() {
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.userExists(receiver)).thenReturn(false);
-        assertThatThrownBy(() -> notificationService.send(
-            new SendNotificationCommand(UUID.randomUUID(), receiver, "x")))
+        assertThatThrownBy(() -> notificationService.send(summons(UUID.randomUUID(), receiver)))
             .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // The catalog types are their own heading. CUSTOM is the one the sender has to name, or the
+    // row lands in an inbox indistinguishable from the one under it.
+    @Test
+    void send_customWithoutASubject_throws() {
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+
+        assertThatThrownBy(() -> notificationService.send(new SendNotificationCommand(
+            UUID.randomUUID(), receiver, NotificationType.CUSTOM, "   ", "hola", null, null)))
+            .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void send_catalogTypeWithoutASubject_isAccepted() {
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        when(notificationDomain.send(any(SendNotificationCommand.class)))
+            .thenReturn(notif(UUID.randomUUID(), receiver));
+
+        assertThat(notificationService.send(summons(UUID.randomUUID(), receiver))).isNotNull();
     }
 
     @Test

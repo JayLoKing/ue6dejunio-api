@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.NotificationEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
@@ -15,8 +16,11 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Repository
 @Transactional(readOnly = true)
@@ -31,6 +35,18 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
         this.userRepo = userRepo;
     }
 
+    /**
+     * Now, at the resolution the column can hold.
+     *
+     * <p>{@code LocalDateTime.now()} carries nanoseconds and a Postgres {@code timestamp} keeps
+     * microseconds, so the value handed back in a response was never quite the value stored: the
+     * write reported one instant and every later read of the same row reported another. Truncating
+     * before the write is what makes the answer and the row agree.
+     */
+    private static LocalDateTime nowAsStored() {
+        return LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+    }
+
     @Override
     public boolean userExists(UUID userId) {
         return userRepo.existsById(userId);
@@ -38,16 +54,22 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
 
     @Override
     @Transactional
-    public Notification send(UUID senderId, UUID receiverId, String message) {
-        UserEntity sender = userRepo.getReferenceById(senderId);
-        UserEntity receiver = userRepo.findById(receiverId)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario receptor", receiverId));
+    public Notification send(SendNotificationCommand c) {
+        UserEntity receiver = userRepo.findById(c.receiverId())
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario receptor", c.receiverId()));
         NotificationEntity e = new NotificationEntity();
-        e.setSender(sender);
+        // Null when the system wrote it — a state change, or later the predictive model. Nobody
+        // signs those, and inventing a sender would put a person's name on a machine's message.
+        if (c.senderId() != null) {
+            e.setSender(userRepo.getReferenceById(c.senderId()));
+        }
         e.setReceiver(receiver);
-        e.setMessage(message);
-        e.setRead(false);
-        e.setCreatedAt(LocalDateTime.now());
+        e.setType(c.type());
+        e.setSubject(c.subject());
+        e.setMessage(c.message());
+        e.setResourceType(c.resourceType());
+        e.setResourceId(c.resourceId());
+        e.setCreatedAt(nowAsStored());
         return toDomain(notificationRepo.save(e));
     }
 
@@ -56,34 +78,75 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
         return notificationRepo.findById(id).map(this::toDomain);
     }
 
+    /**
+     * Reading the inbox is what stamps delivery, and that is why this write sits on a read.
+     *
+     * <p>Nothing on the receiver's side reports back, so the only moment the server can honestly
+     * say a notification arrived is the moment it hands the bytes over. The statement touches only
+     * rows never delivered, so a receiver polling every thirty seconds writes once per
+     * notification and never again.
+     */
     @Override
+    @Transactional
     public PageResult<Notification> listReceived(UUID receiverId, boolean unreadOnly,
                                                  PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         Page<NotificationEntity> page = unreadOnly
-            ? notificationRepo.findByReceiver_IdAndReadFalse(receiverId, pageable)
+            ? notificationRepo.findByReceiver_IdAndReadAtIsNull(receiverId, pageable)
             : notificationRepo.findByReceiver_Id(receiverId, pageable);
-        return SpringPaging.toPageResult(page.map(this::toDomain));
+
+        LocalDateTime now = nowAsStored();
+        Set<UUID> justDelivered = page.getContent().stream()
+            .filter(e -> e.getDeliveredAt() == null)
+            .map(NotificationEntity::getId)
+            .collect(Collectors.toSet());
+        if (!justDelivered.isEmpty()) {
+            notificationRepo.markDelivered(justDelivered, now);
+        }
+        // The entities in hand were loaded before that statement and still carry the old null. The
+        // stamp goes on the answer rather than on them: writing it into a managed entity makes it
+        // dirty, and Hibernate would flush one UPDATE per row on top of the single one just run.
+        return SpringPaging.toPageResult(page.map(e -> delivered(e, justDelivered, now)));
+    }
+
+    /** The row as the receiver now has it, without touching what the persistence context holds. */
+    private Notification delivered(NotificationEntity e, Set<UUID> justDelivered,
+                                   LocalDateTime now) {
+        Notification n = toDomain(e);
+        if (!justDelivered.contains(e.getId())) {
+            return n;
+        }
+        return new Notification(n.id(), n.senderId(), n.senderName(), n.receiverId(),
+            n.receiverName(), n.type(), n.subject(), n.message(), n.resourceType(),
+            n.resourceId(), now, n.readAt(), n.createdAt());
     }
 
     @Override
     public long unreadCount(UUID receiverId) {
-        return notificationRepo.countByReceiver_IdAndReadFalse(receiverId);
+        return notificationRepo.countByReceiver_IdAndReadAtIsNull(receiverId);
     }
 
     @Override
     @Transactional
-    public void markAsRead(UUID id) {
+    public LocalDateTime markAsRead(UUID id) {
         NotificationEntity e = notificationRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Notificacion", id));
-        e.setRead(true);
-        notificationRepo.save(e);
+        // Reading it a second time does not move the stamp: what is recorded is when the receiver
+        // first saw it, not when they last opened it.
+        if (e.getReadAt() == null) {
+            // No save: the entity is managed by the transaction this method opened, so the change
+            // flushes on its own. Calling save would be a round trip that changes nothing.
+            e.setReadAt(nowAsStored());
+        }
+        // Handed back rather than left for the caller to guess: a second clock reading up there
+        // would answer with an instant the row does not hold.
+        return e.getReadAt();
     }
 
     @Override
     @Transactional
     public int markAllRead(UUID receiverId) {
-        return notificationRepo.markAllRead(receiverId);
+        return notificationRepo.markAllRead(receiverId, nowAsStored());
     }
 
     @Override
@@ -101,7 +164,9 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
             s != null ? s.getNames() + " " + s.getLastNames() : null,
             r != null ? r.getId() : null,
             r != null ? r.getNames() + " " + r.getLastNames() : null,
-            e.getMessage(), e.isRead(), e.getCreatedAt()
+            e.getType(), e.getSubject(), e.getMessage(),
+            e.getResourceType(), e.getResourceId(),
+            e.getDeliveredAt(), e.getReadAt(), e.getCreatedAt()
         );
     }
 }
