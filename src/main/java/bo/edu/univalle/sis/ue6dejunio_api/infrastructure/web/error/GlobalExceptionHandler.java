@@ -10,6 +10,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,8 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private final boolean includeMessage;
     private final boolean includeBindingErrors;
@@ -160,6 +164,12 @@ public class GlobalExceptionHandler {
                 return build(status, status.getReasonPhrase(), status.getReasonPhrase(), req);
             }
         }
+        // What the caller gets back says "Error interno del servidor" and nothing more, on purpose.
+        // That makes this line the only place the cause survives: without it an unexpected failure
+        // in production leaves no stacktrace anywhere and no way to tell which request caused it.
+        // Only this branch logs — the statuses above are the caller's own mistakes, and logging
+        // them at ERROR would bury the failures worth reading under other people's typos.
+        log.error("Unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
             "Error interno del servidor", req);
     }
