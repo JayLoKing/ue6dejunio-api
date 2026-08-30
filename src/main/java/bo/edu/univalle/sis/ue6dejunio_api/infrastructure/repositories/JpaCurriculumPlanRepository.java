@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -102,6 +103,7 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
         WHERE (:courseId IS NULL OR c.id = :courseId)
               AND (:trimester IS NULL OR p.trimester = :trimester)
               AND (:status IS NULL OR p.status = :status)
+              AND (:excludeStatus IS NULL OR p.status <> :excludeStatus)
               AND (:teacherId IS NULL
                    OR ht.id = :teacherId
                    OR EXISTS (SELECT 1 FROM CurriculumPlanSubjectEntity s
@@ -113,6 +115,29 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     Page<CurriculumPlanEntity> search(@Param("courseId") UUID courseId,
                                       @Param("trimester") Integer trimester,
                                       @Param("status") String status,
+                                      @Param("excludeStatus") String excludeStatus,
                                       @Param("teacherId") UUID teacherId,
                                       Pageable pageable);
+
+    /**
+     * How many areas of knowledge each of these plans spans, asked for a whole page at once.
+     *
+     * <p>The listing query fetches no blocks — a row says how wide the plan is, it does not carry
+     * it — so the count comes from its own query rather than from walking the blocks per row.
+     * Plans with no blocks yet are simply absent from the result, which reads as zero.
+     */
+    @Query("""
+        SELECT s.curriculumPlan.id AS planId,
+               COUNT(DISTINCT s.classGroup.subject.area.id) AS total
+        FROM CurriculumPlanSubjectEntity s
+        WHERE s.curriculumPlan.id IN :planIds
+        GROUP BY s.curriculumPlan.id
+        """)
+    List<PlanCount> areaCountsOf(@Param("planIds") Collection<UUID> planIds);
+
+    /** One plan's id and a number counted against it. */
+    interface PlanCount {
+        UUID getPlanId();
+        long getTotal();
+    }
 }

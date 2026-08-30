@@ -24,6 +24,13 @@ public interface IPdcService {
 
     Pdc getById(UUID id);
 
+    /**
+     * The plans a caller may page through.
+     *
+     * @param teacherId narrows to the plans one teacher takes part in; {@code null} spans the
+     *                  school, which only the Director and the secretariat are entitled to — and
+     *                  which never shows a draft, because an unfinished month is not handed in yet.
+     */
     PageResult<Pdc> list(UUID courseId, Integer trimester, String status, UUID teacherId,
                          PageQuery pageQuery);
 

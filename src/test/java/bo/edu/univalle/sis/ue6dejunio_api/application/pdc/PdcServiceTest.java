@@ -116,8 +116,6 @@ class PdcServiceTest {
         pdcService.create(command(4, august1, september4, List.of(onlySubject)), user);
 
         verify(pdcDomain).addSubjects(planId, List.of(onlySubject));
-        // A specialist plans what they teach, not the whole course.
-        verify(pdcDomain, never()).activeClassGroupIdsOf(any());
     }
 
     @Test
@@ -222,29 +220,9 @@ class PdcServiceTest {
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        // false: this caller is not the homeroom teacher and not the Director.
         pdcService.create(command(), user);
 
         verify(pdcDomain).addSubjects(planId, List.of(ownSubject));
-        verify(pdcDomain, never()).activeClassGroupIdsOf(any());
-    }
-
-    // Nobody reaches the whole course any more. Opening a plan asks only what the caller teaches,
-    // so the course-wide list is a query the service no longer has a reason to make.
-    @Test
-    void create_neverAsksForTheCoursesWholeSubjectList() {
-        UUID planId = UUID.randomUUID();
-        when(pdcDomain.courseExists(courseId)).thenReturn(true);
-        when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
-        when(pdcDomain.classGroupIdsTaughtBy(courseId, user))
-            .thenReturn(List.of(UUID.randomUUID()));
-        when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
-        when(pdcDomain.addSubjects(eq(planId), anyList()))
-            .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
-
-        pdcService.create(command(), user);
-
-        verify(pdcDomain, never()).activeClassGroupIdsOf(any());
     }
 
     @Test

@@ -56,6 +56,17 @@ public class Pdc {
     @Builder.Default
     private List<PdcSubject> subjects = List.of();
 
+    /**
+     * How wide the plan is and how much of it answers to a named student — the two numbers a
+     * listing row shows so the Director can tell a month's work from a token one before opening it.
+     *
+     * <p>Counted rather than derived from {@link #subjects}, which a listing row does not carry.
+     */
+    @Builder.Default
+    private int areaCount = 0;
+    @Builder.Default
+    private int significantAdaptationCount = 0;
+
     private UUID createdById;
     private UUID updatedById;
     private String updatedByName;

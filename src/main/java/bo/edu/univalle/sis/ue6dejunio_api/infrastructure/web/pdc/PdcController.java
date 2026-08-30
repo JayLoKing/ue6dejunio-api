@@ -116,6 +116,7 @@ public class PdcController {
         PageQuery p = PageQuery.of(offset - 1, limit,
             SortField.desc("updatedAt"), SortField.asc("id"));
         // The filter is optional, so the scope is what keeps a Teacher inside their own plans.
+        // What an unscoped listing may show is the service's rule, not this mapping's.
         UUID scope = authz.pdcListScopeTeacherId(authentication);
         return ResponseEntity.ok(PagedResponse.of(
             pdcService.list(courseId, trimester, status, scope, p).map(PdcResponse::from)));

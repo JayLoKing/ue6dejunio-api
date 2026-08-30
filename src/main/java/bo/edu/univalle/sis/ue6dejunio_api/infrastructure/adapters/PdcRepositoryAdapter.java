@@ -17,9 +17,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlan
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumAdaptationRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanSubjectRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -42,17 +45,20 @@ public class PdcRepositoryAdapter implements IPdcDomain {
     private final JpaClassGroupRepository classGroupRepo;
     private final JpaCourseRepository courseRepo;
     private final JpaUserRepository userRepo;
+    private final JpaCurriculumAdaptationRepository adaptationRepo;
 
     public PdcRepositoryAdapter(JpaCurriculumPlanRepository planRepo,
                                 JpaCurriculumPlanSubjectRepository planSubjectRepo,
                                 JpaClassGroupRepository classGroupRepo,
                                 JpaCourseRepository courseRepo,
-                                JpaUserRepository userRepo) {
+                                JpaUserRepository userRepo,
+                                JpaCurriculumAdaptationRepository adaptationRepo) {
         this.planRepo = planRepo;
         this.planSubjectRepo = planSubjectRepo;
         this.classGroupRepo = classGroupRepo;
         this.courseRepo = courseRepo;
         this.userRepo = userRepo;
+        this.adaptationRepo = adaptationRepo;
     }
 
     @Override
@@ -98,8 +104,15 @@ public class PdcRepositoryAdapter implements IPdcDomain {
         // The blocks come back from what the caller already held rather than from a fresh read:
         // this write never touched them, and re-reading them is what made a status flip cost four
         // queries. A plan created here has none yet.
+        //
+        // The counts ride along for the same reason the blocks do. This write touched neither the
+        // subjects nor the adaptations, so what the caller already knew is still true — and letting
+        // the builder default them to zero made a publish answer with a heading a read of the same
+        // plan contradicts.
         return toHeader(saved).toBuilder()
             .subjects(pdc.getSubjects() == null ? List.of() : pdc.getSubjects())
+            .areaCount(pdc.getAreaCount())
+            .significantAdaptationCount(pdc.getSignificantAdaptationCount())
             .build();
     }
 
@@ -125,13 +138,6 @@ public class PdcRepositoryAdapter implements IPdcDomain {
     @Override
     public boolean existsByCoursePlanNumber(UUID courseId, Integer trimester, Integer planNumber) {
         return planRepo.existsByCourse_IdAndTrimesterAndPlanNumber(courseId, trimester, planNumber);
-    }
-
-    @Override
-    public List<UUID> activeClassGroupIdsOf(UUID courseId) {
-        return classGroupRepo.findActiveOfCourseInPlanOrder(courseId).stream()
-            .map(ClassGroupEntity::getId)
-            .toList();
     }
 
     @Override
@@ -166,7 +172,9 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             block.setDisplayOrder(order++);
             plan.getSubjects().add(block);
         }
-        return toDomain(planRepo.save(plan));
+        // A plan whose blocks were just opened holds no adaptations yet, so the count is known
+        // without asking.
+        return toDomain(planRepo.save(plan), 0);
     }
 
     @Override
@@ -326,7 +334,9 @@ public class PdcRepositoryAdapter implements IPdcDomain {
         }
         // The significant adaptations are deliberately not copied: they name a student of the
         // source course, and whether the receiving course has such a student is its own question.
-        return toDomain(planRepo.save(copy));
+        // The adaptations are deliberately left behind by the rotation, so a fresh copy has none.
+        // Asking would spend a query per parallel to be told zero.
+        return toDomain(planRepo.save(copy), 0);
     }
 
     @Override
@@ -350,11 +360,34 @@ public class PdcRepositoryAdapter implements IPdcDomain {
     }
 
     @Override
-    public PageResult<Pdc> list(UUID courseId, Integer trimester, String status, UUID teacherId,
-                                PageQuery pageQuery) {
+    public PageResult<Pdc> list(UUID courseId, Integer trimester, String status,
+                                String excludeStatus, UUID teacherId, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
-        return SpringPaging.toPageResult(
-            planRepo.search(courseId, trimester, status, teacherId, pageable).map(this::toHeader));
+        Page<Pdc> page = planRepo
+            .search(courseId, trimester, status, excludeStatus, teacherId, pageable)
+            .map(this::toHeader);
+
+        // Two grouped queries for the whole page rather than two per row. The listing fetches no
+        // blocks and no adaptations, so counting off the entities would mean loading both
+        // collections for every plan on screen just to print a number.
+        List<UUID> ids = page.getContent().stream().map(Pdc::getId).toList();
+        if (!ids.isEmpty()) {
+            Map<UUID, Long> areas = countsByPlan(planRepo.areaCountsOf(ids));
+            Map<UUID, Long> adaptations = countsByPlan(adaptationRepo.countsByPlan(ids));
+            for (Pdc row : page.getContent()) {
+                row.setAreaCount(areas.getOrDefault(row.getId(), 0L).intValue());
+                row.setSignificantAdaptationCount(
+                    adaptations.getOrDefault(row.getId(), 0L).intValue());
+            }
+        }
+        return SpringPaging.toPageResult(page);
+    }
+
+    private static Map<UUID, Long> countsByPlan(
+        List<JpaCurriculumPlanRepository.PlanCount> counts) {
+        return counts.stream().collect(Collectors.toMap(
+            JpaCurriculumPlanRepository.PlanCount::getPlanId,
+            JpaCurriculumPlanRepository.PlanCount::getTotal));
     }
 
     @Override
@@ -403,7 +436,18 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             .build();
     }
 
+    /**
+     * The plan whole, asking the database how many significant adaptations hang off it.
+     *
+     * <p>Callers holding a plan that cannot have any — one just created, one just copied — take
+     * {@link #toDomain(CurriculumPlanEntity, int)} instead, so the rotation does not spend a query
+     * per parallel to be told zero.
+     */
     private Pdc toDomain(CurriculumPlanEntity e) {
+        return toDomain(e, (int) adaptationRepo.countByCurriculumPlan_Id(e.getId()));
+    }
+
+    private Pdc toDomain(CurriculumPlanEntity e, int significantAdaptationCount) {
         List<PdcSubject> blocks = new ArrayList<>();
         for (CurriculumPlanSubjectEntity s : e.getSubjects()) {
             ClassGroupEntity cg = s.getClassGroup();
@@ -436,7 +480,18 @@ public class PdcRepositoryAdapter implements IPdcDomain {
                 s.getDisplayOrder(),
                 rows));
         }
-        return toHeader(e).toBuilder().subjects(blocks).build();
+        // The detail already holds the blocks, so the areas are counted off them rather than asked
+        // for again. The adaptations are not in the document — they hang off the plan — so they
+        // arrive from the caller, which knows whether asking was worth a query.
+        return toHeader(e).toBuilder()
+            .subjects(blocks)
+            .areaCount((int) blocks.stream()
+                .map(PdcSubject::knowledgeArea)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count())
+            .significantAdaptationCount(significantAdaptationCount)
+            .build();
     }
 
     private static String levelName(CourseEntity c) {

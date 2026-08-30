@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
@@ -175,6 +176,57 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         assertThat(created.getLevelName()).isEqualTo("Primaria Comunitaria Vocacional");
         assertThat(pdcService.getById(created.getId()).getLevelName())
             .isEqualTo("Primaria Comunitaria Vocacional");
+    }
+
+    // A listing row says how wide the plan is without carrying it. The two numbers come from their
+    // own grouped queries, so a plan whose blocks were never read still reports them.
+    @Test
+    void aListingRowCountsTheAreasAndTheSignificantAdaptations() {
+        Pdc created = pdcService.create(august(), teacher);
+
+        Pdc row = pdcService.list(null, null, null, teacher, PageQuery.of(0, 20))
+            .content().stream()
+            .filter(p -> p.getId().equals(created.getId()))
+            .findFirst()
+            .orElseThrow();
+
+        // Matemáticas and Lenguaje sit in two different areas of knowledge.
+        assertThat(row.getAreaCount()).isEqualTo(2);
+        assertThat(row.getSignificantAdaptationCount()).isZero();
+        // The row carries no blocks — the count is what says how wide it is.
+        assertThat(row.getSubjects()).isEmpty();
+    }
+
+    // The write path answers from what the caller already held rather than re-reading the plan.
+    // The counts have to survive that shortcut, or a publish contradicts a read of the same plan.
+    @Test
+    void aStatusChangeKeepsTheCountsItWasGiven() {
+        Pdc created = pdcService.create(august(), teacher);
+        Pdc read = pdcService.getById(created.getId());
+        assertThat(read.getAreaCount()).isEqualTo(2);
+
+        Pdc published = pdcService.publish(read.getId(), teacher);
+
+        assertThat(published.getAreaCount()).isEqualTo(read.getAreaCount());
+        assertThat(published.getSignificantAdaptationCount())
+            .isEqualTo(read.getSignificantAdaptationCount());
+    }
+
+    // A draft is a teacher's unfinished month. The Director reviews what was handed in, so an
+    // unscoped listing leaves drafts out; the teacher who owns it still sees it in theirs.
+    @Test
+    void anUnscopedListingLeavesTheDraftsOut() {
+        Pdc draft = pdcService.create(august(), teacher);
+
+        List<UUID> unscoped = pdcService
+            .list(null, null, null, null, PageQuery.of(0, 20))
+            .content().stream().map(Pdc::getId).toList();
+        List<UUID> owners = pdcService
+            .list(null, null, null, teacher, PageQuery.of(0, 20))
+            .content().stream().map(Pdc::getId).toList();
+
+        assertThat(unscoped).doesNotContain(draft.getId());
+        assertThat(owners).contains(draft.getId());
     }
 
     // The Director opens no plans: they review what the teachers publish. Reaching create at all

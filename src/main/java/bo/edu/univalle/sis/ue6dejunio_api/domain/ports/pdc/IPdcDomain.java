@@ -16,6 +16,7 @@ public interface IPdcDomain {
 
     Optional<Pdc> findById(UUID id);
 
+
     /**
      * The plan's status alone, for the guards that only ask whether it can still be written. Empty
      * when there is no such plan.
@@ -26,9 +27,6 @@ public interface IPdcDomain {
 
     /** One plan per course per numbered month: the second August plan of a course is a mistake. */
     boolean existsByCoursePlanNumber(UUID courseId, Integer trimester, Integer planNumber);
-
-    /** The active class groups of a course, in the order their subjects print in. */
-    List<UUID> activeClassGroupIdsOf(UUID courseId);
 
     /** The active class groups of a course that this teacher runs, in the order they print. */
     List<UUID> classGroupIdsTaughtBy(UUID courseId, UUID teacherId);
@@ -91,7 +89,8 @@ public interface IPdcDomain {
      * @param teacherId narrows the listing to the plans a teacher takes part in; {@code null}
      *                  spans every plan, which only the Director and the secretariat are entitled to.
      */
-    PageResult<Pdc> list(UUID courseId, Integer trimester, String status, UUID teacherId,
+    PageResult<Pdc> list(UUID courseId, Integer trimester, String status, String excludeStatus,
+                         UUID teacherId,
                          PageQuery pageQuery);
 
     void deleteById(UUID id);
