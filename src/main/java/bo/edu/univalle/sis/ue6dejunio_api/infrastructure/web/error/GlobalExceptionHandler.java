@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -71,21 +73,64 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req);
     }
 
+    /** Postgres for "a unique constraint said no". The one integrity failure the caller caused. */
+    private static final String UNIQUE_VIOLATION = "23505";
+
     /**
-     * A row the database itself turned away, answered as the conflict it is.
+     * A row the database itself turned away — a conflict if the caller caused it, a bug if we did.
      *
      * <p>Where a rule is held by a constraint rather than by a look-before-you-write, the caller
      * who loses the race learns about it from Postgres instead of from the service. Left to the
-     * catch-all that arrives as a 500 — the caller told the server broke, when what happened is
-     * that someone else got there first. The message is deliberately the service's own wording:
-     * the exception carries the constraint name, and a constraint name tells the caller nothing
-     * they can act on while telling an attacker the shape of the tables.
+     * catch-all that arrives as a 500: the caller told the server broke, when what happened is
+     * that someone else got there first.
+     *
+     * <p>But {@link DataIntegrityViolationException} is the parent of every integrity failure
+     * Spring translates. A NOT NULL, a foreign key or a check violation is this code writing a row
+     * it had no business writing; answering those 409 would send the caller to resolve a conflict
+     * that is not theirs, and they would retry forever against a bug that had stopped being
+     * logged. So the two are told apart, and only the duplicate is the caller's.
+     *
+     * <p>The signal is the SQL state, not the exception type, and that is not a preference. Spring
+     * translates the same Postgres failure into different types depending on who caught it:
+     * JdbcTemplate produces {@code DuplicateKeyException}, Hibernate wraps its own and produces
+     * the plain parent. Every write in this application goes through JPA, so a handler keyed on
+     * the subclass would answer 500 to every real duplicate. Both paths are pinned by tests.
+     *
+     * <p>The duplicate is logged at WARN rather than ERROR — losing a race is not an outage — but
+     * logged, because the body deliberately withholds the constraint name: it tells the caller
+     * nothing they can act on while telling an attacker the shape of the tables.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
                                                              HttpServletRequest req) {
+        if (!isDuplicate(ex)) {
+            logTheFailure(ex, req);
+            return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                "Error interno del servidor", req);
+        }
+        log.warn("Duplicate rejected by the database on {} {}",
+            req.getMethod(), req.getRequestURI(), ex);
         return build(HttpStatus.CONFLICT, "Conflict",
             "El registro entra en conflicto con uno existente", req);
+    }
+
+    /**
+     * Whether the database turned the row away for being a duplicate.
+     *
+     * <p>An integrity failure that names no SQL state is not evidence of a conflict, so it is not
+     * treated as one: guessing 409 would hand a server bug back as the caller's problem.
+     */
+    private static boolean isDuplicate(DataIntegrityViolationException ex) {
+        if (ex instanceof DuplicateKeyException) {
+            return true;
+        }
+        for (Throwable cause = ex; cause != null && cause.getCause() != cause;
+             cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && UNIQUE_VIOLATION.equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(ValidationException.class)
@@ -117,6 +162,12 @@ public class GlobalExceptionHandler {
      * throws this instead of one of Spring's own {@code ErrorResponse} types, so without a handler
      * it fell through to the catch-all — and asking for more rows than the ceiling allows was
      * reported as a server failure across all fifteen controllers that page this way.
+     *
+     * <p>Hibernate throws this same type at flush when an entity fails bean validation, which
+     * would be a server fault wearing a caller's clothes: the path would name an entity field and
+     * this would answer 400 for a mapping bug. It cannot happen here — no entity in this project
+     * carries a {@code jakarta.validation} annotation, checked rather than assumed. Should one
+     * ever gain them, this handler has to tell the two apart before that stays true.
      */
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
@@ -161,17 +212,34 @@ public class GlobalExceptionHandler {
         if (ex instanceof org.springframework.web.ErrorResponse springError) {
             HttpStatus status = HttpStatus.resolve(springError.getStatusCode().value());
             if (status != null) {
+                // Spring naming the status does not make it the caller's fault: a request that
+                // times out waiting on an async result comes through here as a 503. What decides
+                // whether a failure is worth a log line is the status, not who classified it.
+                if (status.is5xxServerError()) {
+                    logTheFailure(ex, req);
+                }
                 return build(status, status.getReasonPhrase(), status.getReasonPhrase(), req);
             }
         }
-        // What the caller gets back says "Error interno del servidor" and nothing more, on purpose.
-        // That makes this line the only place the cause survives: without it an unexpected failure
-        // in production leaves no stacktrace anywhere and no way to tell which request caused it.
-        // Only this branch logs — the statuses above are the caller's own mistakes, and logging
-        // them at ERROR would bury the failures worth reading under other people's typos.
-        log.error("Unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);
+        logTheFailure(ex, req);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
             "Error interno del servidor", req);
+    }
+
+    /**
+     * The only place a server failure's cause survives.
+     *
+     * <p>What the caller gets back names the status and nothing more, on purpose — the internals
+     * are not theirs to see. So without this line an unexpected failure leaves no stacktrace
+     * anywhere and no way to tell which request caused it.
+     *
+     * <p>Client errors are deliberately not logged here: they are answered with the status they
+     * deserve, and recording them at ERROR would bury the failures worth reading under other
+     * people's typos. The URI is taken without its query string, which is also what keeps a reset
+     * token out of the log.
+     */
+    private static void logTheFailure(Exception ex, HttpServletRequest req) {
+        log.error("Unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message, HttpServletRequest req) {

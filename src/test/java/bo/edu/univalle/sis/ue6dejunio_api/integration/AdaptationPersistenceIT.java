@@ -5,13 +5,16 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptat
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -27,6 +30,8 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
 
     @Autowired private IPdcService pdcService;
     @Autowired private IAdaptationService adaptationService;
+    /** The port under the service, which inserts without asking whether the row is already there. */
+    @Autowired private IAdaptationDomain adaptationDomain;
 
     private UUID teacher;
     private UUID plan;
@@ -103,11 +108,44 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
     void theDatabaseItselfRefusesASecondAdaptationForTheSameStudent() {
         Adaptation first = adaptationFor("Discapacidad");
 
-        assertThatThrownBy(() -> jdbc.update(
-            "INSERT INTO curriculum_adaptations (id_curriculum_adaptation, id_curriculum_plan, "
-                + "id_student, condition_type) VALUES (?,?,?,?)",
-            UUID.randomUUID(), plan, first.studentId(), "TEA"))
+        assertThatThrownBy(() -> adaptationDomain.create(new CreateAdaptationCommand(
+            plan, first.studentId(), "TEA", null, null, null, teacher)))
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /**
+     * What the losing half of the race actually looks like when it reaches the exception handler.
+     *
+     * <p>Not a detail: the handler has to tell this apart from a NOT NULL or a foreign key, which
+     * are this code writing a row it had no business writing and belong in a 500. Spring hands it
+     * a different type depending on who translated the failure — JdbcTemplate produces
+     * {@code DuplicateKeyException}, Hibernate wraps its own and produces the plain parent — and
+     * every write in this application goes through JPA. So the type alone cannot be the signal,
+     * and what survives both paths is the SQL state the driver reported.
+     *
+     * <p>Pinned here rather than reasoned about: a handler keyed on the wrong signal answers 500
+     * to a conflict, and the first time anyone would notice is in production under load.
+     */
+    @Test
+    void theRaceArrivesThroughJpaAsAnIntegrityViolationCarryingTheUniqueSqlState() {
+        Adaptation first = adaptationFor("Discapacidad");
+
+        assertThatThrownBy(() -> adaptationDomain.create(new CreateAdaptationCommand(
+            plan, first.studentId(), "TEA", null, null, null, teacher)))
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .isNotInstanceOf(DuplicateKeyException.class)
+            .satisfies(thrown -> assertThat(sqlStateOf(thrown)).isEqualTo("23505"));
+    }
+
+    /** The SQL state the driver reported, wherever in the cause chain Hibernate buried it. */
+    private static String sqlStateOf(Throwable thrown) {
+        for (Throwable cause = thrown; cause != null && cause.getCause() != cause;
+             cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && sql.getSQLState() != null) {
+                return sql.getSQLState();
+            }
+        }
+        return null;
     }
 
     // Another student of the same plan is a different row, and the constraint must not stand in
