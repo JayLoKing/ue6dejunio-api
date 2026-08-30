@@ -9,7 +9,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveExceptio
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -65,6 +67,23 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req);
     }
 
+    /**
+     * A row the database itself turned away, answered as the conflict it is.
+     *
+     * <p>Where a rule is held by a constraint rather than by a look-before-you-write, the caller
+     * who loses the race learns about it from Postgres instead of from the service. Left to the
+     * catch-all that arrives as a 500 — the caller told the server broke, when what happened is
+     * that someone else got there first. The message is deliberately the service's own wording:
+     * the exception carries the constraint name, and a constraint name tells the caller nothing
+     * they can act on while telling an attacker the shape of the tables.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
+                                                             HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "Conflict",
+            "El registro entra en conflicto con uno existente", req);
+    }
+
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(ValidationException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req);
@@ -77,17 +96,54 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
-        List<Map<String, String>> details = includeBindingErrors
-            ? ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> Map.of(
-                    "field", fe.getField(),
-                    "message", fe.getDefaultMessage() == null ? "inválido" : fe.getDefaultMessage()
-                ))
-                .toList()
-            : List.of();
+        return badRequest(
+            ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> detail(
+                    fe.getField(),
+                    fe.getDefaultMessage() == null ? "inválido" : fe.getDefaultMessage()))
+                .toList(),
+            req);
+    }
+
+    /**
+     * A request parameter the API refuses, answered 400 rather than 500.
+     *
+     * <p>Every listing pages with {@code @Min}/{@code @Max} on its parameters and
+     * {@code @Validated} on the controller class. That pair validates through the AOP proxy and
+     * throws this instead of one of Spring's own {@code ErrorResponse} types, so without a handler
+     * it fell through to the catch-all — and asking for more rows than the ceiling allows was
+     * reported as a server failure across all fifteen controllers that page this way.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
+                                                                   HttpServletRequest req) {
+        return badRequest(
+            ex.getConstraintViolations().stream()
+                .map(v -> detail(parameterOf(v.getPropertyPath().toString()), v.getMessage()))
+                .toList(),
+            req);
+    }
+
+    /**
+     * The parameter the caller sent. A method violation names its path as {@code list.limit} —
+     * the method it was validated on, then the parameter — and only the last segment is something
+     * the caller can act on.
+     */
+    private static String parameterOf(String propertyPath) {
+        int lastSeparator = propertyPath.lastIndexOf('.');
+        return lastSeparator < 0 ? propertyPath : propertyPath.substring(lastSeparator + 1);
+    }
+
+    private static Map<String, String> detail(String field, String message) {
+        return Map.of("field", field, "message", message);
+    }
+
+    private ResponseEntity<ErrorResponse> badRequest(List<Map<String, String>> details,
+                                                     HttpServletRequest req) {
         ErrorResponse body = ErrorResponse.withDetails(
             HttpStatus.BAD_REQUEST.value(), "Bad Request",
-            includeMessage ? "Datos de entrada inválidos" : null, req.getRequestURI(), details
+            includeMessage ? "Datos de entrada inválidos" : null, req.getRequestURI(),
+            includeBindingErrors ? details : List.of()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
