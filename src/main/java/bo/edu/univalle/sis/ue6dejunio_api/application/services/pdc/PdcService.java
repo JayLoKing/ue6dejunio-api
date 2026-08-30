@@ -41,7 +41,7 @@ public class PdcService implements IPdcService {
 
     @Override
     @Transactional
-    public Pdc create(CreatePdcCommand c, UUID currentUserId, boolean mayPlanEverySubject) {
+    public Pdc create(CreatePdcCommand c, UUID currentUserId) {
         if (!pdcDomain.courseExists(c.courseId())) {
             throw new ResourceNotFoundException("Course", c.courseId());
         }
@@ -58,7 +58,7 @@ public class PdcService implements IPdcService {
             throw new ValidationException("El periodo del PDC termina antes de empezar");
         }
 
-        List<UUID> classGroupIds = resolveClassGroups(c, currentUserId, mayPlanEverySubject);
+        List<UUID> classGroupIds = resolveClassGroups(c, currentUserId);
 
         Pdc created = pdcDomain.save(Pdc.builder()
             .courseId(c.courseId())
@@ -88,23 +88,12 @@ public class PdcService implements IPdcService {
      * who teaches nothing and may plan the course as a whole gets every subject; anyone else with
      * nothing to teach here is refused.
      */
-    private List<UUID> resolveClassGroups(CreatePdcCommand c, UUID currentUserId,
-                                          boolean mayPlanEverySubject) {
+    private List<UUID> resolveClassGroups(CreatePdcCommand c, UUID currentUserId) {
         // What the caller teaches here is what their plan is about. A homeroom teacher who also
         // runs the technical subjects plans those too, and a homeroom teacher who does not leaves
         // them to the technical teacher's own plan rather than filing them under their name.
-        List<UUID> ownSubjects = pdcDomain.classGroupIdsTaughtBy(c.courseId(), currentUserId);
-        List<UUID> allowed;
-        if (!ownSubjects.isEmpty()) {
-            allowed = ownSubjects;
-        } else if (mayPlanEverySubject) {
-            // The Director teaches nothing and still opens plans, so an empty list is widened only
-            // for whoever may plan the course as a whole.
-            allowed = pdcDomain.activeClassGroupIdsOf(c.courseId());
-            if (allowed.isEmpty()) {
-                throw new ConflictException("El curso no tiene materias activas para planificar");
-            }
-        } else {
+        List<UUID> allowed = pdcDomain.classGroupIdsTaughtBy(c.courseId(), currentUserId);
+        if (allowed.isEmpty()) {
             // Refused rather than widened. Reading an empty list as "plans everything" would let
             // anyone who reached here without an active subject — a teacher whose only class group
             // was deactivated — open a course-wide plan and take the slot the homeroom teacher

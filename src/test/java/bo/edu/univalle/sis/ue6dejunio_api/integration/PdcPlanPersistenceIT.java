@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The plan against a real database. The service tests mock the port, so nothing until now proved
@@ -63,7 +65,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
     // shape that throws MultipleBagFetchException when the mapping gets it wrong.
     @Test
     void readsBackAPlanHoldingSeveralSubjectsEachWithSeveralWeeks() {
-        Pdc created = pdcService.create(august(), teacher, true);
+        Pdc created = pdcService.create(august(), teacher);
         assertThat(created.getSubjects()).hasSize(2);
 
         for (var block : created.getSubjects()) {
@@ -89,7 +91,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
     // comes back in is part of what it holds rather than something the view rediscovers.
     @Test
     void keepsTheSubjectsInTheOrderTheyPrint() {
-        Pdc created = pdcService.create(august(), teacher, true);
+        Pdc created = pdcService.create(august(), teacher);
 
         List<String> areas = pdcService.getById(created.getId()).getSubjects().stream()
             .map(s -> s.knowledgeArea())
@@ -106,7 +108,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
     // Writing a block replaces its rows. A merge would leave a week the teacher removed behind.
     @Test
     void writingASubjectReplacesItsWeeksRatherThanAddingToThem() {
-        Pdc created = pdcService.create(august(), teacher, true);
+        Pdc created = pdcService.create(august(), teacher);
         UUID block = created.getSubjects().get(0).id();
 
         pdcService.writeSubject(created.getId(), block, twoWeeks("Primera versión"), teacher);
@@ -132,7 +134,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
     // data loss as a refetch overwriting a draft.
     @Test
     void writingASubjectWithoutSendingRowsLeavesTheWeeksAlone() {
-        Pdc created = pdcService.create(august(), teacher, true);
+        Pdc created = pdcService.create(august(), teacher);
         UUID block = created.getSubjects().get(0).id();
         pdcService.writeSubject(created.getId(), block, twoWeeks("Con semanas"), teacher);
 
@@ -150,7 +152,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
     // An empty list is a different answer from no list: it says the teacher removed every week.
     @Test
     void writingASubjectWithAnEmptyRowListClearsTheWeeks() {
-        Pdc created = pdcService.create(august(), teacher, true);
+        Pdc created = pdcService.create(august(), teacher);
         UUID block = created.getSubjects().get(0).id();
         pdcService.writeSubject(created.getId(), block, twoWeeks("Con semanas"), teacher);
 
@@ -168,42 +170,33 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
     // (plan → course → grade → level) and had no way of reaching the document until now.
     @Test
     void carriesTheLevelTheCourseBelongsTo() {
-        Pdc created = pdcService.create(august(), teacher, true);
+        Pdc created = pdcService.create(august(), teacher);
 
         assertThat(created.getLevelName()).isEqualTo("Primaria Comunitaria Vocacional");
         assertThat(pdcService.getById(created.getId()).getLevelName())
             .isEqualTo("Primaria Comunitaria Vocacional");
     }
 
-    // "Maestro/a" on the form is whoever teaches what the plan covers. It cannot be read from the
-    // plan's author: a copy to the parallels is authored by whoever triggered the copy, which may
-    // be the Director, and every copy would then carry their name instead of the teacher's.
-    // A teacher's plan holds their own subjects, so it names one teacher. The Director's does not:
-    // they teach nothing and open the course whole, so the form names everyone whose block is in it.
+    // The Director opens no plans: they review what the teachers publish. Reaching create at all
+    // would mean a month planned from an office, by someone who teaches none of it.
     @Test
-    void namesEveryTeacherWhoseBlockIsInThePlan() {
-        UUID specialist = seedUser("Teacher", true);
-        jdbc.update("UPDATE class_groups SET id_teacher = ? WHERE id_class_group = ?",
-            specialist, languageGroup);
+    void aDirectorCannotOpenAPlan() {
         UUID director = seedUser("Director", false);
 
-        Pdc plan = pdcService.create(august(), director, true);
-
-        assertThat(plan.getTeacherNames())
-            .containsExactlyInAnyOrder(fullNameOf(teacher), fullNameOf(specialist));
+        assertThatThrownBy(() -> pdcService.create(august(), director))
+            .isInstanceOf(ConflictException.class);
     }
 
     // A status flip answers with the plan, and the heading it carries has to be the one a read of
-    // the same plan would give. The write path builds its answer from the blocks the caller already
-    // held instead of re-reading them, so the names have to be derived there too or the printed
-    // "Maestro/a" line comes back empty from a publish and filled from a GET.
+    // the same plan would give. The write path builds its answer without re-reading the document,
+    // so the printed "Maestro/a" line has to survive that shortcut.
     @Test
-    void aStatusChangeAnswersWithTheTeachersToo() {
-        Pdc created = pdcService.create(august(), teacher, true);
+    void aStatusChangeAnswersWithTheTeacherToo() {
+        Pdc created = pdcService.create(august(), teacher);
 
         Pdc published = pdcService.publish(created.getId(), teacher);
 
-        assertThat(published.getTeacherNames()).containsExactly(fullNameOf(teacher));
+        assertThat(published.getHomeroomTeacherName()).isEqualTo(fullNameOf(teacher));
     }
 
     // The subjects somebody else runs are that teacher's to plan. Opening them here would file
@@ -214,20 +207,19 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         jdbc.update("UPDATE class_groups SET id_teacher = ? WHERE id_class_group = ?",
             specialist, languageGroup);
 
-        Pdc plan = pdcService.create(august(), teacher, true);
+        Pdc plan = pdcService.create(august(), teacher);
 
         assertThat(plan.getSubjects()).hasSize(1);
         assertThat(plan.getSubjects().get(0).classGroupId()).isEqualTo(mathGroup);
-        assertThat(plan.getTeacherNames()).containsExactly(fullNameOf(teacher));
     }
 
-    // A teacher running several subjects of the course is one name on the form, not one per block.
+    // "Maestro/a" is the teacher in charge of the course, however many blocks the plan holds.
     @Test
-    void namesEachTeacherOnce() {
-        Pdc plan = pdcService.create(august(), teacher, true);
+    void namesTheCoursesTeacherOnceHoweverManySubjects() {
+        Pdc plan = pdcService.create(august(), teacher);
 
         assertThat(plan.getSubjects()).hasSize(2);
-        assertThat(plan.getTeacherNames()).containsExactly(fullNameOf(teacher));
+        assertThat(plan.getHomeroomTeacherName()).isEqualTo(fullNameOf(teacher));
     }
 
     // The rotation: one teacher of the grade writes the month, the parallels copy it. What the copy
@@ -239,15 +231,15 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         seedClassGroup(parallelB, otherTeacher, "Matematicas");
         seedClassGroup(parallelB, otherTeacher, "Lenguaje");
 
-        Pdc original = pdcService.create(august(), teacher, true);
+        Pdc original = pdcService.create(august(), teacher);
         pdcService.publish(original.getId(), teacher);
         List<Pdc> copies = pdcService.copyToSiblingCourses(original.getId(), teacher);
 
         assertThat(copies).hasSize(1);
-        assertThat(pdcService.getById(original.getId()).getTeacherNames())
-            .containsExactly(fullNameOf(teacher));
-        assertThat(pdcService.getById(copies.get(0).getId()).getTeacherNames())
-            .containsExactly(fullNameOf(otherTeacher));
+        assertThat(pdcService.getById(original.getId()).getHomeroomTeacherName())
+            .isEqualTo(fullNameOf(teacher));
+        assertThat(pdcService.getById(copies.get(0).getId()).getHomeroomTeacherName())
+            .isEqualTo(fullNameOf(otherTeacher));
     }
 
     // Adaptations answer to the students in front of one teacher: which of them needs the content
@@ -260,7 +252,7 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         seedClassGroup(parallelB, otherTeacher, "Matematicas");
         seedClassGroup(parallelB, otherTeacher, "Lenguaje");
 
-        Pdc original = pdcService.create(august(), teacher, true);
+        Pdc original = pdcService.create(august(), teacher);
         UUID block = original.getSubjects().get(0).id();
         pdcService.writeSubject(original.getId(), block, twoWeeks("Objetivo del mes"), teacher);
         pdcService.publish(original.getId(), teacher);
@@ -281,11 +273,11 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
 
     @Test
     void aSecondPlanOfTheSameTrimesterIsAccepted() {
-        pdcService.create(august(), teacher, true);
+        pdcService.create(august(), teacher);
 
         Pdc september = pdcService.create(new CreatePdcCommand(course, 5, 2,
             LocalDate.of(2026, 9, 7), LocalDate.of(2026, 10, 2), null, null, null,
-            List.of(mathGroup)), teacher, true);
+            List.of(mathGroup)), teacher);
 
         assertThat(september.getPlanNumber()).isEqualTo(5);
         assertThat(september.getSubjects()).hasSize(1);

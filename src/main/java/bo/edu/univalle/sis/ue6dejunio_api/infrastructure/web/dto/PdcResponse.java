@@ -22,7 +22,6 @@ public record PdcResponse(
     String levelName,
     UUID homeroomTeacherId,
     String homeroomTeacherName,
-    List<String> teacherNames,
     Integer planNumber,
     Integer trimester,
     LocalDate periodStart,
@@ -90,7 +89,6 @@ public record PdcResponse(
         return new PdcResponse(
             p.getId(), p.getCourseId(), p.getCourseName(), p.getGradeName(), p.getParallelName(),
             p.getLevelName(), p.getHomeroomTeacherId(), p.getHomeroomTeacherName(),
-            p.getTeacherNames(),
             p.getPlanNumber(), p.getTrimester(), p.getPeriodStart(), p.getPeriodEnd(),
             p.getStatus(), p.getReviewObservations(), p.getHolisticObjective(),
             p.getFinalProduct(), p.getBibliography(), p.getSourcePlanId(),

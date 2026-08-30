@@ -786,9 +786,59 @@ class AuthorizationComponentTest {
         assertThat(authz.canWritePdc(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
     }
 
+    // The plan is written by whoever delivers it. The Director reviews what comes back, and a
+    // document they could edit themselves is one they would be reviewing their own hand in.
     @Test
-    void canWritePdc_director_bypassesWithoutLookup() {
-        assertThat(authz.canWritePdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+    void canWritePdc_director_false() {
+        UUID pdcId = UUID.randomUUID();
+
+        assertThat(authz.canWritePdc(token(UUID.randomUUID(), "Director"), pdcId)).isFalse();
+    }
+
+    @Test
+    void canWritePdcForCourse_director_false() {
+        assertThat(authz.canWritePdcForCourse(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+            .isFalse();
+    }
+
+    @Test
+    void canWritePdcSubject_director_false() {
+        assertThat(authz.canWritePdcSubject(
+            token(UUID.randomUUID(), "Director"), UUID.randomUUID(), UUID.randomUUID())).isFalse();
+    }
+
+    // Publishing says a teacher's month is ready and the rotation hands their work to the parallels.
+    // A Director doing either would be reviewing a submission they made themselves.
+    @Test
+    void canAuthorPdc_director_false() {
+        assertThat(authz.canAuthorPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+            .isFalse();
+    }
+
+    // What the Director keeps: a plan opened against the wrong course, or left by a teacher who has
+    // gone, has nobody else who can correct or remove it.
+    @Test
+    void canAdministerPdc_director_true() {
+        assertThat(authz.canAdministerPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+            .isTrue();
+    }
+
+    // An unauthenticated request is denied, not turned into a server error. Both guards branch on
+    // the role before anything else, and reading authorities off a null authentication throws
+    // inside @PreAuthorize — which Spring surfaces as a 500 rather than a 403.
+    @Test
+    void pdcGuards_withoutAuthentication_denyRatherThanThrow() {
+        UUID pdcId = UUID.randomUUID();
+
+        assertThat(authz.canReadPdc(null, pdcId)).isFalse();
+        assertThat(authz.canAuthorPdc(null, pdcId)).isFalse();
+        assertThat(authz.canAuthorPdc(token(UUID.randomUUID(), "Teacher"), null)).isFalse();
+    }
+
+    // Reading is the whole of their part in this, and the write guard no longer grants it.
+    @Test
+    void canReadPdc_director_true() {
+        assertThat(authz.canReadPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
     }
 
     @Test

@@ -87,7 +87,7 @@ public class PdcController {
         Pdc created = pdcService.create(new CreatePdcCommand(
             r.courseId(), r.planNumber(), r.trimester(), r.periodStart(), r.periodEnd(),
             r.holisticObjective(), r.finalProduct(), r.bibliography(), r.classGroupIds()),
-            userId, authz.canPlanEverySubjectOf(token, r.courseId()));
+            userId);
         return ResponseEntity.ok(PdcResponse.from(created));
     }
 
@@ -150,7 +150,7 @@ public class PdcController {
     }
 
     @PostMapping("/{id}/copy-to-parallels")
-    @PreAuthorize("@authz.canAdministerPdc(authentication, #id)")
+    @PreAuthorize("@authz.canAuthorPdc(authentication, #id)")
     @Operation(summary = "Copiar el PDC del mes a los otros paralelos del grado, uno en Draft por curso")
     public ResponseEntity<List<PdcResponse>> copyToParallels(@PathVariable UUID id,
                                                              JwtAuthenticationToken token) {
@@ -161,7 +161,7 @@ public class PdcController {
     }
 
     @PostMapping("/{id}/publish")
-    @PreAuthorize("@authz.canAdministerPdc(authentication, #id)")
+    @PreAuthorize("@authz.canAuthorPdc(authentication, #id)")
     @Operation(summary = "Publicar PDC para revision (Teacher). Draft/With Observations -> Published")
     public ResponseEntity<PdcResponse> publish(@PathVariable UUID id, JwtAuthenticationToken token) {
         UUID userId = currentUser(token);

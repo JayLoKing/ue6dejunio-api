@@ -73,7 +73,7 @@ class PdcServiceTest {
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        pdcService.create(command(), user, true);
+        pdcService.create(command(), user);
 
         ArgumentCaptor<Pdc> saved = ArgumentCaptor.forClass(Pdc.class);
         verify(pdcDomain).save(saved.capture());
@@ -97,7 +97,7 @@ class PdcServiceTest {
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        pdcService.create(command(), user, true);
+        pdcService.create(command(), user);
 
         verify(pdcDomain).addSubjects(planId, nineSubjects);
     }
@@ -113,7 +113,7 @@ class PdcServiceTest {
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        pdcService.create(command(4, august1, september4, List.of(onlySubject)), user, false);
+        pdcService.create(command(4, august1, september4, List.of(onlySubject)), user);
 
         verify(pdcDomain).addSubjects(planId, List.of(onlySubject));
         // A specialist plans what they teach, not the whole course.
@@ -128,7 +128,7 @@ class PdcServiceTest {
         when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of(UUID.randomUUID()));
 
         assertThatThrownBy(() ->
-            pdcService.create(command(4, august1, september4, List.of(foreign)), user, false))
+            pdcService.create(command(4, august1, september4, List.of(foreign)), user))
             .isInstanceOf(ValidationException.class);
         verify(pdcDomain, never()).save(any());
     }
@@ -140,12 +140,12 @@ class PdcServiceTest {
         UUID planId = UUID.randomUUID();
         when(pdcDomain.courseExists(courseId)).thenReturn(true);
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 5)).thenReturn(false);
-        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(List.of(UUID.randomUUID()));
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of(UUID.randomUUID()));
         when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        pdcService.create(command(5, august1, september4, null), user, true);
+        pdcService.create(command(5, august1, september4, null), user);
 
         verify(pdcDomain).save(any(Pdc.class));
     }
@@ -155,7 +155,7 @@ class PdcServiceTest {
         when(pdcDomain.courseExists(courseId)).thenReturn(true);
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(true);
 
-        assertThatThrownBy(() -> pdcService.create(command(), user, true))
+        assertThatThrownBy(() -> pdcService.create(command(), user))
             .isInstanceOf(DuplicateResourceException.class);
     }
 
@@ -163,7 +163,7 @@ class PdcServiceTest {
     void create_unknownCourse_throwsNotFound() {
         when(pdcDomain.courseExists(courseId)).thenReturn(false);
 
-        assertThatThrownBy(() -> pdcService.create(command(), user, true))
+        assertThatThrownBy(() -> pdcService.create(command(), user))
             .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -173,18 +173,21 @@ class PdcServiceTest {
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
 
         assertThatThrownBy(() ->
-            pdcService.create(command(4, september4, august1, null), user, true))
+            pdcService.create(command(4, september4, august1, null), user))
             .isInstanceOf(ValidationException.class);
     }
 
+    // Nobody opens a plan over subjects they do not teach — not even to cover a course that has
+    // none active. Widening an empty list would hand whoever asked the course's single monthly slot.
     @Test
-    void create_courseWithoutActiveSubjects_isRefused() {
+    void create_callerTeachesNothingInTheCourse_isRefused() {
         when(pdcDomain.courseExists(courseId)).thenReturn(true);
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
-        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(List.of());
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> pdcService.create(command(), user, true))
+        assertThatThrownBy(() -> pdcService.create(command(), user))
             .isInstanceOf(ConflictException.class);
+        verify(pdcDomain, never()).save(any());
     }
 
     // Repeating an id passed a distinct-count check and then collided with the index that allows
@@ -200,7 +203,7 @@ class PdcServiceTest {
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        pdcService.create(command(4, august1, september4, List.of(subject, subject)), user, false);
+        pdcService.create(command(4, august1, september4, List.of(subject, subject)), user);
 
         verify(pdcDomain).addSubjects(planId, List.of(subject));
     }
@@ -220,28 +223,28 @@ class PdcServiceTest {
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
         // false: this caller is not the homeroom teacher and not the Director.
-        pdcService.create(command(), user, false);
+        pdcService.create(command(), user);
 
         verify(pdcDomain).addSubjects(planId, List.of(ownSubject));
         verify(pdcDomain, never()).activeClassGroupIdsOf(any());
     }
 
-    // The Director passes the reach guard and teaches nothing. Deriving authority from an empty
-    // subject list made every Director create answer 409 on every course.
+    // Nobody reaches the whole course any more. Opening a plan asks only what the caller teaches,
+    // so the course-wide list is a query the service no longer has a reason to make.
     @Test
-    void create_directorPlansTheWholeCourse() {
+    void create_neverAsksForTheCoursesWholeSubjectList() {
         UUID planId = UUID.randomUUID();
-        List<UUID> everySubject = List.of(UUID.randomUUID(), UUID.randomUUID());
         when(pdcDomain.courseExists(courseId)).thenReturn(true);
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
-        when(pdcDomain.activeClassGroupIdsOf(courseId)).thenReturn(everySubject);
+        when(pdcDomain.classGroupIdsTaughtBy(courseId, user))
+            .thenReturn(List.of(UUID.randomUUID()));
         when(pdcDomain.save(any(Pdc.class))).thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
         when(pdcDomain.addSubjects(eq(planId), anyList()))
             .thenReturn(pdcWithStatus(planId, PdcStatus.DRAFT));
 
-        pdcService.create(command(), user, true);
+        pdcService.create(command(), user);
 
-        verify(pdcDomain).addSubjects(planId, everySubject);
+        verify(pdcDomain, never()).activeClassGroupIdsOf(any());
     }
 
     @Test
@@ -250,7 +253,7 @@ class PdcServiceTest {
         when(pdcDomain.existsByCoursePlanNumber(courseId, 2, 4)).thenReturn(false);
         when(pdcDomain.classGroupIdsTaughtBy(courseId, user)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> pdcService.create(command(), user, false))
+        assertThatThrownBy(() -> pdcService.create(command(), user))
             .isInstanceOf(ConflictException.class);
         verify(pdcDomain, never()).save(any());
     }

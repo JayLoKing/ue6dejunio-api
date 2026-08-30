@@ -13,14 +13,9 @@ import java.util.UUID;
 public interface IPdcService {
 
     /**
-     * Opens a month's plan.
-     *
-     * @param mayPlanEverySubject whether the caller plans the course as a whole rather than only
-     *                            what they teach in it — the homeroom teacher and the Director do,
-     *                            a specialist does not. Passed in because who holds that authority
-     *                            is a question about roles, and roles live at the edge.
+     * Opens a month's plan, covering the subjects the caller teaches in the course and no others.
      */
-    Pdc create(CreatePdcCommand command, UUID currentUserId, boolean mayPlanEverySubject);
+    Pdc create(CreatePdcCommand command, UUID currentUserId);
 
     Pdc update(UUID id, UpdatePdcCommand command, UUID currentUserId);
 

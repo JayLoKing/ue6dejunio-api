@@ -369,24 +369,6 @@ public class AuthorizationComponent {
     }
 
     /**
-     * Whether the caller plans the course as a whole rather than only the subjects they teach in
-     * it. The homeroom teacher runs the course; the Director answers for the school. A specialist
-     * plans their own subject, and reading their absence of subjects as licence over all of them
-     * is how a teacher whose class group was deactivated could take the homeroom teacher's slot.
-     */
-    public boolean canPlanEverySubjectOf(Authentication authentication, UUID courseId) {
-        if (authentication == null || courseId == null || isReadOnlyStaff(authentication)) {
-            return false;
-        }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
-        }
-        UUID teacherId = userId(authentication);
-        return teacherId != null
-            && courseDomain.isHomeroomTeacherOfAny(teacherId, List.of(courseId));
-    }
-
-    /**
      * Who may open a month's plan for a course. The homeroom teacher writes the course-wide plan,
      * and a specialist writes one for the subject they run there — so running any class group of
      * the course is enough. Narrower guards do not fit: {@link #canReadCourse} is homeroom-only and
@@ -396,9 +378,8 @@ public class AuthorizationComponent {
         if (authentication == null || courseId == null || isReadOnlyStaff(authentication)) {
             return false;
         }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
-        }
+        // The Director opens no plans. A month is planned by whoever delivers it, and the office
+        // reviews what comes back — a plan opened from the office would carry no teaching behind it.
         UUID teacherId = userId(authentication);
         if (teacherId == null) {
             return false;
@@ -411,8 +392,13 @@ public class AuthorizationComponent {
     /**
      * Ownership of a curricular plan. A PDC belongs to a course and covers several subjects, so a
      * teacher has a stake in it either by running the course or by teaching one of its subjects —
-     * a specialist has to reach the plan to write their own block. The Director writes anywhere
-     * and read-only staff writes nowhere.
+     * a specialist has to reach the plan to write their own block. Read-only staff writes nowhere.
+     *
+     * <p>The Director is not here. A plan is written by the teachers who deliver it; the Director
+     * reads what they publish and answers with an approval or an observation. Letting the office
+     * write inside the document would put its content under a name that never taught the class.
+     * What the Director may still do to the plan as a whole is settled by
+     * {@link #canAdministerPdc}.
      *
      * <p>Reaching the plan is not the same as writing any part of it: which block a teacher may
      * rewrite is settled by {@link #canWritePdcSubject}.
@@ -421,9 +407,6 @@ public class AuthorizationComponent {
         if (authentication == null || pdcId == null || isReadOnlyStaff(authentication)) {
             return false;
         }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
-        }
         UUID callerId = userId(authentication);
         // Asks for the writers' ids rather than the plan: this runs before every write, and reading
         // the document to compare a handful of UUIDs pulled every block and every weekly row with it.
@@ -431,10 +414,14 @@ public class AuthorizationComponent {
     }
 
     /**
-     * Who may act on the plan as a whole: publish it for review, delete it, or hand it to the
-     * other parallels. Narrower than {@link #canWritePdc}, which only says who may reach the plan
-     * — a specialist holding one block of a course-wide plan writes their subject, but publishing
-     * or deleting the whole document is the author's act, or the homeroom teacher's.
+     * Who may dispose of the plan as a document: correct its heading or remove it. Narrower than
+     * {@link #canWritePdc}, which only says who may reach the plan — a specialist holding one block
+     * of a course-wide plan writes their subject, but the document as a whole is the author's, or
+     * the homeroom teacher's.
+     *
+     * <p>The Director keeps this one. A plan opened against the wrong course, or left behind by a
+     * teacher who has since gone, has nobody else who can correct or remove it — the author is
+     * exactly who is missing in those cases.
      */
     public boolean canAdministerPdc(Authentication authentication, UUID pdcId) {
         if (authentication == null || pdcId == null || isReadOnlyStaff(authentication)) {
@@ -448,6 +435,24 @@ public class AuthorizationComponent {
     }
 
     /**
+     * Who may move the plan through the teachers' half of its life: hand it to the other parallels,
+     * and publish it for review.
+     *
+     * <p>The same people as {@link #canAdministerPdc} minus the Director. Publishing is a teacher
+     * saying their month is ready, and the rotation is a teacher handing their work to the
+     * parallels; a Director doing either would be reviewing a submission they made themselves.
+     */
+    public boolean canAuthorPdc(Authentication authentication, UUID pdcId) {
+        if (authentication == null || pdcId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return false;
+        }
+        return canAdministerPdc(authentication, pdcId);
+    }
+
+    /**
      * Which subject block of a plan a teacher may rewrite: the homeroom teacher owns the whole
      * plan, a specialist owns only the block for the subject they teach. Without this a teacher
      * with one block could rewrite every other subject of the course.
@@ -457,9 +462,7 @@ public class AuthorizationComponent {
             || isReadOnlyStaff(authentication)) {
             return false;
         }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
-        }
+        // No Director branch, for the reason given on canWritePdc: the block is the teacher's work.
         UUID callerId = userId(authentication);
         // Matched inside this plan: a block id from another plan contributes nobody to the set,
         // so it resolves to a denial rather than to someone else's block.
@@ -467,9 +470,18 @@ public class AuthorizationComponent {
             && pdcDomain.subjectWriterIdsOf(pdcId, planSubjectId).contains(callerId);
     }
 
-    /** Read side of {@link #canWritePdc}: the secretariat reads, a Teacher stays in their own plans. */
+    /**
+     * Read side of {@link #canWritePdc}: the secretariat reads, a Teacher stays in their own plans.
+     *
+     * <p>The Director reads every plan, which the write guard no longer grants them. Reviewing is
+     * the whole of their part in this: they cannot open a plan, write in it or publish it, and
+     * without this branch they could not read the one they are asked to approve either.
+     */
     public boolean canReadPdc(Authentication authentication, UUID pdcId) {
-        if (isReadOnlyStaff(authentication)) {
+        if (authentication == null || pdcId == null) {
+            return false;
+        }
+        if (isReadOnlyStaff(authentication) || hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
         return canWritePdc(authentication, pdcId);
@@ -563,6 +575,12 @@ public class AuthorizationComponent {
     }
 
     private boolean hasRole(Authentication auth, String role) {
+        // An absent authentication holds no role. Every caller guards first, but reaching here with
+        // null used to throw inside @PreAuthorize, which Spring surfaces as a 500 — an unauthenticated
+        // request has to be denied, not turned into a server error.
+        if (auth == null) {
+            return false;
+        }
         for (GrantedAuthority a : auth.getAuthorities()) {
             if (role.equals(a.getAuthority())) {
                 return true;
