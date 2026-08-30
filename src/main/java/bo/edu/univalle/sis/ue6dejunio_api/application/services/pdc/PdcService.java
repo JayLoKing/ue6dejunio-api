@@ -9,6 +9,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatusChanged;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpsertPdcSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
@@ -34,8 +36,10 @@ public class PdcService implements IPdcService {
         Set.of(PdcStatus.PUBLISHED, PdcStatus.UNDER_REVIEW, PdcStatus.APPROVED);
 
     private final IPdcDomain pdcDomain;
+    private final IDomainEventPublisher events;
 
-    public PdcService(IPdcDomain pdcDomain) {
+    public PdcService(IPdcDomain pdcDomain, IDomainEventPublisher events) {
+        this.events = events;
         this.pdcDomain = pdcDomain;
     }
 
@@ -219,7 +223,7 @@ public class PdcService implements IPdcService {
         pdc.setStatus(PdcStatus.PUBLISHED);
         pdc.setReviewObservations(null);
         pdc.setUpdatedById(currentUserId);
-        return pdcDomain.save(pdc);
+        return announce(pdcDomain.save(pdc));
     }
 
     @Override
@@ -229,7 +233,7 @@ public class PdcService implements IPdcService {
         pdc.setStatus(PdcStatus.APPROVED);
         pdc.setReviewObservations(null);
         pdc.setUpdatedById(currentUserId);
-        return pdcDomain.save(pdc);
+        return announce(pdcDomain.save(pdc));
     }
 
     @Override
@@ -242,7 +246,20 @@ public class PdcService implements IPdcService {
         pdc.setStatus(PdcStatus.WITH_OBSERVATIONS);
         pdc.setReviewObservations(observations);
         pdc.setUpdatedById(currentUserId);
-        return pdcDomain.save(pdc);
+        return announce(pdcDomain.save(pdc));
+    }
+
+    /**
+     * States what the plan became, and hands the plan back untouched.
+     *
+     * <p>Only a fact leaves here — who should hear about it is not this service's question. The
+     * listener runs after this transaction commits, so a change that is refused announces nothing.
+     */
+    private Pdc announce(Pdc saved) {
+        events.publish(new PdcStatusChanged(
+            saved.getId(), saved.getCreatedById(), saved.getStatus(),
+            saved.getPlanNumber(), saved.getTrimester(), saved.getReviewObservations()));
+        return saved;
     }
 
     @Override

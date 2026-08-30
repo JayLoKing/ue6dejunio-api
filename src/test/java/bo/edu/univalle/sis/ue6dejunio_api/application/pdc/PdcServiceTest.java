@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpsertPdcSubjectCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,12 @@ import static org.mockito.Mockito.when;
 class PdcServiceTest {
 
     @Mock private IPdcDomain pdcDomain;
+    /**
+     * A state change states what it became and stops there. Nothing here asserts on the event —
+     * who hears about it is the notification module's question, and is pinned by its own IT. What
+     * this mock buys is that these tests keep saying nothing about notifications at all.
+     */
+    @Mock private IDomainEventPublisher events;
     @InjectMocks private PdcService pdcService;
 
     private final UUID user = UUID.randomUUID();

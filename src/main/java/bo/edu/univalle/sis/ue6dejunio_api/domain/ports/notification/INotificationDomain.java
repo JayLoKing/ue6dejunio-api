@@ -6,11 +6,20 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notificatio
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface INotificationDomain {
     boolean userExists(UUID userId);
+
+    /**
+     * Everyone who can act on a plan waiting for review.
+     *
+     * <p>All of them, not the first one found: a school with two Directors has two people who
+     * might pick the review up, and telling one leaves the other blind to a plan that is waiting.
+     */
+    List<UUID> activeDirectorIds();
     Notification send(SendNotificationCommand command);
     Optional<Notification> findById(UUID id);
     /** Stamps delivery on whatever it hands back: this is the moment the row reached its reader. */

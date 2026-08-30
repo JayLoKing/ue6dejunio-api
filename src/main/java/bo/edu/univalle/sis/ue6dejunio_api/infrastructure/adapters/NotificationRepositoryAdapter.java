@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -47,9 +48,19 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
     }
 
+    /** The role name as the seed writes it, and as {@code AuthorizationComponent} reads it. */
+    private static final String DIRECTOR_ROLE = "Director";
+
     @Override
     public boolean userExists(UUID userId) {
         return userRepo.existsById(userId);
+    }
+
+    @Override
+    public List<UUID> activeDirectorIds() {
+        return userRepo.findByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE).stream()
+            .map(UserEntity::getId)
+            .toList();
     }
 
     @Override
