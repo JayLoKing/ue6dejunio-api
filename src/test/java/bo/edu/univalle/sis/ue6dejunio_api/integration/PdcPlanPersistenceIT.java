@@ -1,18 +1,22 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpsertPdcSubjectCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PdcPlanPersistenceIT extends AbstractIntegrationTest {
 
     @Autowired private IPdcService pdcService;
+    @Autowired private IAdaptationService adaptationService;
 
     private UUID teacher;
     private UUID course;
@@ -195,6 +200,49 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         assertThat(row.getSignificantAdaptationCount()).isZero();
         // The row carries no blocks — the count is what says how wide it is.
         assertThat(row.getSubjects()).isEmpty();
+    }
+
+    /**
+     * Every field of the plan survives a write, checked over the whole class rather than one field
+     * at a time.
+     *
+     * <p>A write does not re-read the document: it rebuilds its answer with
+     * {@code toHeader(saved).toBuilder()} and copies across what the caller already held. Anything
+     * the rebuild forgets falls back to its {@code @Builder.Default} — silently, and only on the
+     * write path, so a publish answers with a plan that a read of the same plan contradicts. That
+     * defect has now shipped twice, with the teacher names and with the counts, and both times the
+     * suite missed it because every other test re-reads after publishing instead of looking at what
+     * the publish returned.
+     *
+     * <p>Walking the fields is what makes this close the whole class: the next field added to
+     * {@link Pdc} fails here until {@code save} carries it, without anyone remembering to come back.
+     */
+    @Test
+    void everyFieldOfThePlanSurvivesAWrite() throws IllegalAccessException {
+        // Fields the write is meant to change: it stamps who wrote and when, so the answer differing
+        // from a later read is the point rather than a loss.
+        Set<String> writtenByTheSaveItself = Set.of("updatedAt", "updatedById", "updatedByName");
+
+        Pdc created = pdcService.create(august(), teacher);
+        pdcService.writeSubject(created.getId(), created.getSubjects().get(0).id(),
+            twoWeeks("Objetivo del mes"), teacher);
+        adaptationService.create(new CreateAdaptationCommand(created.getId(), seedStudent(),
+            "Contenido adaptado", "Metodología adaptada", "Criterio adaptado", teacher));
+
+        Pdc answeredByTheWrite = pdcService.publish(created.getId(), teacher);
+        Pdc read = pdcService.getById(created.getId());
+
+        for (Field field : Pdc.class.getDeclaredFields()) {
+            if (field.isSynthetic() || writtenByTheSaveItself.contains(field.getName())) {
+                continue;
+            }
+            field.setAccessible(true);
+            assertThat(field.get(answeredByTheWrite))
+                .as("El campo '%s' se pierde al escribir: save() no lo copia y vuelve a su valor "
+                    + "por defecto, así que un publish contradice una lectura del mismo plan",
+                    field.getName())
+                .isEqualTo(field.get(read));
+        }
     }
 
     // The write path answers from what the caller already held rather than re-reading the plan.
