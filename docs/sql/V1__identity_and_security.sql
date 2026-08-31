@@ -24,4 +24,7 @@ CREATE TABLE users (
 CREATE INDEX idx_users_email ON users (email);
 CREATE INDEX idx_users_role ON users (role_id);
 
-INSERT INTO roles (name) VALUES ('DIRECTOR'), ('SECRETARIO'), ('DOCENTE');
+-- Spelled exactly as the code reads them: role names are compared as literals and never
+-- normalized, so a database seeded with any other spelling has no Directors, no Secretary and no
+-- Teachers as far as the application can tell -- and it says so by doing nothing.
+INSERT INTO roles (name) VALUES ('Director'), ('Secretary'), ('Teacher');
