@@ -57,6 +57,13 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     }
 
     @Override
+    public Optional<String> roleNameOf(UUID userId) {
+        return userRepo.findById(userId)
+            .map(UserEntity::getRole)
+            .map(role -> role.getName());
+    }
+
+    @Override
     public List<UUID> activeDirectorIds() {
         return userRepo.findByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE).stream()
             .map(UserEntity::getId)

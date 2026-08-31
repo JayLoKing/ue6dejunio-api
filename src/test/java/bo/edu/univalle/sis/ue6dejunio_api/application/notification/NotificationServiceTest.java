@@ -40,15 +40,55 @@ class NotificationServiceTest {
             null, "hola", null, null);
     }
 
+    /** A receiver the Director is allowed to write to, which every send below assumes. */
+    private void receiverIsATeacher(UUID receiver) {
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        when(notificationDomain.roleNameOf(receiver)).thenReturn(Optional.of("Teacher"));
+    }
+
     @Test
     void send_receiverExists_saves() {
         UUID sender = UUID.randomUUID();
         UUID receiver = UUID.randomUUID();
-        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        receiverIsATeacher(receiver);
         when(notificationDomain.send(any(SendNotificationCommand.class)))
             .thenReturn(notif(UUID.randomUUID(), receiver));
         Notification r = notificationService.send(summons(sender, receiver));
         assertThat(r.message()).isEqualTo("msg");
+    }
+
+    // The listener writes these with no sender, and they are the one thing a person may not put
+    // in an inbox by hand. Nothing about the receiver's role applies to them.
+    @Test
+    void send_whatTheSystemWrites_skipsTheRulesAboutPeople() {
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        when(notificationDomain.send(any(SendNotificationCommand.class)))
+            .thenReturn(notif(UUID.randomUUID(), receiver));
+
+        assertThat(notificationService.send(new SendNotificationCommand(
+            null, receiver, NotificationType.PDC_APPROVED, null, "hola", null, null)))
+            .isNotNull();
+    }
+
+    @Test
+    void send_aPersonWritingWhatTheSystemAnnounces_throws() {
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+
+        assertThatThrownBy(() -> notificationService.send(new SendNotificationCommand(
+            UUID.randomUUID(), receiver, NotificationType.PDC_APPROVED, null, "hola", null, null)))
+            .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void send_toSomebodyWhoDoesNotAnswerToTheDirector_throws() {
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        when(notificationDomain.roleNameOf(receiver)).thenReturn(Optional.of("Director"));
+
+        assertThatThrownBy(() -> notificationService.send(summons(UUID.randomUUID(), receiver)))
+            .isInstanceOf(ValidationException.class);
     }
 
     @Test
@@ -74,7 +114,7 @@ class NotificationServiceTest {
     @Test
     void send_catalogTypeWithoutASubject_isAccepted() {
         UUID receiver = UUID.randomUUID();
-        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        receiverIsATeacher(receiver);
         when(notificationDomain.send(any(SendNotificationCommand.class)))
             .thenReturn(notif(UUID.randomUUID(), receiver));
 

@@ -20,6 +20,14 @@ public interface INotificationDomain {
      * might pick the review up, and telling one leaves the other blind to a plan that is waiting.
      */
     List<UUID> activeDirectorIds();
+
+    /**
+     * The receiver's role, so the rule about who the Director may write to lives in the service
+     * where it can be read, rather than in a query named after the rule.
+     *
+     * @return empty when there is no such user
+     */
+    Optional<String> roleNameOf(UUID userId);
     Notification send(SendNotificationCommand command);
     Optional<Notification> findById(UUID id);
     /** Stamps delivery on whatever it hands back: this is the moment the row reached its reader. */

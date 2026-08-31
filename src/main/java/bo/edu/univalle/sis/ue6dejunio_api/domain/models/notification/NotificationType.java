@@ -35,4 +35,19 @@ public enum NotificationType {
     public boolean requiresSubject() {
         return this == CUSTOM;
     }
+
+    /**
+     * Whether a person may write this one, or only the plan changing can.
+     *
+     * <p>The three PDC types are statements of fact about a review that happened, and the listener
+     * is what makes them true. Posted by hand they become a claim nobody checked: a teacher would
+     * read that their plan was approved while it still sat unreviewed, with the inbox saying one
+     * thing and the plan another and no way to tell which.
+     */
+    public boolean writtenByHand() {
+        return switch (this) {
+            case PDC_PUBLISHED, PDC_APPROVED, PDC_OBSERVED -> false;
+            case NOTEBOOK, ATTENDANCE, PDC_PROGRESS, SUMMONS, CUSTOM -> true;
+        };
+    }
 }

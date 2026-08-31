@@ -12,10 +12,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class NotificationService implements INotificationService {
+
+    /**
+     * Who answers to the Director. The role names are the ones the seed writes and
+     * {@code AuthorizationComponent} reads.
+     */
+    private static final Set<String> MAY_BE_WRITTEN_TO = Set.of("Teacher", "Secretary");
 
     private final INotificationDomain notificationDomain;
 
@@ -41,7 +48,33 @@ public class NotificationService implements INotificationService {
             throw new ValidationException(
                 "Solo una notificacion personalizada lleva asunto propio");
         }
+        // Only what nobody signed skips this: the listener writes the PDC types with no sender,
+        // and those are statements the plan itself made true.
+        if (c.senderId() != null) {
+            requireAPersonMayWrite(c);
+        }
         return notificationDomain.send(c);
+    }
+
+    /**
+     * What a person is allowed to put in someone's inbox.
+     *
+     * <p>Two rules, and both are about the inbox being trustworthy. A PDC type posted by hand is a
+     * claim nobody checked — the teacher reads that their plan was approved while it sits
+     * unreviewed. And the Director supervises teachers and the secretary: another Director is a
+     * peer and himself is nobody, so neither is a place the school reaches anyone.
+     */
+    private void requireAPersonMayWrite(SendNotificationCommand c) {
+        if (!c.type().writtenByHand()) {
+            throw new ValidationException(
+                "Ese aviso lo escribe el sistema cuando el plan cambia de estado");
+        }
+        String role = notificationDomain.roleNameOf(c.receiverId())
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario receptor", c.receiverId()));
+        if (!MAY_BE_WRITTEN_TO.contains(role)) {
+            throw new ValidationException(
+                "Una notificacion del Director va a un docente o a la secretaria");
+        }
     }
 
     /**

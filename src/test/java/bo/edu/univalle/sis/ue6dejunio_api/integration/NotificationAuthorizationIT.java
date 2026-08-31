@@ -55,4 +55,47 @@ class NotificationAuthorizationIT extends AbstractIntegrationTest {
     void theDirectorSends() throws Exception {
         send(seedUser("Director", false), "Director", seedUser("Teacher", false), 200);
     }
+
+    @Test
+    void theDirectorWritesToTheSecretaryToo() throws Exception {
+        send(seedUser("Director", false), "Director", seedUser("Secretary", false), 200);
+    }
+
+    /**
+     * A notification about a plan is written by the plan changing, and by nothing else.
+     *
+     * <p>Left open, the Director could post PDC_APPROVED by hand and a teacher would read that
+     * their plan was approved while it still sat unreviewed — the inbox saying one thing and the
+     * plan another, with no way to tell which is true. Those three types belong to the listener.
+     */
+    @Test
+    void theDirectorCannotHandWriteWhatTheSystemAnnounces() throws Exception {
+        UUID director = seedUser("Director", false);
+        UUID teacher = seedUser("Teacher", false);
+
+        for (String systemOnly : new String[]{"PDC_PUBLISHED", "PDC_APPROVED", "PDC_OBSERVED"}) {
+            mvc.perform(post("/api/notifications")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(Map.of(
+                        "receiver_id", teacher.toString(),
+                        "type", systemOnly,
+                        "message", "Tu plan fue aprobado.")))
+                    .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    // The Director supervises teachers and the secretary. Another Director is a peer, and himself
+    // is nobody — a notification is how the school reaches someone who answers to it.
+    @Test
+    void theDirectorDoesNotWriteToAnotherDirector() throws Exception {
+        send(seedUser("Director", false), "Director", seedUser("Director", false), 400);
+    }
+
+    @Test
+    void theDirectorDoesNotWriteToHimself() throws Exception {
+        UUID director = seedUser("Director", false);
+
+        send(director, "Director", director, 400);
+    }
 }
