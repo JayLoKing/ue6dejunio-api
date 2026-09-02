@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.parallel.Parallel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.parallel.IParallelDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ParallelEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.ParallelMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import org.springframework.data.domain.Pageable;
@@ -19,11 +20,14 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
 
     private final JpaParallelRepository parallelRepo;
     private final JpaCourseRepository courseRepo;
+    private final ParallelMapper mapper;
 
     public ParallelRepositoryAdapter(JpaParallelRepository parallelRepo,
-                                     JpaCourseRepository courseRepo) {
+                                     JpaCourseRepository courseRepo,
+                                     ParallelMapper mapper) {
         this.parallelRepo = parallelRepo;
         this.courseRepo = courseRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -34,12 +38,12 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
             : parallelRepo.findById(parallel.id()).orElseGet(ParallelEntity::new);
         e.setName(parallel.name());
         if (parallel.id() != null) e.setId(parallel.id());
-        return toDomain(parallelRepo.save(e));
+        return mapper.toDomain(parallelRepo.save(e));
     }
 
     @Override
     public Optional<Parallel> findById(Integer id) {
-        return parallelRepo.findById(id).map(this::toDomain);
+        return parallelRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
@@ -55,16 +59,12 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
     @Override
     public PageResult<Parallel> list(PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
-        return SpringPaging.toPageResult(parallelRepo.findAll(pageable).map(this::toDomain));
+        return SpringPaging.toPageResult(parallelRepo.findAll(pageable).map(mapper::toDomain));
     }
 
     @Override
     @Transactional
     public void deleteById(Integer id) {
         parallelRepo.deleteById(id);
-    }
-
-    private Parallel toDomain(ParallelEntity e) {
-        return new Parallel(e.getId(), e.getName());
     }
 }

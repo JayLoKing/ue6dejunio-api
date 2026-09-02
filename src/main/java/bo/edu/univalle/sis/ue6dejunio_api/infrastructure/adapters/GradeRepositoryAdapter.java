@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade.IGradeDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.GradeEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.LevelEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.GradeMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaLevelRepository;
@@ -23,13 +24,16 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     private final JpaGradeRepository gradeRepo;
     private final JpaLevelRepository levelRepo;
     private final JpaCourseRepository courseRepo;
+    private final GradeMapper mapper;
 
     public GradeRepositoryAdapter(JpaGradeRepository gradeRepo,
                                   JpaLevelRepository levelRepo,
-                                  JpaCourseRepository courseRepo) {
+                                  JpaCourseRepository courseRepo,
+                                  GradeMapper mapper) {
         this.gradeRepo = gradeRepo;
         this.levelRepo = levelRepo;
         this.courseRepo = courseRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -40,7 +44,7 @@ public class GradeRepositoryAdapter implements IGradeDomain {
         GradeEntity g = new GradeEntity();
         g.setName(name);
         g.setLevel(level);
-        return toDomain(gradeRepo.save(g));
+        return mapper.toDomain(gradeRepo.save(g));
     }
 
     @Override
@@ -52,12 +56,12 @@ public class GradeRepositoryAdapter implements IGradeDomain {
             .orElseThrow(() -> new ResourceNotFoundException("Level", levelId));
         g.setName(name);
         g.setLevel(level);
-        return toDomain(gradeRepo.save(g));
+        return mapper.toDomain(gradeRepo.save(g));
     }
 
     @Override
     public Optional<Grade> findById(Integer id) {
-        return gradeRepo.findById(id).map(this::toDomain);
+        return gradeRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
@@ -83,7 +87,7 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     @Override
     public PageResult<Grade> list(PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
-        return SpringPaging.toPageResult(gradeRepo.findAll(pageable).map(this::toDomain));
+        return SpringPaging.toPageResult(gradeRepo.findAll(pageable).map(mapper::toDomain));
     }
 
     @Override
@@ -92,9 +96,4 @@ public class GradeRepositoryAdapter implements IGradeDomain {
         gradeRepo.deleteById(id);
     }
 
-    private Grade toDomain(GradeEntity e) {
-        return new Grade(e.getId(), e.getName(),
-            e.getLevel() != null ? e.getLevel().getId() : null,
-            e.getLevel() != null ? e.getLevel().getName() : null);
-    }
 }

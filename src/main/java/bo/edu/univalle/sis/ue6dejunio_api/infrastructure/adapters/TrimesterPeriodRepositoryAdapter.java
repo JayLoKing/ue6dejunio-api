@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.Trimeste
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.TrimesterPeriodEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.TrimesterPeriodMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaTrimesterPeriodRepository;
 import org.springframework.stereotype.Repository;
@@ -21,11 +22,14 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
 
     private final JpaTrimesterPeriodRepository trimesterPeriodRepo;
     private final JpaAcademicYearRepository academicYearRepo;
+    private final TrimesterPeriodMapper mapper;
 
     public TrimesterPeriodRepositoryAdapter(JpaTrimesterPeriodRepository trimesterPeriodRepo,
-                                            JpaAcademicYearRepository academicYearRepo) {
+                                            JpaAcademicYearRepository academicYearRepo,
+                                            TrimesterPeriodMapper mapper) {
         this.trimesterPeriodRepo = trimesterPeriodRepo;
         this.academicYearRepo = academicYearRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -38,7 +42,7 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
         e.setTrimester(trimester);
         e.setStartDate(startDate);
         e.setEndDate(endDate);
-        return toDomain(trimesterPeriodRepo.save(e));
+        return mapper.toDomain(trimesterPeriodRepo.save(e));
     }
 
     @Override
@@ -48,7 +52,7 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
             .orElseThrow(() -> new ResourceNotFoundException("TrimesterPeriod", id));
         e.setStartDate(startDate);
         e.setEndDate(endDate);
-        return toDomain(trimesterPeriodRepo.save(e));
+        return mapper.toDomain(trimesterPeriodRepo.save(e));
     }
 
     @Override
@@ -59,13 +63,13 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
 
     @Override
     public Optional<TrimesterPeriod> findById(UUID id) {
-        return trimesterPeriodRepo.findById(id).map(this::toDomain);
+        return trimesterPeriodRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
     public List<TrimesterPeriod> findByAcademicYear(Integer academicYearId) {
         return trimesterPeriodRepo.findByAcademicYear_IdOrderByTrimester(academicYearId).stream()
-            .map(this::toDomain).toList();
+            .map(mapper::toDomain).toList();
     }
 
     @Override
@@ -78,8 +82,4 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
         return trimesterPeriodRepo.existsByAcademicYear_IdAndTrimester(academicYearId, trimester);
     }
 
-    private TrimesterPeriod toDomain(TrimesterPeriodEntity e) {
-        return new TrimesterPeriod(e.getId(), e.getAcademicYear().getId(), e.getTrimester(),
-            e.getStartDate(), e.getEndDate());
-    }
 }

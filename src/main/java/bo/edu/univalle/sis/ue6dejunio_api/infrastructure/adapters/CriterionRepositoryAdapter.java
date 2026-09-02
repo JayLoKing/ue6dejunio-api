@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.EvaluationCriterionEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.CriterionMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
@@ -24,15 +25,18 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     private final JpaClassGroupRepository classGroupRepo;
     private final JpaCurriculumPlanRepository planRepo;
     private final JpaAssessmentScoreRepository assessmentScoreRepo;
+    private final CriterionMapper mapper;
 
     public CriterionRepositoryAdapter(JpaEvaluationCriterionRepository criterionRepo,
                                       JpaClassGroupRepository classGroupRepo,
                                       JpaCurriculumPlanRepository planRepo,
-                                      JpaAssessmentScoreRepository assessmentScoreRepo) {
+                                      JpaAssessmentScoreRepository assessmentScoreRepo,
+                                      CriterionMapper mapper) {
         this.criterionRepo = criterionRepo;
         this.classGroupRepo = classGroupRepo;
         this.planRepo = planRepo;
         this.assessmentScoreRepo = assessmentScoreRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -59,7 +63,7 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
             e.setCurriculumPlan(planRepo.getReferenceById(curriculumPlanId));
         }
         e.setCreatedAt(LocalDateTime.now());
-        return toDomain(criterionRepo.save(e));
+        return mapper.toDomain(criterionRepo.save(e));
     }
 
     @Override
@@ -68,17 +72,17 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
         EvaluationCriterionEntity e = criterionRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Criterion", id));
         if (name != null) e.setName(name);
-        return toDomain(criterionRepo.save(e));
+        return mapper.toDomain(criterionRepo.save(e));
     }
 
     @Override
     public Optional<EvaluationCriterion> findById(UUID id) {
-        return criterionRepo.findById(id).map(this::toDomain);
+        return criterionRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
     public List<EvaluationCriterion> list(UUID classGroupId, Integer trimester, String dimension) {
-        return criterionRepo.search(classGroupId, trimester, dimension).stream().map(this::toDomain).toList();
+        return criterionRepo.search(classGroupId, trimester, dimension).stream().map(mapper::toDomain).toList();
     }
 
     @Override
@@ -92,10 +96,4 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
         return assessmentScoreRepo.existsByCriterion(id);
     }
 
-    private EvaluationCriterion toDomain(EvaluationCriterionEntity e) {
-        return new EvaluationCriterion(
-            e.getId(), e.getClassGroup().getId(), e.getTrimester(), e.getDimension(), e.getName(),
-            e.getActivityName(),
-            e.getCurriculumPlan() != null ? e.getCurriculumPlan().getId() : null);
-    }
 }

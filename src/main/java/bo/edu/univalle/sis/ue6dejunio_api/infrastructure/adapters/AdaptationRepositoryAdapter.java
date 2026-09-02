@@ -8,8 +8,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptat
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumAdaptationEntity;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.AdaptationMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumAdaptationRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
@@ -30,15 +30,18 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
     private final JpaCurriculumPlanRepository planRepo;
     private final JpaStudentRepository studentRepo;
     private final JpaUserRepository userRepo;
+    private final AdaptationMapper mapper;
 
     public AdaptationRepositoryAdapter(JpaCurriculumAdaptationRepository adaptationRepo,
                                        JpaCurriculumPlanRepository planRepo,
                                        JpaStudentRepository studentRepo,
-                                       JpaUserRepository userRepo) {
+                                       JpaUserRepository userRepo,
+                                       AdaptationMapper mapper) {
         this.adaptationRepo = adaptationRepo;
         this.planRepo = planRepo;
         this.studentRepo = studentRepo;
         this.userRepo = userRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -76,7 +79,7 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
         LocalDateTime createdAt = LocalDateTime.now();
         e.setCreatedAt(createdAt);
         e.setUpdatedAt(createdAt);
-        return toDomain(adaptationRepo.save(e));
+        return mapper.toDomain(adaptationRepo.save(e));
     }
 
     /** A null column means "leave it": each step of the form sends only the columns it holds. */
@@ -93,19 +96,19 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
             e.setUpdatedBy(userRepo.getReferenceById(c.updatedBy()));
         }
         e.setUpdatedAt(LocalDateTime.now());
-        return toDomain(adaptationRepo.save(e));
+        return mapper.toDomain(adaptationRepo.save(e));
     }
 
     @Override
     public Optional<Adaptation> findById(UUID id) {
-        return adaptationRepo.findById(id).map(this::toDomain);
+        return adaptationRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
     public PageResult<Adaptation> listByPlan(UUID planId, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            adaptationRepo.findByCurriculumPlan_Id(planId, pageable).map(this::toDomain));
+            adaptationRepo.findByCurriculumPlan_Id(planId, pageable).map(mapper::toDomain));
     }
 
     @Override
@@ -114,17 +117,4 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
         adaptationRepo.deleteById(id);
     }
 
-    private Adaptation toDomain(CurriculumAdaptationEntity e) {
-        StudentEntity s = e.getStudent();
-        return new Adaptation(
-            e.getId(),
-            e.getCurriculumPlan() != null ? e.getCurriculumPlan().getId() : null,
-            s != null ? s.getId() : null,
-            s != null ? s.getNames() + " " + s.getLastNames() : null,
-            e.getConditionType(),
-            e.getAdaptedContents(), e.getAdaptedMethodology(), e.getAdaptedCriteria(),
-            e.getCreatedBy() != null ? e.getCreatedBy().getId() : null,
-            e.getUpdatedBy() != null ? e.getUpdatedBy().getId() : null,
-            e.getCreatedAt(), e.getUpdatedAt());
-    }
 }

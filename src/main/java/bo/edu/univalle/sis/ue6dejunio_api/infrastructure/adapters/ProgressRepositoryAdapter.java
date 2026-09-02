@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.PlanProgress;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.progress.IProgressDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlanProgressEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.ProgressMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaPlanProgressRepository;
 import org.springframework.stereotype.Repository;
@@ -20,11 +21,14 @@ public class ProgressRepositoryAdapter implements IProgressDomain {
 
     private final JpaPlanProgressRepository progressRepo;
     private final JpaCurriculumPlanRepository planRepo;
+    private final ProgressMapper mapper;
 
     public ProgressRepositoryAdapter(JpaPlanProgressRepository progressRepo,
-                                     JpaCurriculumPlanRepository planRepo) {
+                                     JpaCurriculumPlanRepository planRepo,
+                                     ProgressMapper mapper) {
         this.progressRepo = progressRepo;
         this.planRepo = planRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -43,17 +47,12 @@ public class ProgressRepositoryAdapter implements IProgressDomain {
         e.setObservations(obs);
         e.setCreatedBy(createdBy);
         e.setCreatedAt(LocalDateTime.now());
-        return toDomain(progressRepo.save(e));
+        return mapper.toDomain(progressRepo.save(e));
     }
 
     @Override
     public List<PlanProgress> listByPlan(UUID planId) {
         return progressRepo.findByCurriculumPlan_IdOrderByProgressDateDesc(planId)
-            .stream().map(this::toDomain).toList();
-    }
-
-    private PlanProgress toDomain(CurriculumPlanProgressEntity e) {
-        return new PlanProgress(e.getId(), e.getCurriculumPlan().getId(), e.getProgressDate(),
-            e.getAdvancedContent(), e.getPercentage(), e.getObservations(), e.getCreatedBy(), e.getCreatedAt());
+            .stream().map(mapper::toDomain).toList();
     }
 }

@@ -5,8 +5,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.KnowledgeAreaEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.SubjectEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.SubjectMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaKnowledgeAreaRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
@@ -24,13 +24,16 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
     private final JpaSubjectRepository subjectRepo;
     private final JpaAssessmentScoreRepository assessmentScoreRepo;
     private final JpaKnowledgeAreaRepository areaRepo;
+    private final SubjectMapper mapper;
 
     public SubjectRepositoryAdapter(JpaSubjectRepository subjectRepo,
                                     JpaAssessmentScoreRepository assessmentScoreRepo,
-                                    JpaKnowledgeAreaRepository areaRepo) {
+                                    JpaKnowledgeAreaRepository areaRepo,
+                                    SubjectMapper mapper) {
         this.subjectRepo = subjectRepo;
         this.assessmentScoreRepo = assessmentScoreRepo;
         this.areaRepo = areaRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -44,7 +47,7 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
             .orElseThrow(() -> new ResourceNotFoundException("KnowledgeArea", areaId)));
         e.setTechnical(technical);
         e.setActive(true);
-        return toDomain(subjectRepo.save(e));
+        return mapper.toDomain(subjectRepo.save(e));
     }
 
     @Override
@@ -65,19 +68,19 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
         if (active != null) {
             e.setActive(active);
         }
-        return toDomain(subjectRepo.save(e));
+        return mapper.toDomain(subjectRepo.save(e));
     }
 
     @Override
     public Optional<Subject> findById(UUID id) {
-        return subjectRepo.findById(id).map(this::toDomain);
+        return subjectRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
     public PageResult<Subject> list(PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            subjectRepo.findByActiveTrue(pageable).map(this::toDomain));
+            subjectRepo.findByActiveTrue(pageable).map(mapper::toDomain));
     }
 
     @Override
@@ -99,11 +102,4 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
         return areaId != null && areaRepo.existsById(areaId);
     }
 
-    private Subject toDomain(SubjectEntity e) {
-        KnowledgeAreaEntity area = e.getArea();
-        return new Subject(e.getId(), e.getName(),
-            area != null ? area.getId() : null,
-            area != null ? area.getName() : null,
-            e.isTechnical(), e.isActive());
-    }
 }

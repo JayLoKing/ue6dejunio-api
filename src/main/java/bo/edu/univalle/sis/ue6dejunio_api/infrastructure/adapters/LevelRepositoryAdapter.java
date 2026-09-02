@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.Level;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.level.ILevelDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.LevelEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.LevelMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaLevelRepository;
 import org.springframework.data.domain.Pageable;
@@ -19,10 +20,13 @@ public class LevelRepositoryAdapter implements ILevelDomain {
 
     private final JpaLevelRepository levelRepo;
     private final JpaGradeRepository gradeRepo;
+    private final LevelMapper mapper;
 
-    public LevelRepositoryAdapter(JpaLevelRepository levelRepo, JpaGradeRepository gradeRepo) {
+    public LevelRepositoryAdapter(JpaLevelRepository levelRepo, JpaGradeRepository gradeRepo,
+                                  LevelMapper mapper) {
         this.levelRepo = levelRepo;
         this.gradeRepo = gradeRepo;
+        this.mapper = mapper;
     }
 
     @Override
@@ -33,12 +37,12 @@ public class LevelRepositoryAdapter implements ILevelDomain {
             : levelRepo.findById(level.id()).orElseGet(LevelEntity::new);
         e.setName(level.name());
         if (level.id() != null) e.setId(level.id());
-        return toDomain(levelRepo.save(e));
+        return mapper.toDomain(levelRepo.save(e));
     }
 
     @Override
     public Optional<Level> findById(Integer id) {
-        return levelRepo.findById(id).map(this::toDomain);
+        return levelRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
@@ -54,16 +58,12 @@ public class LevelRepositoryAdapter implements ILevelDomain {
     @Override
     public PageResult<Level> list(PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
-        return SpringPaging.toPageResult(levelRepo.findAll(pageable).map(this::toDomain));
+        return SpringPaging.toPageResult(levelRepo.findAll(pageable).map(mapper::toDomain));
     }
 
     @Override
     @Transactional
     public void deleteById(Integer id) {
         levelRepo.deleteById(id);
-    }
-
-    private Level toDomain(LevelEntity e) {
-        return new Level(e.getId(), e.getName());
     }
 }
