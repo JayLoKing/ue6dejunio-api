@@ -101,12 +101,9 @@ public class NotificationStreamRegistry {
         });
 
         // Before anything else: this is what makes the response headers reach the browser, which
-        // is how the client learns it is connected rather than still opening.
-        if (!send(readerId, emitter, READY_EVENT, "ok")) {
-            // Forgotten but not finished: handed back open, it would be a response Spring keeps
-            // waiting on for the full timeout with nobody left holding the other end.
-            emitter.complete();
-        }
+        // is how the client learns it is connected rather than still opening. A write that fails
+        // here leaves the stream both forgotten and finished, which `send` takes care of.
+        send(readerId, emitter, READY_EVENT, "ok");
         return emitter;
     }
 
@@ -185,8 +182,17 @@ public class NotificationStreamRegistry {
         try {
             emitter.send(SseEmitter.event().name(name).data(data));
             return true;
-        } catch (IOException | IllegalStateException ex) {
-            log.debug("The stream of {} is gone, dropping it", readerId);
+        } catch (IOException ex) {
+            log.debug("The stream of {} broke, dropping it", readerId);
+            forget(readerId, emitter);
+            // Out of the map is not out of the container: an emitter nobody finishes leaves the
+            // async request open until its timeout, half an hour after the browser went away.
+            emitter.complete();
+            return false;
+        } catch (IllegalStateException ex) {
+            // Already finished — this is what a completed emitter answers. Completing it a second
+            // time is what the servlet's async context refuses.
+            log.debug("The stream of {} was already closed, dropping it", readerId);
             forget(readerId, emitter);
             return false;
         }
