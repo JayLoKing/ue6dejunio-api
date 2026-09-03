@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -78,8 +79,14 @@ public class NotificationStreamRegistry {
      */
     public SseEmitter open(UUID readerId) {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
-        streams.computeIfAbsent(readerId, id -> new CopyOnWriteArrayList<>()).add(emitter);
-        evictOldestBeyondTheCap(readerId);
+        List<SseEmitter> evicted = register(readerId, emitter);
+        // Outside the map's own computation, deliberately: completing an emitter runs its
+        // completion callback, which comes back here to forget it — re-entering the same key of a
+        // ConcurrentHashMap from inside a compute on that key is the one thing it forbids.
+        for (SseEmitter old : evicted) {
+            log.debug("{} is over the stream cap, closing their oldest one", readerId);
+            old.complete();
+        }
 
         emitter.onCompletion(() -> forget(readerId, emitter));
         emitter.onError(e -> {
@@ -103,17 +110,28 @@ public class NotificationStreamRegistry {
         return emitter;
     }
 
-    /** Closes the streams over the cap, oldest first — the ones most likely to be already gone. */
-    private void evictOldestBeyondTheCap(UUID readerId) {
-        List<SseEmitter> open = streams.get(readerId);
-        if (open == null) {
-            return;
-        }
-        while (open.size() > MAX_STREAMS_PER_READER) {
-            SseEmitter oldest = open.remove(0);
-            log.debug("{} is over the stream cap, closing their oldest one", readerId);
-            oldest.complete();
-        }
+    /**
+     * Puts the stream in and takes the ones over the cap out, in one atomic step.
+     *
+     * <p>{@code compute} rather than {@code computeIfAbsent(...).add(...)}, and the reason is the
+     * reconnect this class exists to survive. In the two-step version the {@code add} happens
+     * outside the map's lock: a stream being reaped at that moment empties the list, the reaper
+     * drops the mapping, and the new emitter lands in a list nothing points at any more. It would
+     * get its ready event, be told the client is connected, and then never receive another thing.
+     *
+     * @return the streams that were evicted, for the caller to close outside this lock
+     */
+    private List<SseEmitter> register(UUID readerId, SseEmitter emitter) {
+        List<SseEmitter> evicted = new ArrayList<>();
+        streams.compute(readerId, (id, open) -> {
+            List<SseEmitter> held = open == null ? new CopyOnWriteArrayList<>() : open;
+            held.add(emitter);
+            while (held.size() > MAX_STREAMS_PER_READER) {
+                evicted.add(held.remove(0));
+            }
+            return held;
+        });
+        return evicted;
     }
 
     /** Whether this exact stream is still registered. For the tests that assert what was evicted. */
