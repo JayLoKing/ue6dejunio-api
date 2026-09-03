@@ -175,26 +175,21 @@ public class NotificationStreamRegistry {
      *
      * <p>{@link IllegalStateException} as well as {@link IOException}: a completed emitter refuses
      * a write with the former, and that is the ordinary shape of a browser that hung up.
-     *
-     * @return whether the write landed
      */
-    private boolean send(UUID readerId, SseEmitter emitter, String name, String data) {
+    private void send(UUID readerId, SseEmitter emitter, String name, String data) {
         try {
             emitter.send(SseEmitter.event().name(name).data(data));
-            return true;
         } catch (IOException ex) {
             log.debug("The stream of {} broke, dropping it", readerId);
             forget(readerId, emitter);
             // Out of the map is not out of the container: an emitter nobody finishes leaves the
             // async request open until its timeout, half an hour after the browser went away.
             emitter.complete();
-            return false;
         } catch (IllegalStateException ex) {
             // Already finished — this is what a completed emitter answers. Completing it a second
             // time is what the servlet's async context refuses.
             log.debug("The stream of {} was already closed, dropping it", readerId);
             forget(readerId, emitter);
-            return false;
         }
     }
 
