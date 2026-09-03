@@ -73,6 +73,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/course-enrollments/**").hasAnyRole("Director", "Teacher")
                 .requestMatchers(HttpMethod.GET, "/api/students/**")
                     .hasAnyRole("Director", "Teacher", "Secretary")
+                // Taking a student off the roll is the Director's alone. Stated here as well as on
+                // the handler because this is where the route's reach is read from: leaving it
+                // inside the broader Teacher rule below made the narrower rule easy to miss, and a
+                // teacher could end a student's enrolments from their own course screen.
+                .requestMatchers(HttpMethod.POST, "/api/students/*/withdraw").hasRole("Director")
                 .requestMatchers("/api/students/**").hasAnyRole("Director", "Teacher")
                 .requestMatchers("/api/criteria/**").hasAnyRole("Director", "Teacher")
                 .requestMatchers(HttpMethod.GET, "/api/scores/**")

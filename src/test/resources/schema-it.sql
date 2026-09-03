@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS students (
     gender char(1),
     status varchar(20) DEFAULT 'Effective',
     status_reason text,
+    status_note text,
+    status_changed_at timestamp,
+    status_changed_by uuid,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 

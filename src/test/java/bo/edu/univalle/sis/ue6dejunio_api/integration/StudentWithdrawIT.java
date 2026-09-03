@@ -62,7 +62,7 @@ class StudentWithdrawIT extends AbstractIntegrationTest {
         mvc.perform(post("/api/students/{id}/withdraw", student)
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                 .contentType("application/json")
-                .content("{\"reason\":\"Otro\"}"))
+                .content("{\"reason\":\"Otro\",\"note\":\"Se mudo.\"}"))
             .andExpect(status().isNoContent());
 
         mvc.perform(get("/api/students/search")
@@ -90,13 +90,13 @@ class StudentWithdrawIT extends AbstractIntegrationTest {
         mvc.perform(post("/api/students/{id}/withdraw", student)
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                 .contentType("application/json")
-                .content("{\"reason\":\"Otro\"}"))
+                .content("{\"reason\":\"Otro\",\"note\":\"Se mudo.\"}"))
             .andExpect(status().isNoContent());
 
         mvc.perform(post("/api/students/{id}/withdraw", student)
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                 .contentType("application/json")
-                .content("{\"reason\":\"Otro\"}"))
+                .content("{\"reason\":\"Otro\",\"note\":\"Se mudo.\"}"))
             .andExpect(status().isConflict());
     }
 
@@ -105,7 +105,7 @@ class StudentWithdrawIT extends AbstractIntegrationTest {
         mvc.perform(post("/api/students/{id}/withdraw", UUID.randomUUID())
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                 .contentType("application/json")
-                .content("{\"reason\":\"Otro\"}"))
+                .content("{\"reason\":\"Otro\",\"note\":\"Se mudo.\"}"))
             .andExpect(status().isNotFound());
     }
 
@@ -118,12 +118,74 @@ class StudentWithdrawIT extends AbstractIntegrationTest {
             .andExpect(status().isBadRequest());
     }
 
+    /**
+     * A teacher registers and corrects the students of their own course, and may not take one off
+     * the roll: a withdrawal ends every enrolment and drops the student from every listing in the
+     * school. This was open to Teacher and is now the Director's alone.
+     */
     @Test
-    void withdraw_teacherAllowed() throws Exception {
+    void withdraw_teacherRefused() throws Exception {
         mvc.perform(post("/api/students/{id}/withdraw", student)
                 .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher"))
                 .contentType("application/json")
+                .content("{\"reason\":\"Otro\",\"note\":\"Se mudó.\"}"))
+            .andExpect(status().isForbidden());
+
+        String status = jdbc.queryForObject(
+            "SELECT status FROM students WHERE id_student = ?", String.class, student);
+        assertThat(status).isEqualTo("Effective");
+    }
+
+    /** "Otro" alone puts the word "Otro" in front of a teacher and answers nothing. */
+    @Test
+    void withdraw_theOpenReasonWithoutWords_returns400() throws Exception {
+        mvc.perform(post("/api/students/{id}/withdraw", student)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .contentType("application/json")
                 .content("{\"reason\":\"Otro\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    /** Who decided and when, written down: the notice is useless without somebody to ask. */
+    @Test
+    void withdraw_recordsTheWordsTheAuthorAndTheMoment() throws Exception {
+        mvc.perform(post("/api/students/{id}/withdraw", student)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .contentType("application/json")
+                .content("{\"reason\":\"Otro\",\"note\":\"Se mudó a Santa Cruz.\"}"))
             .andExpect(status().isNoContent());
+
+        assertThat(jdbc.queryForObject(
+            "SELECT status_reason FROM students WHERE id_student = ?", String.class, student))
+            .isEqualTo("Otro");
+        assertThat(jdbc.queryForObject(
+            "SELECT status_note FROM students WHERE id_student = ?", String.class, student))
+            .isEqualTo("Se mudó a Santa Cruz.");
+        assertThat(jdbc.queryForObject(
+            "SELECT status_changed_by FROM students WHERE id_student = ?", UUID.class, student))
+            .isEqualTo(director);
+        assertThat(jdbc.queryForObject(
+            "SELECT status_changed_at FROM students WHERE id_student = ?", Object.class, student))
+            .isNotNull();
+    }
+
+    /** And it comes back out again, by name, for the panel the teacher reads. */
+    @Test
+    void withdraw_theReasonReadsBackWithWhoDecided() throws Exception {
+        mvc.perform(post("/api/students/{id}/withdraw", student)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .contentType("application/json")
+                .content("{\"reason\":\"Transferencia\",\"note\":\"A la U.E. San Martín.\"}"))
+            .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/students/{id}", student)
+                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("Withdrawn"))
+            .andExpect(jsonPath("$.statusReason").value("Transferencia"))
+            .andExpect(jsonPath("$.statusNote").value("A la U.E. San Martín."))
+            .andExpect(jsonPath("$.statusChangedById").value(director.toString()))
+            .andExpect(jsonPath("$.statusChangedByName").isNotEmpty())
+            .andExpect(jsonPath("$.statusChangedAt").isNotEmpty());
     }
 }

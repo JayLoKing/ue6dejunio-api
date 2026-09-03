@@ -18,7 +18,14 @@ public class Student {
     private LocalDate birthDate;
     private String gender;
     private String status;
+    /** The category behind the status: "Retiro Voluntario", "Transferencia" or "Otro". */
     private String statusReason;
+    /** What the Director wrote. The whole point of the "Otro" category, which says nothing alone. */
+    private String statusNote;
+    private LocalDateTime statusChangedAt;
+    private UUID statusChangedById;
+    /** Who decided, by name, so a teacher reading the notice knows who to ask. */
+    private String statusChangedByName;
     private LocalDateTime createdAt;
 
     public String fullName() {

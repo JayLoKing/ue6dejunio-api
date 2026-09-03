@@ -2,7 +2,10 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -55,6 +58,28 @@ public class StudentEntity {
 
     @Column(name = "status_reason")
     private String statusReason;
+
+    /** What the Director wrote, for the category that says nothing on its own. */
+    @Column(name = "status_note")
+    private String statusNote;
+
+    @Column(name = "status_changed_at")
+    private LocalDateTime statusChangedAt;
+
+    /**
+     * Who last changed the status.
+     *
+     * <p>LAZY, and fetched by name where it is actually read. EAGER on a {@code @ManyToOne} does
+     * not become a join on a derived query — Hibernate runs the root query and then one select per
+     * distinct author, which is a query per row on the enrolment import that looks students up in
+     * batches. The queries that need the author ask for it with an entity graph instead.
+     *
+     * <p>Nullable: the column is {@code ON DELETE SET NULL}, so a removed account leaves the change
+     * recorded without an author rather than taking the student's row with it.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "status_changed_by")
+    private UserEntity statusChangedBy;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

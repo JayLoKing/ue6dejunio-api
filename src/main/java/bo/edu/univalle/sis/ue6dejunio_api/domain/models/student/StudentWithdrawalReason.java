@@ -17,6 +17,16 @@ public enum StudentWithdrawalReason {
         return label;
     }
 
+    /**
+     * Whether this category is empty without an explanation.
+     *
+     * <p>Only the open one is. "Transferencia" already tells a teacher what happened; "Otro" is the
+     * category for a reason this list does not have, so on its own it says nothing at all.
+     */
+    public boolean needsItsOwnWords() {
+        return this == OTRO;
+    }
+
     /** Accepts either the Spanish label ("Retiro Voluntario") or the enum constant name, case-insensitive. */
     public static Optional<StudentWithdrawalReason> fromRequestValue(String value) {
         if (value == null || value.isBlank()) {

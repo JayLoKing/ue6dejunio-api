@@ -7,7 +7,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
@@ -44,16 +46,36 @@ public class StudentService implements IStudentService {
 
     @Override
     @Transactional
-    public void withdraw(UUID studentId, StudentWithdrawalReason reason) {
+    public void withdraw(WithdrawStudentCommand command) {
+        StudentWithdrawalReason reason = command.reason();
         if (reason == null) {
             throw new ValidationException("Motivo de baja invalido");
         }
-        Student student = studentDomain.findById(studentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
+        String note = blankToNull(command.note());
+        // The open category is the one that has to say what it means. Stored alone it puts the
+        // word "Otro" in front of a teacher and answers nothing.
+        if (reason.needsItsOwnWords() && note == null) {
+            throw new ValidationException(
+                "Una baja por otro motivo exige decir cual es");
+        }
+
+        Student student = studentDomain.findById(command.studentId())
+            .orElseThrow(() -> new ResourceNotFoundException("Estudiante", command.studentId()));
         if (STATUS_WITHDRAWN.equals(student.getStatus())) {
             throw new ConflictException("El estudiante ya se encuentra dado de baja");
         }
-        studentDomain.updateStatus(studentId, STATUS_WITHDRAWN, reason.label());
-        courseEnrollmentDomain.withdrawActiveEnrollments(studentId);
+
+        studentDomain.updateStatus(command.studentId(), new StudentStatusChange(
+            STATUS_WITHDRAWN, reason.label(), note, command.actorId()));
+        courseEnrollmentDomain.withdrawActiveEnrollments(command.studentId());
+    }
+
+    /** Whitespace is not a note. Kept as absent, so nobody is shown an empty line. */
+    private static String blankToNull(String text) {
+        if (text == null) {
+            return null;
+        }
+        String trimmed = text.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

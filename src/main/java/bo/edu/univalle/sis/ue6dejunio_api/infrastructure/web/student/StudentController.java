@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
@@ -17,8 +18,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -68,12 +71,37 @@ public class StudentController {
     }
 
     @PostMapping("/{id}/withdraw")
-    @PreAuthorize("@authz.canWriteStudent(authentication, #id)")
-    @Operation(summary = "Baja logica de estudiante (retiro/transferencia/otro)")
-    public ResponseEntity<Void> withdraw(@PathVariable UUID id, @Valid @RequestBody WithdrawStudentRequest request) {
+    // The Director's, and nobody else's. A teacher registers and corrects the students of their
+    // own course; taking one off the roll ends their enrolments and drops them from every listing,
+    // and that is a decision the school makes once, not one a course makes about its own roster.
+    @PreAuthorize("hasRole('Director')")
+    @Operation(summary = "Baja logica de estudiante, solo Director (retiro/transferencia/otro)")
+    public ResponseEntity<Void> withdraw(@PathVariable UUID id,
+                                         @Valid @RequestBody WithdrawStudentRequest request,
+                                         JwtAuthenticationToken token) {
         StudentWithdrawalReason reason = StudentWithdrawalReason.fromRequestValue(request.reason())
             .orElseThrow(() -> new ValidationException("Motivo de baja invalido: " + request.reason()));
-        studentService.withdraw(id, reason);
+        studentService.withdraw(new WithdrawStudentCommand(
+            id, reason, request.note(), currentUser(token)));
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * The caller's id, for the row that records who decided.
+     *
+     * <p>Refused rather than left null when the token carries no usable subject: an audit column
+     * that silently says "nobody" is worse than a denial, because it reads as a decision the
+     * school made anonymously.
+     */
+    private static UUID currentUser(JwtAuthenticationToken token) {
+        String subject = token.getToken().getSubject();
+        if (subject == null) {
+            throw new AccessDeniedException("Token sin sujeto utilizable");
+        }
+        try {
+            return UUID.fromString(subject);
+        } catch (IllegalArgumentException e) {
+            throw new AccessDeniedException("Token sin sujeto utilizable");
+        }
     }
 }

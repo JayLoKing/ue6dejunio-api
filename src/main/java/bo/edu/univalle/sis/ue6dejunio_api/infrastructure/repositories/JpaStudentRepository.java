@@ -6,16 +6,32 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectory
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID> {
 
+    /**
+     * The three reads that turn a row into a {@code Student}, each asking for the author of its
+     * last status change in the same query.
+     *
+     * <p>The mapper always resolves that author's name, so without the graph a lazy association
+     * would be initialised one student at a time — and these two are the enrolment import, which
+     * looks students up by the hundred precisely to avoid a query per row.
+     */
+    @Override
+    @EntityGraph(attributePaths = "statusChangedBy")
+    Optional<StudentEntity> findById(UUID id);
+
+    @EntityGraph(attributePaths = "statusChangedBy")
     List<StudentEntity> findByRudeCodeIn(Collection<String> rudeCodes);
 
+    @EntityGraph(attributePaths = "statusChangedBy")
     List<StudentEntity> findByIdentityCardIn(Collection<String> identityCards);
 
     @Query(value = """

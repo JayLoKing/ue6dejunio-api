@@ -7,14 +7,17 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.StudentMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,10 +26,13 @@ import java.util.UUID;
 public class StudentRepositoryAdapter implements IStudentDomain {
 
     private final JpaStudentRepository repo;
+    private final JpaUserRepository userRepo;
     private final StudentMapper mapper;
 
-    public StudentRepositoryAdapter(JpaStudentRepository repo, StudentMapper mapper) {
+    public StudentRepositoryAdapter(JpaStudentRepository repo, JpaUserRepository userRepo,
+                                    StudentMapper mapper) {
         this.repo = repo;
+        this.userRepo = userRepo;
         this.mapper = mapper;
     }
 
@@ -70,11 +76,18 @@ public class StudentRepositoryAdapter implements IStudentDomain {
 
     @Override
     @Transactional
-    public void updateStatus(UUID studentId, String status, String statusReason) {
+    public void updateStatus(UUID studentId, StudentStatusChange change) {
         StudentEntity entity = repo.findById(studentId)
             .orElseThrow(() -> new ResourceNotFoundException("Estudiante", studentId));
-        entity.setStatus(status);
-        entity.setStatusReason(statusReason);
+        entity.setStatus(change.status());
+        entity.setStatusReason(change.reason());
+        entity.setStatusNote(change.note());
+        // Stamped here rather than carried in: a clock the caller passes is a clock the caller can
+        // be wrong about, and this is the row that says when a child left the school.
+        entity.setStatusChangedAt(LocalDateTime.now());
+        entity.setStatusChangedBy(change.changedBy() == null
+            ? null
+            : userRepo.getReferenceById(change.changedBy()));
         repo.save(entity);
     }
 }

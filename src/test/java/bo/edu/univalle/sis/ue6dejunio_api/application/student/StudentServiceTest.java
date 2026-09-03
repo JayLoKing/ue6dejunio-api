@@ -5,9 +5,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.student.StudentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import org.junit.jupiter.api.Test;
@@ -46,16 +49,85 @@ class StudentServiceTest {
         assertThat(result).isSameAs(expected);
     }
 
+    private static WithdrawStudentCommand withdrawal(UUID id, StudentWithdrawalReason reason,
+                                                     String note, UUID actor) {
+        return new WithdrawStudentCommand(id, reason, note, actor);
+    }
+
     @Test
     void withdraw_activeStudent_setsWithdrawnAndWithdrawsEnrollments() {
         UUID id = UUID.randomUUID();
+        UUID director = UUID.randomUUID();
         Student student = Student.builder().id(id).status("Effective").build();
         when(studentDomain.findById(id)).thenReturn(Optional.of(student));
 
-        studentService.withdraw(id, StudentWithdrawalReason.RETIRO_VOLUNTARIO);
+        studentService.withdraw(
+            withdrawal(id, StudentWithdrawalReason.RETIRO_VOLUNTARIO, null, director));
 
-        verify(studentDomain).updateStatus(id, "Withdrawn", "Retiro Voluntario");
+        verify(studentDomain).updateStatus(id, new StudentStatusChange(
+            "Withdrawn", "Retiro Voluntario", null, director));
         verify(courseEnrollmentDomain).withdrawActiveEnrollments(id);
+    }
+
+    /**
+     * "Otro" is the category for a reason the list does not have, so it is the one that has to say
+     * what that reason was. Stored alone it puts the word "Otro" in front of a teacher and nothing
+     * else — the exact question the notice is supposed to answer.
+     */
+    @Test
+    void withdraw_theOpenCategoryWithoutWords_isRefused() {
+        UUID id = UUID.randomUUID();
+
+        assertThatThrownBy(() -> studentService.withdraw(
+            withdrawal(id, StudentWithdrawalReason.OTRO, "   ", UUID.randomUUID())))
+            .isInstanceOf(ValidationException.class);
+
+        verify(studentDomain, never()).findById(any());
+    }
+
+    @Test
+    void withdraw_theOpenCategoryWithWords_carriesThem() {
+        UUID id = UUID.randomUUID();
+        UUID director = UUID.randomUUID();
+        Student student = Student.builder().id(id).status("Effective").build();
+        when(studentDomain.findById(id)).thenReturn(Optional.of(student));
+
+        studentService.withdraw(withdrawal(
+            id, StudentWithdrawalReason.OTRO, "  Se mudó a Santa Cruz.  ", director));
+
+        // Trimmed: the surrounding blanks are typing, not part of what the Director said.
+        verify(studentDomain).updateStatus(id, new StudentStatusChange(
+            "Withdrawn", "Otro", "Se mudó a Santa Cruz.", director));
+    }
+
+    /** A named category may still be expanded on — "Transferencia" does not say to where. */
+    @Test
+    void withdraw_aNamedCategoryMayCarryWordsToo() {
+        UUID id = UUID.randomUUID();
+        UUID director = UUID.randomUUID();
+        Student student = Student.builder().id(id).status("Effective").build();
+        when(studentDomain.findById(id)).thenReturn(Optional.of(student));
+
+        studentService.withdraw(withdrawal(
+            id, StudentWithdrawalReason.TRANSFERENCIA, "A la U.E. San Martín.", director));
+
+        verify(studentDomain).updateStatus(id, new StudentStatusChange(
+            "Withdrawn", "Transferencia", "A la U.E. San Martín.", director));
+    }
+
+    /** Blank is not a note. Kept as null so the reader is not shown an empty line. */
+    @Test
+    void withdraw_aNamedCategoryWithBlankWords_recordsNoNote() {
+        UUID id = UUID.randomUUID();
+        UUID director = UUID.randomUUID();
+        Student student = Student.builder().id(id).status("Effective").build();
+        when(studentDomain.findById(id)).thenReturn(Optional.of(student));
+
+        studentService.withdraw(withdrawal(
+            id, StudentWithdrawalReason.RETIRO_VOLUNTARIO, "   ", director));
+
+        verify(studentDomain).updateStatus(id, new StudentStatusChange(
+            "Withdrawn", "Retiro Voluntario", null, director));
     }
 
     @Test
@@ -64,10 +136,11 @@ class StudentServiceTest {
         Student student = Student.builder().id(id).status("Withdrawn").build();
         when(studentDomain.findById(id)).thenReturn(Optional.of(student));
 
-        assertThatThrownBy(() -> studentService.withdraw(id, StudentWithdrawalReason.OTRO))
+        assertThatThrownBy(() -> studentService.withdraw(
+            withdrawal(id, StudentWithdrawalReason.OTRO, "x", UUID.randomUUID())))
             .isInstanceOf(ConflictException.class);
 
-        verify(studentDomain, never()).updateStatus(any(), any(), any());
+        verify(studentDomain, never()).updateStatus(any(), any());
         verify(courseEnrollmentDomain, never()).withdrawActiveEnrollments(any());
     }
 
@@ -76,7 +149,8 @@ class StudentServiceTest {
         UUID id = UUID.randomUUID();
         when(studentDomain.findById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> studentService.withdraw(id, StudentWithdrawalReason.TRANSFERENCIA))
+        assertThatThrownBy(() -> studentService.withdraw(
+            withdrawal(id, StudentWithdrawalReason.TRANSFERENCIA, null, UUID.randomUUID())))
             .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -84,8 +158,9 @@ class StudentServiceTest {
     void withdraw_nullReason_throwsValidationException() {
         UUID id = UUID.randomUUID();
 
-        assertThatThrownBy(() -> studentService.withdraw(id, null))
-            .isInstanceOf(bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException.class);
+        assertThatThrownBy(() -> studentService.withdraw(
+            withdrawal(id, null, null, UUID.randomUUID())))
+            .isInstanceOf(ValidationException.class);
 
         verify(studentDomain, never()).findById(any());
     }
