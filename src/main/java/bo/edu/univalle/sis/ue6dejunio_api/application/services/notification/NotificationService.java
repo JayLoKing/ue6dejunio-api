@@ -5,7 +5,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationSent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import org.springframework.stereotype.Service;
@@ -25,9 +27,12 @@ public class NotificationService implements INotificationService {
     private static final Set<String> MAY_BE_WRITTEN_TO = Set.of("Teacher", "Secretary");
 
     private final INotificationDomain notificationDomain;
+    private final IDomainEventPublisher events;
 
-    public NotificationService(INotificationDomain notificationDomain) {
+    public NotificationService(INotificationDomain notificationDomain,
+                               IDomainEventPublisher events) {
         this.notificationDomain = notificationDomain;
+        this.events = events;
     }
 
     @Override
@@ -53,7 +58,11 @@ public class NotificationService implements INotificationService {
         if (c.senderId() != null) {
             requireAPersonMayWrite(c);
         }
-        return notificationDomain.send(c);
+        Notification written = notificationDomain.send(c);
+        // Stated after the row exists and only if it does. Whoever listens runs once this commits,
+        // so a send that is rolled back nudges nobody towards an inbox that never grew.
+        events.publish(new NotificationSent(written.receiverId(), written.id()));
+        return written;
     }
 
     /**

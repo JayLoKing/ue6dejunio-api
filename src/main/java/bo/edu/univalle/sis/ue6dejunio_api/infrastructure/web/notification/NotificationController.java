@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotific
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.NotificationResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.sse.NotificationStreamRegistry;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.SendNotificationRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UnreadCountResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
@@ -38,9 +41,12 @@ import java.util.UUID;
 public class NotificationController {
 
     private final INotificationService notificationService;
+    private final NotificationStreamRegistry streams;
 
-    public NotificationController(INotificationService notificationService) {
+    public NotificationController(INotificationService notificationService,
+                                  NotificationStreamRegistry streams) {
         this.notificationService = notificationService;
+        this.streams = streams;
     }
 
     private static UUID currentUser(JwtAuthenticationToken token) {
@@ -74,6 +80,24 @@ public class NotificationController {
         return ResponseEntity.ok(PagedResponse.of(
             notificationService.inbox(currentUser(token), unreadOnly, p)
                 .map(NotificationResponse::from)));
+    }
+
+    /**
+     * The reader's own live stream: one {@code notification} event per row that lands in their
+     * inbox, plus a heartbeat so a connection that quietly stopped forwarding can be told apart
+     * from a quiet one.
+     *
+     * <p>Nothing but ids travels here. What was said stays behind {@link #inbox}, which is the
+     * endpoint that decides what this reader is entitled to; a stream that carried the text would
+     * be a second, unguarded way to read it.
+     *
+     * <p>Scoped to the token's own subject and to nothing else. There is no path parameter to
+     * tamper with, so there is no version of this request that reads somebody else's inbox.
+     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Stream SSE de las notificaciones del usuario autenticado")
+    public SseEmitter stream(JwtAuthenticationToken token) {
+        return streams.open(currentUser(token));
     }
 
     @GetMapping("/unread-count")

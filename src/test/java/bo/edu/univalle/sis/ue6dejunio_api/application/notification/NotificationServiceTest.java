@@ -4,8 +4,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.Noti
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationSent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +30,7 @@ import static org.mockito.Mockito.when;
 class NotificationServiceTest {
 
     @Mock private INotificationDomain notificationDomain;
+    @Mock private IDomainEventPublisher events;
     @InjectMocks private NotificationService notificationService;
 
     private Notification notif(UUID id, UUID receiver) {
@@ -55,6 +59,37 @@ class NotificationServiceTest {
             .thenReturn(notif(UUID.randomUUID(), receiver));
         Notification r = notificationService.send(summons(sender, receiver));
         assertThat(r.message()).isEqualTo("msg");
+    }
+
+    // The row is written and then the fact is stated, so a browser holding the stream open can be
+    // told to go and read it. The event names the receiver only: the stream is a nudge, and what
+    // was actually said stays behind the inbox the reader is authorised for.
+    @Test
+    void send_written_announcesItSoAnOpenTabCanBeNudged() {
+        UUID sender = UUID.randomUUID();
+        UUID receiver = UUID.randomUUID();
+        UUID written = UUID.randomUUID();
+        receiverIsATeacher(receiver);
+        when(notificationDomain.send(any(SendNotificationCommand.class)))
+            .thenReturn(notif(written, receiver));
+
+        notificationService.send(summons(sender, receiver));
+
+        verify(events).publish(new NotificationSent(receiver, written));
+    }
+
+    // Nothing was written, so there is nothing to go and read. Announcing a refused send would
+    // spend a round trip per rejected message on every tab the receiver has open.
+    @Test
+    void send_refused_announcesNothing() {
+        UUID sender = UUID.randomUUID();
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(false);
+
+        assertThatThrownBy(() -> notificationService.send(summons(sender, receiver)))
+            .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(events, never()).publish(any());
     }
 
     // The listener writes these with no sender, and they are the one thing a person may not put
