@@ -22,6 +22,19 @@ public interface INotificationDomain {
     List<UUID> activeDirectorIds();
 
     /**
+     * The active teachers who answer for a student: the homeroom teacher of every course they sat
+     * in, plus the teacher of each active class group in those courses.
+     *
+     * <p>Both, because both keep a roster. The homeroom teacher runs the course; a technical
+     * teacher runs one subject in it and marks attendance for the same student. Telling only the
+     * first leaves the second calling out a name that is no longer on the roll.
+     *
+     * <p>Enrolments of any status, since a withdrawal is what closes them: asking for the active
+     * ones after the fact would find nobody to tell.
+     */
+    List<UUID> teacherIdsResponsibleForStudent(UUID studentId);
+
+    /**
      * The receiver's role, so the rule about who the Director may write to lives in the service
      * where it can be read, rather than in a query named after the rule.
      *

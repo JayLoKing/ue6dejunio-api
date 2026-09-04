@@ -169,6 +169,46 @@ class StudentWithdrawIT extends AbstractIntegrationTest {
             .isNotNull();
     }
 
+    /**
+     * The whole chain: the Director withdraws, and the teacher whose roster just shrank is told
+     * without having to open it.
+     *
+     * <p>An integration test because what could break here is the query that finds those teachers,
+     * and the listener running after the withdrawal commits. Neither is visible to a mock.
+     */
+    @Test
+    void withdraw_tellsTheTeacherWhoseCourseTheStudentWasIn() throws Exception {
+        mvc.perform(post("/api/students/{id}/withdraw", student)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .contentType("application/json")
+                .content("{\"reason\":\"Transferencia\",\"note\":\"A la U.E. San Martín.\"}"))
+            .andExpect(status().isNoContent());
+
+        String message = jdbc.queryForObject(
+            "SELECT message FROM notifications WHERE receiver_id = ? AND type = ?",
+            String.class, teacher, "STUDENT_WITHDRAWN");
+
+        assertThat(message).contains("Transferencia").contains("A la U.E. San Martín.");
+        // Nobody signed it: the withdrawal wrote it, not a person.
+        assertThat(jdbc.queryForObject(
+            "SELECT sender_id FROM notifications WHERE receiver_id = ? AND type = ?",
+            UUID.class, teacher, "STUDENT_WITHDRAWN")).isNull();
+    }
+
+    /** A refused withdrawal announces nothing: the student is still on the roll. */
+    @Test
+    void withdraw_refused_tellsNobody() throws Exception {
+        mvc.perform(post("/api/students/{id}/withdraw", student)
+                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher"))
+                .contentType("application/json")
+                .content("{\"reason\":\"Transferencia\"}"))
+            .andExpect(status().isForbidden());
+
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM notifications WHERE type = ?", Integer.class,
+            "STUDENT_WITHDRAWN")).isZero();
+    }
+
     /** And it comes back out again, by name, for the panel the teacher reads. */
     @Test
     void withdraw_theReasonReadsBackWithWhoDecided() throws Exception {

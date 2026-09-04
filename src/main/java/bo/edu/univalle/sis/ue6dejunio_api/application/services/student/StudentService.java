@@ -9,8 +9,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
 import org.springframework.stereotype.Service;
@@ -25,10 +27,14 @@ public class StudentService implements IStudentService {
 
     private final IStudentDomain studentDomain;
     private final ICourseEnrollmentDomain courseEnrollmentDomain;
+    private final IDomainEventPublisher events;
 
-    public StudentService(IStudentDomain studentDomain, ICourseEnrollmentDomain courseEnrollmentDomain) {
+    public StudentService(IStudentDomain studentDomain,
+                          ICourseEnrollmentDomain courseEnrollmentDomain,
+                          IDomainEventPublisher events) {
         this.studentDomain = studentDomain;
         this.courseEnrollmentDomain = courseEnrollmentDomain;
+        this.events = events;
     }
 
     @Override
@@ -68,6 +74,11 @@ public class StudentService implements IStudentService {
         studentDomain.updateStatus(command.studentId(), new StudentStatusChange(
             STATUS_WITHDRAWN, reason.label(), note, command.actorId()));
         courseEnrollmentDomain.withdrawActiveEnrollments(command.studentId());
+
+        // Only the fact leaves here. Which teachers have to hear about it is a question about the
+        // school, not about a student record, and it is answered on the notification side.
+        events.publish(new StudentWithdrawn(
+            command.studentId(), student.fullName(), reason.label(), note));
     }
 
     /** Whitespace is not a note. Kept as absent, so nobody is shown an empty line. */

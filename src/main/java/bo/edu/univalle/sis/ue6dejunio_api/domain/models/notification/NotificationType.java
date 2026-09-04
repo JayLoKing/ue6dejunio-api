@@ -18,6 +18,14 @@ public enum NotificationType {
     PDC_APPROVED,
     PDC_OBSERVED,
 
+    /**
+     * A student was taken off the roll, and the teachers who ran their courses are being told.
+     *
+     * <p>Written by the withdrawal itself. A teacher whose roster shrinks overnight otherwise has
+     * to go and ask why, and by hand this would be a claim about a decision nobody can check.
+     */
+    STUDENT_WITHDRAWN,
+
     /** The Director's own, about the work he supervises. */
     NOTEBOOK,
     ATTENDANCE,
@@ -37,16 +45,17 @@ public enum NotificationType {
     }
 
     /**
-     * Whether a person may write this one, or only the plan changing can.
+     * Whether a person may write this one, or only the change itself can.
      *
      * <p>The three PDC types are statements of fact about a review that happened, and the listener
      * is what makes them true. Posted by hand they become a claim nobody checked: a teacher would
      * read that their plan was approved while it still sat unreviewed, with the inbox saying one
-     * thing and the plan another and no way to tell which.
+     * thing and the plan another and no way to tell which. A withdrawal is the same shape — the
+     * student's row is what makes it true.
      */
     public boolean writtenByHand() {
         return switch (this) {
-            case PDC_PUBLISHED, PDC_APPROVED, PDC_OBSERVED -> false;
+            case PDC_PUBLISHED, PDC_APPROVED, PDC_OBSERVED, STUDENT_WITHDRAWN -> false;
             case NOTEBOOK, ATTENDANCE, PDC_PROGRESS, SUMMONS, CUSTOM -> true;
         };
     }

@@ -8,6 +8,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotific
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.NotificationEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseEnrollmentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaNotificationRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,11 +31,14 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
 
     private final JpaNotificationRepository notificationRepo;
     private final JpaUserRepository userRepo;
+    private final JpaCourseEnrollmentRepository enrollmentRepo;
 
     public NotificationRepositoryAdapter(JpaNotificationRepository notificationRepo,
-                                         JpaUserRepository userRepo) {
+                                         JpaUserRepository userRepo,
+                                         JpaCourseEnrollmentRepository enrollmentRepo) {
         this.notificationRepo = notificationRepo;
         this.userRepo = userRepo;
+        this.enrollmentRepo = enrollmentRepo;
     }
 
     /**
@@ -68,6 +73,20 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
         return userRepo.findByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE).stream()
             .map(UserEntity::getId)
             .toList();
+    }
+
+    /**
+     * Two queries rather than one: JPQL has no union that reads as well as this, and the two
+     * questions are genuinely different — who runs the course, and who runs a subject inside it.
+     * A set because a homeroom teacher who also teaches a subject there is one person, and would
+     * otherwise get the same notice twice.
+     */
+    @Override
+    public List<UUID> teacherIdsResponsibleForStudent(UUID studentId) {
+        Set<UUID> teachers = new LinkedHashSet<>(
+            enrollmentRepo.findHomeroomTeacherIdsOfStudent(studentId));
+        teachers.addAll(enrollmentRepo.findClassGroupTeacherIdsOfStudent(studentId));
+        return List.copyOf(teachers);
     }
 
     @Override

@@ -10,8 +10,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +37,7 @@ class StudentServiceTest {
 
     @Mock private IStudentDomain studentDomain;
     @Mock private ICourseEnrollmentDomain courseEnrollmentDomain;
+    @Mock private IDomainEventPublisher events;
     @InjectMocks private StudentService studentService;
 
     @Test
@@ -128,6 +131,38 @@ class StudentServiceTest {
 
         verify(studentDomain).updateStatus(id, new StudentStatusChange(
             "Withdrawn", "Retiro Voluntario", null, director));
+    }
+
+    /**
+     * The fact leaves here and nothing else. Who has to hear about it is a question about the
+     * school — which teachers ran this student's courses — and it is not this service's to answer.
+     */
+    @Test
+    void withdraw_written_statesWhatHappened() {
+        UUID id = UUID.randomUUID();
+        Student student = Student.builder()
+            .id(id).status("Effective").names("Ana").lastNames("Quispe").build();
+        when(studentDomain.findById(id)).thenReturn(Optional.of(student));
+
+        studentService.withdraw(withdrawal(
+            id, StudentWithdrawalReason.OTRO, "Se mudó a Santa Cruz.", UUID.randomUUID()));
+
+        verify(events).publish(new StudentWithdrawn(
+            id, "Ana Quispe", "Otro", "Se mudó a Santa Cruz."));
+    }
+
+    /** Nothing was written, so there is nothing to tell anybody about. */
+    @Test
+    void withdraw_refused_statesNothing() {
+        UUID id = UUID.randomUUID();
+        Student student = Student.builder().id(id).status("Withdrawn").build();
+        when(studentDomain.findById(id)).thenReturn(Optional.of(student));
+
+        assertThatThrownBy(() -> studentService.withdraw(
+            withdrawal(id, StudentWithdrawalReason.TRANSFERENCIA, null, UUID.randomUUID())))
+            .isInstanceOf(ConflictException.class);
+
+        verify(events, never()).publish(any());
     }
 
     @Test

@@ -45,4 +45,25 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     List<UUID> findIdsInCourse(@Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds,
                                @Param("courseId") UUID courseId);
     List<CourseEnrollmentEntity> findByStudent_IdAndStatus(UUID studentId, String status);
+
+    /**
+     * The homeroom teachers of every course the student sat in, active accounts only.
+     *
+     * <p>Enrolments of any status: a withdrawal is what closes them, so asking for the active ones
+     * afterwards would find nobody left to tell.
+     */
+    @Query("SELECT DISTINCT t.id FROM CourseEnrollmentEntity ce "
+        + "JOIN ce.course c JOIN c.homeroomTeacher t "
+        + "WHERE ce.student.id = :studentId AND t.active = true")
+    List<UUID> findHomeroomTeacherIdsOfStudent(@Param("studentId") UUID studentId);
+
+    /**
+     * The teachers of the active class groups in those same courses — the technical teachers, who
+     * keep a roster of their own for the subject they run.
+     */
+    @Query("SELECT DISTINCT t.id FROM CourseEnrollmentEntity ce "
+        + "JOIN ce.course c, ClassGroupEntity cg JOIN cg.teacher t "
+        + "WHERE cg.course = c AND cg.active = true "
+        + "AND ce.student.id = :studentId AND t.active = true")
+    List<UUID> findClassGroupTeacherIdsOfStudent(@Param("studentId") UUID studentId);
 }
