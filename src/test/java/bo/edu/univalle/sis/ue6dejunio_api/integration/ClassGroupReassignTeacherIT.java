@@ -62,11 +62,25 @@ class ClassGroupReassignTeacherIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void reassign_aulaTeacherToTechnicalClassGroup_returns409() throws Exception {
+    void reassign_technicalClassGroupToTheCoursesOwnHomeroomTeacher_returns200() throws Exception {
+        // aulaTeacher runs courseA. There are not enough technical teachers to cover every course,
+        // so the school has the teacher in charge take its technical subjects too.
         mvc.perform(put("/api/courses/{c}/class-groups/{g}/teacher", courseA, classGroupTechnical)
                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("teacherId", aulaTeacher))))
+            .andExpect(status().isOk());
+    }
+
+    /** The licence is over their own course. An aula teacher from elsewhere is still refused. */
+    @Test
+    void reassign_technicalClassGroupToAnOutsideAulaTeacher_returns409() throws Exception {
+        UUID outsider = seedUser("Teacher", false);
+
+        mvc.perform(put("/api/courses/{c}/class-groups/{g}/teacher", courseA, classGroupTechnical)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("teacherId", outsider))))
             .andExpect(status().isConflict());
     }
 

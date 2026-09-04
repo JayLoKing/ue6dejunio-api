@@ -38,7 +38,7 @@ public class ClassGroupService implements IClassGroupService {
             if (a.teacherId() == null) {
                 throw new ValidationException("Cada materia requiere un docente asignado");
             }
-            validateTeacherMatchesSubject(a.subjectId(), a.teacherId());
+            validateTeacherMatchesSubject(command.courseId(), a.subjectId(), a.teacherId());
             if (classGroupDomain.existsByCourseAndSubject(command.courseId(), a.subjectId())) {
                 throw new DuplicateResourceException("class_group (materia ya asignada al curso)",
                     a.subjectId().toString());
@@ -85,16 +85,36 @@ public class ClassGroupService implements IClassGroupService {
         if (!classGroupDomain.userIsTeacher(teacherId)) {
             throw new ResourceNotFoundException("Docente", teacherId);
         }
-        validateTeacherMatchesSubject(cg.subjectId(), teacherId);
+        validateTeacherMatchesSubject(courseId, cg.subjectId(), teacherId);
         return classGroupDomain.setTeacher(classGroupId, teacherId);
     }
 
-    private void validateTeacherMatchesSubject(UUID subjectId, UUID teacherId) {
-        boolean technicalSubject = classGroupDomain.subjectIsTechnical(subjectId);
-        if (technicalSubject && !classGroupDomain.userIsTechnicalTeacher(teacherId)) {
-            throw new ConflictException("Materia tecnica requiere docente tecnico: " + subjectId);
+    /**
+     * Who may stand in front of a subject.
+     *
+     * <p>A technical subject belongs to a technical teacher, or to the teacher who runs this
+     * course. The school does not have enough technical teachers to cover every course, and the
+     * gap is filled by the homeroom teacher rather than leaving the subject with nobody in front
+     * of it — a rule that refuses that does not protect anything, it just describes a course that
+     * cannot be created.
+     *
+     * <p>The licence is over their own course only: an aula teacher from another course is still
+     * refused, and it is the course being assigned that decides, which is why this needs to know
+     * which one it is.
+     *
+     * <p>Nothing opens in the other direction. A non-technical subject still belongs to an aula
+     * teacher, because there the shortage does not exist.
+     */
+    private void validateTeacherMatchesSubject(UUID courseId, UUID subjectId, UUID teacherId) {
+        if (classGroupDomain.subjectIsTechnical(subjectId)) {
+            if (!classGroupDomain.userIsTechnicalTeacher(teacherId)
+                && !classGroupDomain.userIsHomeroomTeacherOf(teacherId, courseId)) {
+                throw new ConflictException("Materia tecnica: requiere un docente tecnico o el "
+                    + "docente de aula del curso: " + subjectId);
+            }
+            return;
         }
-        if (!technicalSubject && !classGroupDomain.userIsNonTechnicalTeacher(teacherId)) {
+        if (!classGroupDomain.userIsNonTechnicalTeacher(teacherId)) {
             throw new ConflictException(
                 "Materia no tecnica requiere docente de aula (no tecnico): " + subjectId);
         }

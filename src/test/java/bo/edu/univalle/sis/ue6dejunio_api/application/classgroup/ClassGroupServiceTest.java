@@ -42,6 +42,9 @@ class ClassGroupServiceTest {
         when(classGroupDomain.subjectExists(subjectId)).thenReturn(true);
         when(classGroupDomain.subjectIsTechnical(subjectId)).thenReturn(true);
         when(classGroupDomain.userIsTechnicalTeacher(teacherId)).thenReturn(false);
+        // An aula teacher from some other course. The exception the school makes is for the one who
+        // runs THIS course, not for aula teachers in general.
+        when(classGroupDomain.userIsHomeroomTeacherOf(teacherId, courseId)).thenReturn(false);
 
         CreateClassGroupCommand command = new CreateClassGroupCommand(
             courseId, List.of(new CreateClassGroupCommand.Assignment(subjectId, teacherId)));
@@ -51,6 +54,49 @@ class ClassGroupServiceTest {
             .isNotInstanceOf(IllegalArgumentException.class);
 
         verify(classGroupDomain, never()).create(any(), any(), any());
+    }
+
+    /**
+     * There are not enough technical teachers to cover every course, so the school has the teacher
+     * who runs the course teach its technical subjects too. Refusing that left the subject with
+     * nobody in front of it, which is not a stricter rule — it is a course without a class.
+     */
+    @Test
+    void createForCourse_technicalSubject_takenByTheCoursesOwnHomeroomTeacher_ok() {
+        when(classGroupDomain.courseExists(courseId)).thenReturn(true);
+        when(classGroupDomain.subjectExists(subjectId)).thenReturn(true);
+        when(classGroupDomain.subjectIsTechnical(subjectId)).thenReturn(true);
+        when(classGroupDomain.userIsTechnicalTeacher(teacherId)).thenReturn(false);
+        when(classGroupDomain.userIsHomeroomTeacherOf(teacherId, courseId)).thenReturn(true);
+        when(classGroupDomain.existsByCourseAndSubject(courseId, subjectId)).thenReturn(false);
+        when(classGroupDomain.create(courseId, subjectId, teacherId))
+            .thenReturn(new ClassGroup(classGroupId, courseId, "1ro", "A", subjectId, "Materia",
+                teacherId, "Docente", true));
+
+        CreateClassGroupCommand command = new CreateClassGroupCommand(
+            courseId, List.of(new CreateClassGroupCommand.Assignment(subjectId, teacherId)));
+
+        assertThat(classGroupService.createForCourse(command)).hasSize(1);
+        verify(classGroupDomain).create(courseId, subjectId, teacherId);
+    }
+
+    /**
+     * The opening is only for technical subjects. A non-technical one still belongs to an aula
+     * teacher, and letting a technical teacher take it would undo the rule in the other direction.
+     */
+    @Test
+    void createForCourse_nonTechnicalSubject_isNotOpenedByBeingHomeroomTeacher() {
+        when(classGroupDomain.courseExists(courseId)).thenReturn(true);
+        when(classGroupDomain.subjectExists(subjectId)).thenReturn(true);
+        when(classGroupDomain.subjectIsTechnical(subjectId)).thenReturn(false);
+        when(classGroupDomain.userIsNonTechnicalTeacher(teacherId)).thenReturn(false);
+
+        CreateClassGroupCommand command = new CreateClassGroupCommand(
+            courseId, List.of(new CreateClassGroupCommand.Assignment(subjectId, teacherId)));
+
+        assertThatThrownBy(() -> classGroupService.createForCourse(command))
+            .isInstanceOf(ConflictException.class);
+        verify(classGroupDomain, never()).userIsHomeroomTeacherOf(any(), any());
     }
 
     @Test
@@ -154,5 +200,23 @@ class ClassGroupServiceTest {
 
         assertThat(result.teacherId()).isEqualTo(teacherId);
         verify(classGroupDomain).setTeacher(classGroupId, teacherId);
+    }
+
+    /** Handing a technical subject to the teacher who runs the course, after the fact. */
+    @Test
+    void reassignTeacher_technicalSubjectToTheCoursesOwnHomeroomTeacher_ok() {
+        ClassGroup cg = new ClassGroup(classGroupId, courseId, "1ro", "A", subjectId, "Materia",
+            null, null, true);
+        ClassGroup updated = new ClassGroup(classGroupId, courseId, "1ro", "A", subjectId, "Materia",
+            teacherId, "Docente", true);
+        when(classGroupDomain.findById(classGroupId)).thenReturn(Optional.of(cg));
+        when(classGroupDomain.userIsTeacher(teacherId)).thenReturn(true);
+        when(classGroupDomain.subjectIsTechnical(subjectId)).thenReturn(true);
+        when(classGroupDomain.userIsTechnicalTeacher(teacherId)).thenReturn(false);
+        when(classGroupDomain.userIsHomeroomTeacherOf(teacherId, courseId)).thenReturn(true);
+        when(classGroupDomain.setTeacher(classGroupId, teacherId)).thenReturn(updated);
+
+        assertThat(classGroupService.reassignTeacher(courseId, classGroupId, teacherId).teacherId())
+            .isEqualTo(teacherId);
     }
 }

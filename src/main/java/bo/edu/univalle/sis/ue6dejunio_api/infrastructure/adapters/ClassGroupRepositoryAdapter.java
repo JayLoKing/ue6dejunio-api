@@ -70,6 +70,17 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     }
 
     @Override
+    public boolean userIsHomeroomTeacherOf(UUID userId, UUID courseId) {
+        if (userId == null || courseId == null) {
+            return false;
+        }
+        return courseRepo.findById(courseId)
+            .map(CourseEntity::getHomeroomTeacher)
+            .map(t -> userId.equals(t.getId()))
+            .orElse(false);
+    }
+
+    @Override
     public boolean subjectIsTechnical(UUID subjectId) {
         return subjectRepo.findById(subjectId).map(s -> s.isTechnical()).orElse(false);
     }

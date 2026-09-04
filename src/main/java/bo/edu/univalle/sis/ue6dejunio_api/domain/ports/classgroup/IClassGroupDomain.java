@@ -13,6 +13,15 @@ public interface IClassGroupDomain {
     boolean userIsTeacher(UUID userId);
     boolean userIsTechnicalTeacher(UUID userId);
     boolean userIsNonTechnicalTeacher(UUID userId);
+
+    /**
+     * Whether this teacher is the one who runs the course — its homeroom teacher.
+     *
+     * <p>Asked about one course and not in general: the school lets the teacher in charge of a
+     * course take its technical subjects when no technical teacher is free, and that licence is
+     * theirs over their own course only.
+     */
+    boolean userIsHomeroomTeacherOf(UUID userId, UUID courseId);
     boolean subjectIsTechnical(UUID subjectId);
     boolean existsByCourseAndSubject(UUID courseId, UUID subjectId);
 
