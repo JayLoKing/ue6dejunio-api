@@ -62,6 +62,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/levels/**").hasRole("Director")
                 .requestMatchers("/api/grades/**").hasRole("Director")
                 .requestMatchers("/api/subjects/**").hasRole("Director")
+                // The catalogue that groups the subjects. Administered where they are, by whoever
+                // administers them.
+                .requestMatchers("/api/knowledge-areas/**").hasRole("Director")
                 .requestMatchers("/api/parallels/**").hasRole("Director")
                 .requestMatchers("/api/trimester-periods/**").hasRole("Director")
                 .requestMatchers("/api/catalog/**").authenticated()

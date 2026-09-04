@@ -15,8 +15,12 @@
 -- -----------------------------------------------------------------------------
 --   roles            El arranque no puede recrear al Director sin el rol
 --                    "Director"; falla con "Rol Director no existe en la BDD".
---   knowledge_areas  subjects.id_area es NOT NULL y no hay pantalla para crear
---                    areas: sin ellas el Director no podria crear materias.
+--   knowledge_areas  Las cuatro areas de saberes del curriculo. Se conservan por
+--                    comodidad, no por necesidad: desde que existe la pantalla
+--                    "Areas de Saberes" el Director puede crearlas. Si se
+--                    quieren probar tambien esas altas, agregar knowledge_areas
+--                    al TRUNCATE de abajo — pero entonces hay que cargarlas
+--                    ANTES que las materias, porque subjects.id_area es NOT NULL.
 --   academic_years   La gestion. El arranque la recrea igual, pero borrarla
 --                    obligaria a reiniciar antes de poder crear un curso.
 --

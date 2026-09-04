@@ -93,6 +93,11 @@ public abstract class AbstractIntegrationTest {
     /** The gestiones schema-it.sql seeds. Anything else in the table was made up by a test. */
     private static final String SEEDED_YEARS = "(2025, 2026)";
 
+    /** Likewise the four areas of knowledge the curriculum actually has. */
+    private static final String SEEDED_AREAS =
+        "('Cosmos y Pensamiento', 'Comunidad y Sociedad', 'Vida Tierra y Territorio', "
+            + "'Ciencia Tecnología y Producción')";
+
     @BeforeEach
     void resetSharedState() {
         jdbc.execute("TRUNCATE TABLE " + String.join(", ", TRANSACTIONAL_TABLES) + " CASCADE");
@@ -102,6 +107,13 @@ public abstract class AbstractIntegrationTest {
         jdbc.update("DELETE FROM academic_trimesters WHERE id_academic_year IN "
             + "(SELECT id_academic_year FROM academic_years WHERE year NOT IN " + SEEDED_YEARS + ")");
         jdbc.update("DELETE FROM academic_years WHERE year NOT IN " + SEEDED_YEARS);
+        // Same story for the areas of knowledge: a catalogue table nobody truncates, so an area a
+        // test invents outlives it and turns up in the next class's listing. Its subjects go first
+        // — subjects are catalogue too, and subjects.id_area is ON DELETE RESTRICT, so the area
+        // cannot leave while one still names it.
+        jdbc.update("DELETE FROM subjects WHERE id_area IN "
+            + "(SELECT id_area FROM knowledge_areas WHERE name NOT IN " + SEEDED_AREAS + ")");
+        jdbc.update("DELETE FROM knowledge_areas WHERE name NOT IN " + SEEDED_AREAS);
         // Rate-limit buckets live in the shared context, not the database, so they need their own
         // reset: otherwise a test that deliberately exhausts a bucket makes the next one fail 429.
         bucketStore.clear();
