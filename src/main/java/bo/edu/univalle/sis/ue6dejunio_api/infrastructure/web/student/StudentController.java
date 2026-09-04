@@ -3,6 +3,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
@@ -55,19 +57,42 @@ public class StudentController {
         return ResponseEntity.ok(StudentResponse.from(studentService.getById(id)));
     }
 
+    /**
+     * The institution's students, for whoever is entitled to see them.
+     *
+     * <p>One endpoint rather than two. A Director's listing and a teacher's picker ask the same
+     * question with different filters, and the answer to "which students may this caller see" is
+     * already {@code effectiveDirectoryCourseId}: the Director and the secretariat span the
+     * school, a teacher is pinned to their own course whatever they send.
+     *
+     * @param scope ACTIVE, WITHDRAWN or ALL. Absent means ACTIVE — what every caller meant before
+     *              this filter existed, so an old caller keeps getting exactly what it got
+     */
     @GetMapping("/search")
-    @Operation(summary = "Buscar estudiantes por nombre o RUDE. Docente acotado a su curso de aula")
+    @Operation(summary = "Buscar estudiantes por nombre, apellido, RUDE o carnet. "
+        + "Filtros: curso, grado, paralelo y estado. Docente acotado a su curso de aula")
     public ResponseEntity<PagedResponse<StudentDirectoryResponse>> search(
         @RequestParam(required = false) String q,
         @RequestParam(required = false) UUID courseId,
+        @RequestParam(required = false) Integer gradeId,
+        @RequestParam(required = false) Integer parallelId,
+        @RequestParam(required = false) String scope,
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit,
         Authentication authentication
     ) {
+        // A scope outside the set is a caller mistake, not an empty page: read as "no filter" it
+        // would quietly answer with the active students and look like the school lost the rest.
+        StudentDirectoryScope effectiveScope = scope == null || scope.isBlank()
+            ? StudentDirectoryScope.ACTIVE
+            : StudentDirectoryScope.fromRequestValue(scope)
+                .orElseThrow(() -> new ValidationException("Alcance invalido: " + scope));
         UUID effectiveCourseId = authz.effectiveDirectoryCourseId(authentication, courseId);
         PageQuery pageQuery = PageQuery.of(offset - 1, limit, SortField.asc("id"));
+        StudentDirectoryQuery query = new StudentDirectoryQuery(
+            q, effectiveCourseId, gradeId, parallelId, effectiveScope);
         return ResponseEntity.ok(PagedResponse.of(
-            studentService.search(q, effectiveCourseId, pageQuery).map(StudentDirectoryResponse::from)));
+            studentService.search(query, pageQuery).map(StudentDirectoryResponse::from)));
     }
 
     @PostMapping("/{id}/withdraw")

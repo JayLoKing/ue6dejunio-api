@@ -8,6 +8,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -104,5 +105,115 @@ class StudentDirectorySearchIT extends AbstractIntegrationTest {
                 .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    /** The school looks a student up by carnet as often as by RUDE. */
+    @Test
+    void searchByIdentityCard_matches() throws Exception {
+        String carnet = jdbc.queryForObject(
+            "SELECT identity_card FROM students WHERE id_student = ?",
+            String.class, studentInHomeroom);
+
+        mvc.perform(get("/api/students/search").param("q", carnet)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].identityCard").value(carnet));
+    }
+
+    /** The secretariat reads the whole school, the same as the Director. */
+    @Test
+    void secretary_spansTheSchool() throws Exception {
+        mvc.perform(get("/api/students/search")
+                .header("Authorization", "Bearer " + tokenFor(
+                    seedUser("Secretary", false), "Secretary")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(2));
+    }
+
+    /** A caller who filtered by nothing still means the students still on the roll. */
+    @Test
+    void withoutAScope_theWithdrawnAreLeftOut() throws Exception {
+        withdraw(studentInHomeroom);
+
+        mvc.perform(get("/api/students/search")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(studentInOtherCourse.toString()));
+    }
+
+    @Test
+    void withdrawnScope_returnsOnlyTheOnesWhoLeft() throws Exception {
+        withdraw(studentInHomeroom);
+
+        mvc.perform(get("/api/students/search").param("scope", "WITHDRAWN")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(studentInHomeroom.toString()))
+            .andExpect(jsonPath("$.content[0].status").value("Withdrawn"));
+    }
+
+    @Test
+    void allScope_returnsEverybody() throws Exception {
+        withdraw(studentInHomeroom);
+
+        mvc.perform(get("/api/students/search").param("scope", "ALL")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(2));
+    }
+
+    /**
+     * The one that made the enrolment join worth rewriting: a withdrawal closes the enrolments
+     * too, so joined on 'Effective' alone every withdrawn student came back with no course and
+     * this filter excluded all of them.
+     */
+    @Test
+    void withdrawnStudent_keepsTheGradeTheyWereIn() throws Exception {
+        withdraw(studentInHomeroom);
+        Integer gradeId = jdbc.queryForObject(
+            "SELECT id_grade FROM courses WHERE id_course = ?", Integer.class, homeroomCourse);
+
+        mvc.perform(get("/api/students/search")
+                .param("scope", "WITHDRAWN")
+                .param("gradeId", String.valueOf(gradeId))
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].parallel").value("A"));
+    }
+
+    @Test
+    void parallelFilter_narrowsToOneParallel() throws Exception {
+        mvc.perform(get("/api/students/search")
+                .param("parallelId", String.valueOf(parallelIdOf(otherCourse)))
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(studentInOtherCourse.toString()));
+    }
+
+    /** A scope the catalog does not have is a caller mistake, not an empty page. */
+    @Test
+    void unknownScope_returns400() throws Exception {
+        mvc.perform(get("/api/students/search").param("scope", "NO_EXISTE")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isBadRequest());
+    }
+
+    private Integer parallelIdOf(UUID courseId) {
+        return jdbc.queryForObject(
+            "SELECT id_parallel FROM courses WHERE id_course = ?", Integer.class, courseId);
+    }
+
+    /** Through the endpoint, so the enrolment is closed the way the application closes it. */
+    private void withdraw(UUID studentId) throws Exception {
+        mvc.perform(post("/api/students/{id}/withdraw", studentId)
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .contentType("application/json")
+                .content("{\"reason\":\"Transferencia\"}"))
+            .andExpect(status().isNoContent());
     }
 }

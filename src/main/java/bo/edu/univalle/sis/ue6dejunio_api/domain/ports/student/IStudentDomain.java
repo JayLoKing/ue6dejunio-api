@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 
 import java.util.Collection;
@@ -20,7 +21,7 @@ public interface IStudentDomain {
 
     /** The students behind a whole batch of identity cards, in one lookup. */
     List<Student> findByIdentityCardIn(Collection<String> identityCards);
-    PageResult<StudentDirectoryItem> searchDirectory(String q, UUID courseId, PageQuery pageQuery);
+    PageResult<StudentDirectoryItem> searchDirectory(StudentDirectoryQuery query, PageQuery pageQuery);
 
     /**
      * Moves the student to another status and records why, in whose words, and by whom.

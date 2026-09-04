@@ -8,6 +8,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
@@ -44,12 +46,25 @@ class StudentServiceTest {
     void search_delegatesToDomain() {
         UUID courseId = UUID.randomUUID();
         PageQuery pageQuery = PageQuery.of(0, 30);
+        StudentDirectoryQuery query = StudentDirectoryQuery.of("Lopez", courseId);
         PageResult<StudentDirectoryItem> expected = new PageResult<>(List.of(), 0, 30, 0);
-        when(studentDomain.searchDirectory("Lopez", courseId, pageQuery)).thenReturn(expected);
+        when(studentDomain.searchDirectory(query, pageQuery)).thenReturn(expected);
 
-        PageResult<StudentDirectoryItem> result = studentService.search("Lopez", courseId, pageQuery);
+        PageResult<StudentDirectoryItem> result = studentService.search(query, pageQuery);
 
         assertThat(result).isSameAs(expected);
+    }
+
+    /**
+     * A caller that filtered by nothing is asking about the students still on the roll. Read as
+     * "no filter" it would answer with the ones who left as well, and every existing picker in the
+     * app would start offering students the school no longer has.
+     */
+    @Test
+    void directoryQuery_withoutAScope_meansTheOnesStillOnTheRoll() {
+        StudentDirectoryQuery query = new StudentDirectoryQuery(null, null, null, null, null);
+
+        assertThat(query.scope()).isEqualTo(StudentDirectoryScope.ACTIVE);
     }
 
     private static WithdrawStudentCommand withdrawal(UUID id, StudentWithdrawalReason reason,

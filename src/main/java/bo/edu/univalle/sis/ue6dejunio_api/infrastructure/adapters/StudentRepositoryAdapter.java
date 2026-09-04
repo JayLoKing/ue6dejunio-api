@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
@@ -64,14 +65,23 @@ public class StudentRepositoryAdapter implements IStudentDomain {
         return repo.findByIdentityCardIn(identityCards).stream().map(mapper::toDomain).toList();
     }
 
+    /**
+     * Two queries and not one: a blank {@code q} takes the listing, so a null never reaches a
+     * {@code LIKE}. Everything else about them is the same set of optional filters.
+     */
     @Override
-    public PageResult<StudentDirectoryItem> searchDirectory(String q, UUID courseId,
+    public PageResult<StudentDirectoryItem> searchDirectory(StudentDirectoryQuery query,
                                                             PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
+        // Null narrows to nothing, which is what ALL means. The scope, not the caller, decides it.
+        String status = query.scope().status();
+        String q = query.q();
         if (q == null || q.isBlank()) {
-            return SpringPaging.toPageResult(repo.listDirectory(courseId, pageable));
+            return SpringPaging.toPageResult(repo.listDirectory(
+                query.courseId(), query.gradeId(), query.parallelId(), status, pageable));
         }
-        return SpringPaging.toPageResult(repo.searchDirectory(q, courseId, pageable));
+        return SpringPaging.toPageResult(repo.searchDirectory(
+            q.trim(), query.courseId(), query.gradeId(), query.parallelId(), status, pageable));
     }
 
     @Override

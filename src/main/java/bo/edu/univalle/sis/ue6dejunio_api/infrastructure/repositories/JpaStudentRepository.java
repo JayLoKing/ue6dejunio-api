@@ -34,47 +34,88 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
     @EntityGraph(attributePaths = "statusChangedBy")
     List<StudentEntity> findByIdentityCardIn(Collection<String> identityCards);
 
-    @Query(value = """
-        SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
-            s.id, s.rudeCode, CONCAT(s.names, ' ', s.lastNames), g.name, p.name, l.name)
-        FROM StudentEntity s
-        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = 'Effective'
-        LEFT JOIN ce.course c
-        LEFT JOIN c.grade g
-        LEFT JOIN c.parallel p
-        LEFT JOIN g.level l
-        WHERE s.status = 'Effective' AND (:courseId IS NULL OR c.id = :courseId)
-        """,
-        countQuery = """
-        SELECT COUNT(DISTINCT s) FROM StudentEntity s
-        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = 'Effective'
-        LEFT JOIN ce.course c
-        WHERE s.status = 'Effective' AND (:courseId IS NULL OR c.id = :courseId)
-        """)
-    Page<StudentDirectoryItem> listDirectory(@Param("courseId") UUID courseId, Pageable pageable);
+    /*
+     * The two directory queries below repeat their FROM and their filters on purpose: the only
+     * difference is the name match, and it stays out of the listing one because binding a null
+     * into a LIKE is what the adapter's blank-q split exists to avoid.
+     *
+     * The enrolment is joined on `ce.status = s.status` rather than on 'Effective'. A withdrawal
+     * closes the student's enrolments in the same transaction that closes the student, so this
+     * reads as "the enrolment that matches what the student now is" — and it is what lets the
+     * Director filter withdrawn students by the grade they were in. Joined on 'Effective' alone,
+     * every withdrawn row came back with no course at all and the grade filter excluded them alL.
+     */
 
     @Query(value = """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
-            s.id, s.rudeCode, CONCAT(s.names, ' ', s.lastNames), g.name, p.name, l.name)
+            s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
+            g.name, p.name, l.name, s.status)
         FROM StudentEntity s
-        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = 'Effective'
+        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
         LEFT JOIN c.grade g
         LEFT JOIN c.parallel p
         LEFT JOIN g.level l
-        WHERE s.status = 'Effective' AND (:courseId IS NULL OR c.id = :courseId)
-              AND (LOWER(s.names) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(s.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%')))
+        WHERE (:status IS NULL OR s.status = :status)
+              AND (:courseId IS NULL OR c.id = :courseId)
+              AND (:gradeId IS NULL OR g.id = :gradeId)
+              AND (:parallelId IS NULL OR p.id = :parallelId)
         """,
         countQuery = """
         SELECT COUNT(DISTINCT s) FROM StudentEntity s
-        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = 'Effective'
+        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
-        WHERE s.status = 'Effective' AND (:courseId IS NULL OR c.id = :courseId)
+        LEFT JOIN c.grade g
+        LEFT JOIN c.parallel p
+        WHERE (:status IS NULL OR s.status = :status)
+              AND (:courseId IS NULL OR c.id = :courseId)
+              AND (:gradeId IS NULL OR g.id = :gradeId)
+              AND (:parallelId IS NULL OR p.id = :parallelId)
+        """)
+    Page<StudentDirectoryItem> listDirectory(@Param("courseId") UUID courseId,
+                                             @Param("gradeId") Integer gradeId,
+                                             @Param("parallelId") Integer parallelId,
+                                             @Param("status") String status,
+                                             Pageable pageable);
+
+    @Query(value = """
+        SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
+            s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
+            g.name, p.name, l.name, s.status)
+        FROM StudentEntity s
+        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
+        LEFT JOIN ce.course c
+        LEFT JOIN c.grade g
+        LEFT JOIN c.parallel p
+        LEFT JOIN g.level l
+        WHERE (:status IS NULL OR s.status = :status)
+              AND (:courseId IS NULL OR c.id = :courseId)
+              AND (:gradeId IS NULL OR g.id = :gradeId)
+              AND (:parallelId IS NULL OR p.id = :parallelId)
               AND (LOWER(s.names) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%')))
+                   OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(s.identityCard) LIKE LOWER(CONCAT('%', :q, '%')))
+        """,
+        countQuery = """
+        SELECT COUNT(DISTINCT s) FROM StudentEntity s
+        LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
+        LEFT JOIN ce.course c
+        LEFT JOIN c.grade g
+        LEFT JOIN c.parallel p
+        WHERE (:status IS NULL OR s.status = :status)
+              AND (:courseId IS NULL OR c.id = :courseId)
+              AND (:gradeId IS NULL OR g.id = :gradeId)
+              AND (:parallelId IS NULL OR p.id = :parallelId)
+              AND (LOWER(s.names) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(s.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(s.identityCard) LIKE LOWER(CONCAT('%', :q, '%')))
         """)
-    Page<StudentDirectoryItem> searchDirectory(@Param("q") String q, @Param("courseId") UUID courseId, Pageable pageable);
+    Page<StudentDirectoryItem> searchDirectory(@Param("q") String q,
+                                               @Param("courseId") UUID courseId,
+                                               @Param("gradeId") Integer gradeId,
+                                               @Param("parallelId") Integer parallelId,
+                                               @Param("status") String status,
+                                               Pageable pageable);
 }

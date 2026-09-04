@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
@@ -46,8 +47,9 @@ public class StudentService implements IStudentService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<StudentDirectoryItem> search(String q, UUID courseId, PageQuery pageQuery) {
-        return studentDomain.searchDirectory(q, courseId, pageQuery);
+    public PageResult<StudentDirectoryItem> search(StudentDirectoryQuery query,
+                                                   PageQuery pageQuery) {
+        return studentDomain.searchDirectory(query, pageQuery);
     }
 
     @Override
