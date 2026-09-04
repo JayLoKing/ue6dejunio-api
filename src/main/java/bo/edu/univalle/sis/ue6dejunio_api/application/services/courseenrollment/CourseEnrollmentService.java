@@ -17,6 +17,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollR
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
@@ -29,6 +30,7 @@ import java.util.UUID;
 public class CourseEnrollmentService implements ICourseEnrollmentService {
 
     private static final String STATUS_EFFECTIVE = "Effective";
+    private static final String STATUS_WITHDRAWN = "Withdrawn";
 
     private final IStudentDomain studentDomain;
     private final ICourseEnrollmentDomain enrollmentDomain;
@@ -52,15 +54,31 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         Map<String, Student> byIdentityCard = indexBy(
             studentDomain.findByIdentityCardIn(valuesOf(command.students(), CreateStudentCommand::identityCard)),
             Student::getIdentityCard);
-        Set<UUID> seatedInCourse = new HashSet<>(enrollmentDomain.enrolledStudentIds(
+        // Every enrolment these students hold in the course, whatever its status, in one query. The
+        // loop reads its two decisions off this map — seat still held, or closed row to reopen —
+        // rather than asking the database once per name.
+        Map<UUID, String> enrollmentInCourse = enrollmentDomain.enrollmentStatusByStudent(
             command.courseId(),
             Stream.concat(byRude.values().stream(), byIdentityCard.values().stream())
-                .map(Student::getId).collect(Collectors.toSet())));
+                .map(Student::getId).collect(Collectors.toSet()));
+        Set<UUID> seatedInCourse = enrollmentInCourse.entrySet().stream()
+            .filter(e -> STATUS_EFFECTIVE.equals(e.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toCollection(HashSet::new));
+        // Reopened together once the roster has been read: one statement for the whole import
+        // instead of one per student who came back.
+        Set<UUID> toReactivate = new HashSet<>();
 
         int created = 0;
         int existing = 0;
         int enrolled = 0;
         int skipped = 0;
+        // Who the school is taking back. A set, so a file that repeats a name counts them once,
+        // and written after the loop the same way the reopened enrolments are: listing someone on
+        // a roster is the school saying they attend, and it used to be the one way of saying it
+        // the record ignored — the import gave them a live enrolment while students.status stayed
+        // 'Withdrawn', so the teacher saw them in the course and the directory did not.
+        Set<UUID> readmitted = new HashSet<>();
 
         for (CreateStudentCommand sc : command.students()) {
             Student student = resolve(sc, byRude, byIdentityCard);
@@ -72,17 +90,31 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 index(byIdentityCard, student.getIdentityCard(), student);
             } else {
                 existing++;
+                // Only noted here. Who comes back is written once, after the roster has been read.
+                if (STATUS_WITHDRAWN.equals(student.getStatus())) {
+                    readmitted.add(student.getId());
+                }
             }
-            // add() is false when the id is already there, which covers both a seat taken in an
-            // earlier import and the same student appearing twice in this one.
+            // add() is false when the id is already there, which covers both a seat still held from
+            // an earlier import and the same student appearing twice in this one.
             if (seatedInCourse.add(student.getId())) {
-                enrollmentDomain.saveEnrollment(student.getId(), command.courseId());
+                // A closed row is the only way back into a course they already left: UNIQUE
+                // (id_student, id_course) leaves nothing to insert alongside it.
+                if (enrollmentInCourse.containsKey(student.getId())) {
+                    toReactivate.add(student.getId());
+                } else {
+                    enrollmentDomain.saveEnrollment(student.getId(), command.courseId());
+                }
                 enrolled++;
             } else {
                 skipped++;
             }
         }
-        return new EnrollResult(command.students().size(), created, existing, enrolled, skipped);
+        enrollmentDomain.reactivateEnrollments(command.courseId(), toReactivate);
+        studentDomain.updateStatusIn(readmitted,
+            new StudentStatusChange(STATUS_EFFECTIVE, null, null, command.actorId()));
+        return new EnrollResult(
+            command.students().size(), created, existing, readmitted.size(), enrolled, skipped);
     }
 
     @Override

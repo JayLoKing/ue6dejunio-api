@@ -5,21 +5,43 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrollmentEntity, UUID> {
 
+    /**
+     * Student and status of every enrolment these students hold in the course. Two scalars rather
+     * than the entities: the import only has to tell a seat still held from a closed row it must
+     * reopen, and loading forty entities to read one column each would be the expensive way to ask.
+     */
     @Query("""
-        SELECT e.student.id FROM CourseEnrollmentEntity e
+        SELECT e.student.id, e.status FROM CourseEnrollmentEntity e
         WHERE e.course.id = :courseId AND e.student.id IN :studentIds
         """)
-    List<UUID> enrolledStudentIds(@Param("courseId") UUID courseId,
-                                            @Param("studentIds") Collection<UUID> studentIds);
+    List<Object[]> enrollmentStatuses(@Param("courseId") UUID courseId,
+                                      @Param("studentIds") Collection<UUID> studentIds);
+
+    /**
+     * Reopens closed enrolments in bulk, so a readmission costs one statement for the whole import
+     * rather than one per student who came back.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE CourseEnrollmentEntity e
+        SET e.status = :status, e.enrollmentDate = :enrollmentDate
+        WHERE e.course.id = :courseId AND e.student.id IN :studentIds
+        """)
+    int reactivateEnrollments(@Param("courseId") UUID courseId,
+                              @Param("studentIds") Collection<UUID> studentIds,
+                              @Param("status") String status,
+                              @Param("enrollmentDate") LocalDate enrollmentDate);
     @EntityGraph(attributePaths = "student")
     Page<CourseEnrollmentEntity> findByCourse_Id(UUID courseId, Pageable pageable);
 

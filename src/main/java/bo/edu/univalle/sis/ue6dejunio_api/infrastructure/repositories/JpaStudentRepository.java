@@ -4,13 +4,16 @@ import java.util.Collection;
 import java.util.List;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +36,27 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
 
     @EntityGraph(attributePaths = "statusChangedBy")
     List<StudentEntity> findByIdentityCardIn(Collection<String> identityCards);
+
+    /**
+     * One status change written across many students at once.
+     *
+     * <p>Bulk JPQL goes around dirty tracking, so every column the single-student path stamps has
+     * to be named here — {@code statusChangedAt} above all, which the adapter otherwise sets on the
+     * entity itself.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE StudentEntity s
+        SET s.status = :status, s.statusReason = :reason, s.statusNote = :note,
+            s.statusChangedAt = :changedAt, s.statusChangedBy = :changedBy
+        WHERE s.id IN :ids
+        """)
+    int updateStatusIn(@Param("ids") Collection<UUID> ids,
+                       @Param("status") String status,
+                       @Param("reason") String reason,
+                       @Param("note") String note,
+                       @Param("changedAt") LocalDateTime changedAt,
+                       @Param("changedBy") UserEntity changedBy);
 
     /*
      * The two directory queries below repeat their FROM and their filters on purpose: the only

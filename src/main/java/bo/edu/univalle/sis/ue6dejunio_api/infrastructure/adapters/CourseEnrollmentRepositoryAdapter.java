@@ -47,12 +47,16 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
-    public List<UUID> enrolledStudentIds(UUID courseId, Collection<UUID> studentIds) {
+    public Map<UUID, String> enrollmentStatusByStudent(UUID courseId, Collection<UUID> studentIds) {
         // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
         if (courseId == null || studentIds == null || studentIds.isEmpty()) {
-            return List.of();
+            return Map.of();
         }
-        return enrollmentRepo.enrolledStudentIds(courseId, studentIds);
+        Map<UUID, String> byStudent = new HashMap<>();
+        for (Object[] row : enrollmentRepo.enrollmentStatuses(courseId, studentIds)) {
+            byStudent.put((UUID) row[0], (String) row[1]);
+        }
+        return byStudent;
     }
 
     @Override
@@ -64,6 +68,18 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
         e.setEnrollmentDate(LocalDate.now());
         e.setStatus(STATUS_EFFECTIVE);
         enrollmentRepo.save(e);
+    }
+
+    @Override
+    @Transactional
+    public void reactivateEnrollments(UUID courseId, Collection<UUID> studentIds) {
+        if (courseId == null || studentIds == null || studentIds.isEmpty()) {
+            return;
+        }
+        // The date is restated because this is the day they came back, not the day they first
+        // enrolled — the row is the same one only because the unique index leaves no other.
+        enrollmentRepo.reactivateEnrollments(
+            courseId, studentIds, STATUS_EFFECTIVE, LocalDate.now());
     }
 
     @Override

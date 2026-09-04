@@ -19,7 +19,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,21 +54,41 @@ public class CourseEnrollmentController {
     @PostMapping
     @PreAuthorize("@authz.canWriteCourseEnrollment(authentication, #request.courseId())")
     @Operation(summary = "Inscribir un estudiante al curso (registro manual)")
-    public ResponseEntity<EnrollResponse> enrollSingle(@Valid @RequestBody EnrollStudentRequest request) {
+    public ResponseEntity<EnrollResponse> enrollSingle(@Valid @RequestBody EnrollStudentRequest request,
+                                                       JwtAuthenticationToken token) {
         EnrollResult result = enrollmentService.enroll(new EnrollToCourseCommand(
-            request.courseId(), List.of(toCommand(request.student()))));
+            request.courseId(), List.of(toCommand(request.student())), currentUser(token)));
         return ResponseEntity.ok(EnrollResponse.from(result));
     }
 
     @PostMapping("/sync")
     @PreAuthorize("@authz.canWriteCourseEnrollment(authentication, #request.courseId())")
     @Operation(summary = "Sincronizar nomina (PDF): crea estudiantes e inscribe al curso. Transaccion ACID")
-    public ResponseEntity<EnrollResponse> sync(@Valid @RequestBody EnrollCourseRequest request) {
+    public ResponseEntity<EnrollResponse> sync(@Valid @RequestBody EnrollCourseRequest request,
+                                               JwtAuthenticationToken token) {
         List<CreateStudentCommand> students = request.students().stream()
             .map(CourseEnrollmentController::toCommand).toList();
         EnrollResult result = enrollmentService.enroll(
-            new EnrollToCourseCommand(request.courseId(), students));
+            new EnrollToCourseCommand(request.courseId(), students, currentUser(token)));
         return ResponseEntity.ok(EnrollResponse.from(result));
+    }
+
+    /**
+     * The caller's id, for the row that records who put a student back on the roll.
+     *
+     * <p>Refused rather than left null when the token carries no usable subject: an audit column
+     * that silently says "nobody" reads as a decision the school made anonymously.
+     */
+    private static UUID currentUser(JwtAuthenticationToken token) {
+        String subject = token.getToken().getSubject();
+        if (subject == null) {
+            throw new AccessDeniedException("Token sin sujeto utilizable");
+        }
+        try {
+            return UUID.fromString(subject);
+        } catch (IllegalArgumentException e) {
+            throw new AccessDeniedException("Token sin sujeto utilizable");
+        }
     }
 
     @GetMapping

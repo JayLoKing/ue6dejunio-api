@@ -13,9 +13,22 @@ import java.util.UUID;
 public interface ICourseEnrollmentDomain {
     boolean courseExists(UUID courseId);
 
-    /** Which of these students already sit in the course, asked once for the whole set. */
-    List<UUID> enrolledStudentIds(UUID courseId, Collection<UUID> studentIds);
+    /**
+     * The enrolment each of these students holds in the course and the status it is in, asked once
+     * for the whole set.
+     *
+     * <p>Every status, not just the ones in force, and that is the point: an absent student has no
+     * row and needs one, while a student with a closed row cannot be given a second — {@code
+     * (id_student, id_course)} is unique — and has to come back through the row that recorded them
+     * leaving. Answering both questions here is what keeps an import of forty at a fixed number of
+     * queries instead of one lookup per name.
+     */
+    Map<UUID, String> enrollmentStatusByStudent(UUID courseId, Collection<UUID> studentIds);
+
     void saveEnrollment(UUID studentId, UUID courseId);
+
+    /** Reopens the closed enrolments these students hold in the course, in one statement. */
+    void reactivateEnrollments(UUID courseId, Collection<UUID> studentIds);
     PageResult<CourseStudent> studentsByCourse(UUID courseId, PageQuery pageQuery);
 
     /**

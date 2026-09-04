@@ -31,4 +31,13 @@ public interface IStudentDomain {
      * took a student off the roll.
      */
     void updateStatus(UUID studentId, StudentStatusChange change);
+
+    /**
+     * The same change applied to a whole set of students, in one statement.
+     *
+     * <p>For the moments the school moves people together rather than one at a time — an imported
+     * roster putting back everyone who had left. Asking per student would cost a read and a write
+     * per name on the one path whose whole design is a fixed number of queries for the roster.
+     */
+    void updateStatusIn(Collection<UUID> studentIds, StudentStatusChange change);
 }
