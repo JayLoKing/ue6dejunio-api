@@ -1,10 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.GradeItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.ParallelItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.SubjectItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.TeacherItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.catalog.ICatalogDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
@@ -25,13 +27,16 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     private final JpaGradeRepository gradeRepo;
     private final JpaParallelRepository parallelRepo;
     private final JpaUserRepository userRepo;
+    private final JpaAcademicYearRepository academicYearRepo;
 
     public CatalogRepositoryAdapter(JpaSubjectRepository subjectRepo, JpaGradeRepository gradeRepo,
-                                    JpaParallelRepository parallelRepo, JpaUserRepository userRepo) {
+                                    JpaParallelRepository parallelRepo, JpaUserRepository userRepo,
+                                    JpaAcademicYearRepository academicYearRepo) {
         this.subjectRepo = subjectRepo;
         this.gradeRepo = gradeRepo;
         this.parallelRepo = parallelRepo;
         this.userRepo = userRepo;
+        this.academicYearRepo = academicYearRepo;
     }
 
     @Override
@@ -66,6 +71,13 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
             : userRepo.findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(TEACHER_ROLE, technical);
         return list.stream()
             .map(u -> new TeacherItem(u.getId(), u.getNames() + " " + u.getLastNames(), u.getEmail(), u.isTechnical()))
+            .toList();
+    }
+
+    @Override
+    public List<AcademicYearItem> academicYears() {
+        return academicYearRepo.findAllByOrderByYearDesc().stream()
+            .map(y -> new AcademicYearItem(y.getId(), y.getYear()))
             .toList();
     }
 }

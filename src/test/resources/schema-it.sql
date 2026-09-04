@@ -276,7 +276,10 @@ INSERT INTO grades (id_level, name)
     SELECT id_level, 'Primero' FROM levels WHERE name = 'Primaria Comunitaria Vocacional'
     ON CONFLICT DO NOTHING;
 INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C') ON CONFLICT DO NOTHING;
-INSERT INTO academic_years (year) VALUES (2026) ON CONFLICT DO NOTHING;
+-- Two of them, because the directory is about one gestión at a time and a single year cannot tell
+-- a listing that picked the right one from a listing that has no rule at all. 2026 is the current
+-- one everywhere: every helper that does not name a year resolves the latest.
+INSERT INTO academic_years (year) VALUES (2025), (2026) ON CONFLICT DO NOTHING;
 INSERT INTO knowledge_areas (name, display_order) VALUES
     ('Cosmos y Pensamiento', 1),
     ('Comunidad y Sociedad', 2),

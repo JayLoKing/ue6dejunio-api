@@ -30,7 +30,8 @@ class TrimesterPeriodIT extends AbstractIntegrationTest {
     @BeforeEach
     void seed() {
         director = seedUser("Director", false);
-        academicYearId = jdbc.queryForObject("SELECT id_academic_year FROM academic_years LIMIT 1", Integer.class);
+        // The current gestión, which is the one schema-it.sql configured trimesters for.
+        academicYearId = currentAcademicYearId();
     }
 
     @Test

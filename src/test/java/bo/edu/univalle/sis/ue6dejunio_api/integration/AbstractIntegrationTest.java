@@ -90,9 +90,18 @@ public abstract class AbstractIntegrationTest {
         "courses", "students", "users"
     };
 
+    /** The gestiones schema-it.sql seeds. Anything else in the table was made up by a test. */
+    private static final String SEEDED_YEARS = "(2025, 2026)";
+
     @BeforeEach
     void resetSharedState() {
         jdbc.execute("TRUNCATE TABLE " + String.join(", ", TRANSACTIONAL_TABLES) + " CASCADE");
+        // A test that needs a year of its own inserts one, and academic_years is a catalog table
+        // nobody truncates. Left behind, the highest of those invented years becomes what every
+        // later test calls the current gestión — and the student directory answers about it.
+        jdbc.update("DELETE FROM academic_trimesters WHERE id_academic_year IN "
+            + "(SELECT id_academic_year FROM academic_years WHERE year NOT IN " + SEEDED_YEARS + ")");
+        jdbc.update("DELETE FROM academic_years WHERE year NOT IN " + SEEDED_YEARS);
         // Rate-limit buckets live in the shared context, not the database, so they need their own
         // reset: otherwise a test that deliberately exhausts a bucket makes the next one fail 429.
         bucketStore.clear();
@@ -132,18 +141,37 @@ public abstract class AbstractIntegrationTest {
         return id;
     }
 
+    /** A course in the current gestión — the year every caller who names none is talking about. */
     protected UUID seedCourse(UUID homeroomTeacherId, String parallelName) {
+        return seedCourse(homeroomTeacherId, parallelName, currentAcademicYearId());
+    }
+
+    /**
+     * A course in a named gestión. {@code UNIQUE (id_grade, id_parallel, id_academic_year)} is what
+     * makes this worth having: the same grade and parallel in another year is another course, which
+     * is exactly how a student who moves up keeps one record and gains a second enrolment.
+     */
+    protected UUID seedCourse(UUID homeroomTeacherId, String parallelName, Integer academicYearId) {
         UUID id = UUID.randomUUID();
         Integer gradeId = jdbc.queryForObject("SELECT id_grade FROM grades LIMIT 1", Integer.class);
         Integer parallelId = jdbc.queryForObject(
             "SELECT id_parallel FROM parallels WHERE name = ?", Integer.class, parallelName);
-        Integer academicYearId = jdbc.queryForObject(
-            "SELECT id_academic_year FROM academic_years LIMIT 1", Integer.class);
         jdbc.update(
             "INSERT INTO courses (id_course, id_grade, id_parallel, id_academic_year, "
                 + "id_homeroom_teacher, is_active) VALUES (?,?,?,?,?,true)",
             id, gradeId, parallelId, academicYearId, homeroomTeacherId);
         return id;
+    }
+
+    /** The latest year on record, which is what the application calls the current gestión. */
+    protected Integer currentAcademicYearId() {
+        return jdbc.queryForObject(
+            "SELECT id_academic_year FROM academic_years ORDER BY year DESC LIMIT 1", Integer.class);
+    }
+
+    protected Integer academicYearId(int year) {
+        return jdbc.queryForObject(
+            "SELECT id_academic_year FROM academic_years WHERE year = ?", Integer.class, year);
     }
 
     protected UUID seedClassGroup(UUID courseId, UUID teacherId, String subjectName) {

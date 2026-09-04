@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.catalog;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.GradeItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.ParallelItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.SubjectItem;
@@ -46,6 +47,12 @@ public class CatalogController {
     @Operation(summary = "Listar paralelos")
     public ResponseEntity<List<ParallelItem>> parallels() {
         return ResponseEntity.ok(catalogService.parallels());
+    }
+
+    @GetMapping("/academic-years")
+    @Operation(summary = "Listar gestiones, de la mas reciente a la mas antigua")
+    public ResponseEntity<List<AcademicYearItem>> academicYears() {
+        return ResponseEntity.ok(catalogService.academicYears());
     }
 
     @GetMapping("/teachers")

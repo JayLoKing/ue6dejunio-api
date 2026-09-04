@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.catalog;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.GradeItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.ParallelItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.SubjectItem;
@@ -47,6 +48,11 @@ public class CatalogService implements ICatalogService {
     @Override
     public List<TeacherItem> teachers(Boolean technical) {
         return catalogDomain.teachers(technical);
+    }
+
+    @Override
+    public List<AcademicYearItem> academicYears() {
+        return catalogDomain.academicYears();
     }
 
     @Override
