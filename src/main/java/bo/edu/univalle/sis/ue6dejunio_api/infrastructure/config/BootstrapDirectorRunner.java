@@ -12,6 +12,16 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Creates the one account that has to exist before anybody can log in.
+ *
+ * <p>Every value comes from the environment and none of them has a fallback in this file. The
+ * Director's e-mail and password used to be defaults here, which meant an install that configured
+ * nothing still came up with a working account whose credentials are readable by anyone with the
+ * repository — on the one piece of code that runs before there is any user to notice. Unconfigured
+ * now creates nothing at all: an install with no Director is obvious the first time somebody tries
+ * to sign in, and an install with a publicly known one is not.
+ */
 @Component
 @Profile("!test & !it")
 public class BootstrapDirectorRunner implements CommandLineRunner {
@@ -31,11 +41,11 @@ public class BootstrapDirectorRunner implements CommandLineRunner {
         IUserDomain userDomain,
         IRoleDomain roleDomain,
         PasswordEncoder passwordEncoder,
-        @Value("${app.bootstrap.director.email:director@ue6.bo}") String email,
-        @Value("${app.bootstrap.director.password:Director2026}") String password,
-        @Value("${app.bootstrap.director.ci:0000000}") String ci,
-        @Value("${app.bootstrap.director.names:Director}") String names,
-        @Value("${app.bootstrap.director.last-names:Inicial}") String lastNames
+        @Value("${app.bootstrap.director.email:}") String email,
+        @Value("${app.bootstrap.director.password:}") String password,
+        @Value("${app.bootstrap.director.ci:}") String ci,
+        @Value("${app.bootstrap.director.names:}") String names,
+        @Value("${app.bootstrap.director.last-names:}") String lastNames
     ) {
         this.userDomain = userDomain;
         this.roleDomain = roleDomain;
@@ -49,6 +59,13 @@ public class BootstrapDirectorRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (isBlank(email) || isBlank(password)) {
+            // Half-configured is a mistake, and it is said out loud rather than resolved into an
+            // account nobody meant to create.
+            log.info("Bootstrap: sin credenciales de Director en el entorno, no se crea ninguna "
+                + "cuenta. Configurar BOOTSTRAP_DIRECTOR_EMAIL y BOOTSTRAP_DIRECTOR_PASSWORD.");
+            return;
+        }
         if (userDomain.findByEmail(email).isPresent()) {
             return;
         }
@@ -66,6 +83,13 @@ public class BootstrapDirectorRunner implements CommandLineRunner {
             .active(true)
             .build();
         userDomain.save(user);
-        log.info("Bootstrap: usuario DIRECTOR creado [{}]. Cambiar contrasena tras primer login.", email);
+        // The e-mail identifies the account and is what the person will type; the password is not
+        // logged, and the first login has to replace it anyway.
+        log.info("Bootstrap: usuario DIRECTOR creado [{}]. Cambiar contrasena tras primer login.",
+            email);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
