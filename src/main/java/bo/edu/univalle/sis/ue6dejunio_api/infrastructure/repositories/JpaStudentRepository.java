@@ -43,7 +43,12 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
      * closes the student's enrolments in the same transaction that closes the student, so this
      * reads as "the enrolment that matches what the student now is" — and it is what lets the
      * Director filter withdrawn students by the grade they were in. Joined on 'Effective' alone,
-     * every withdrawn row came back with no course at all and the grade filter excluded them alL.
+     * every withdrawn row came back with no course at all and the grade filter excluded them all.
+     *
+     * Known limit: a student holding two enrolments of the same status — two courses, or the same
+     * course across two academic years — comes back as two content rows while the count query
+     * counts them once. The duplication predates this join; what it needs is a rule about which
+     * year the directory is about, and that is a decision, not a fix.
      */
 
     @Query(value = """
