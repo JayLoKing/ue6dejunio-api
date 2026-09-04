@@ -12,6 +12,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusCha
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
@@ -29,13 +30,16 @@ public class StudentService implements IStudentService {
     private final IStudentDomain studentDomain;
     private final ICourseEnrollmentDomain courseEnrollmentDomain;
     private final IDomainEventPublisher events;
+    private final IAcademicYearDomain academicYearDomain;
 
     public StudentService(IStudentDomain studentDomain,
                           ICourseEnrollmentDomain courseEnrollmentDomain,
-                          IDomainEventPublisher events) {
+                          IDomainEventPublisher events,
+                          IAcademicYearDomain academicYearDomain) {
         this.studentDomain = studentDomain;
         this.courseEnrollmentDomain = courseEnrollmentDomain;
         this.events = events;
+        this.academicYearDomain = academicYearDomain;
     }
 
     @Override
@@ -49,7 +53,26 @@ public class StudentService implements IStudentService {
     @Transactional(readOnly = true)
     public PageResult<StudentDirectoryItem> search(StudentDirectoryQuery query,
                                                    PageQuery pageQuery) {
-        return studentDomain.searchDirectory(query, pageQuery);
+        return studentDomain.searchDirectory(inSomeGestion(query), pageQuery);
+    }
+
+    /**
+     * A directory listing is always about one gestión, and this is where the caller who named none
+     * gets given the current one.
+     *
+     * <p>Left open, the listing spans every year at once: a student who moved up holds an enrolment
+     * per year and comes back once for each, while the total counts the person once. Pinning the
+     * year is what makes the rows and the total agree.
+     *
+     * <p>A course is left alone, because a course already belongs to exactly one gestión. Narrowing
+     * to the current year on top of it would answer with nothing for every teacher whose course is
+     * not this year's.
+     */
+    private StudentDirectoryQuery inSomeGestion(StudentDirectoryQuery query) {
+        if (query.academicYearId() != null || query.courseId() != null) {
+            return query;
+        }
+        return query.inAcademicYear(academicYearDomain.currentYearId());
     }
 
     @Override

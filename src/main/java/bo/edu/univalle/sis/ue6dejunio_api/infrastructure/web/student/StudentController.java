@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -70,12 +71,14 @@ public class StudentController {
      */
     @GetMapping("/search")
     @Operation(summary = "Buscar estudiantes por nombre, apellido, RUDE o carnet. "
-        + "Filtros: curso, grado, paralelo y estado. Docente acotado a su curso de aula")
+        + "Filtros: curso, grado, paralelo, gestion y estado. Sin gestion responde por la actual. "
+        + "Docente acotado a su curso de aula")
     public ResponseEntity<PagedResponse<StudentDirectoryResponse>> search(
-        @RequestParam(required = false) String q,
+        @RequestParam(required = false) @Size(max = 100) String q,
         @RequestParam(required = false) UUID courseId,
         @RequestParam(required = false) Integer gradeId,
         @RequestParam(required = false) Integer parallelId,
+        @RequestParam(required = false) Integer academicYearId,
         @RequestParam(required = false) String scope,
         @RequestParam(defaultValue = "1") @Min(1) int offset,
         @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit,
@@ -90,7 +93,7 @@ public class StudentController {
         UUID effectiveCourseId = authz.effectiveDirectoryCourseId(authentication, courseId);
         PageQuery pageQuery = PageQuery.of(offset - 1, limit, SortField.asc("id"));
         StudentDirectoryQuery query = new StudentDirectoryQuery(
-            q, effectiveCourseId, gradeId, parallelId, effectiveScope);
+            q, effectiveCourseId, gradeId, parallelId, academicYearId, effectiveScope);
         return ResponseEntity.ok(PagedResponse.of(
             studentService.search(query, pageQuery).map(StudentDirectoryResponse::from)));
     }

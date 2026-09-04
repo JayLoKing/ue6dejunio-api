@@ -195,6 +195,113 @@ class StudentDirectorySearchIT extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.content[0].id").value(studentInOtherCourse.toString()));
     }
 
+    /**
+     * The row has to say which gestión it is talking about. A student's grade is only true of one
+     * year, so a listing that shows "Primero A" without the year is showing an undated fact.
+     */
+    @Test
+    void everyRow_saysWhichGestionItIsAbout() throws Exception {
+        mvc.perform(get("/api/students/search").param("q", "Lopez")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].academicYear").value(2026));
+    }
+
+    /**
+     * The bug this filter exists to close. A student who moved up holds one enrolment per gestión —
+     * same person, same record, another grade — and the directory used to return them once per
+     * enrolment while the count counted them once. Now the listing is about a single year, so the
+     * rows and the total agree again.
+     */
+    @Test
+    void studentEnrolledInTwoGestions_isOneRow_andTheTotalAgrees() throws Exception {
+        seedEnrollment(studentInHomeroom, seedCourse(teacher, "A", academicYearId(2025)));
+
+        mvc.perform(get("/api/students/search").param("q", "Lopez")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.total").value(1))
+            .andExpect(jsonPath("$.content[0].academicYear").value(2026));
+    }
+
+    /** Naming no gestión means the current one, the same way naming no scope means the roll. */
+    @Test
+    void withoutAGestion_theOtherYearsAreLeftOut() throws Exception {
+        UUID pastStudent = seedNamedStudent("Rosa", "Quispe", "5555555555555");
+        seedEnrollment(pastStudent, seedCourse(otherTeacher, "C", academicYearId(2025)));
+
+        mvc.perform(get("/api/students/search")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(2))
+            .andExpect(jsonPath("$.content[?(@.rudeCode == '5555555555555')]").isEmpty());
+    }
+
+    @Test
+    void gestionFilter_answersAboutThatYearInstead() throws Exception {
+        UUID pastStudent = seedNamedStudent("Rosa", "Quispe", "5555555555555");
+        seedEnrollment(pastStudent, seedCourse(otherTeacher, "C", academicYearId(2025)));
+
+        mvc.perform(get("/api/students/search")
+                .param("academicYearId", String.valueOf(academicYearId(2025)))
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(pastStudent.toString()))
+            .andExpect(jsonPath("$.content[0].parallel").value("C"))
+            .andExpect(jsonPath("$.content[0].academicYear").value(2025));
+    }
+
+    /**
+     * A course already belongs to exactly one gestión, so pinning the year on top of it would
+     * answer with nothing for any teacher whose course is not this year's.
+     */
+    @Test
+    void teacherPinnedToTheirCourse_isNotNarrowedByTheCurrentGestion() throws Exception {
+        UUID pastTeacher = seedUser("Teacher", false);
+        UUID pastCourse = seedCourse(pastTeacher, "C", academicYearId(2025));
+        UUID pastStudent = seedNamedStudent("Rosa", "Quispe", "5555555555555");
+        seedEnrollment(pastStudent, pastCourse);
+
+        mvc.perform(get("/api/students/search")
+                .header("Authorization", "Bearer " + tokenFor(pastTeacher, "Teacher")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(pastStudent.toString()));
+    }
+
+    /**
+     * A student is registered before they are enrolled, and between those two acts they belong to
+     * no gestión at all. Narrowing to a year must not hide them: they are the secretariat's pending
+     * work, and a filter that drops them makes the school look like it never registered them.
+     */
+    @Test
+    void studentWithNoEnrolmentYet_isStillListed() throws Exception {
+        UUID unenrolled = seedNamedStudent("Ana", "Mamani", "7777777777777");
+
+        mvc.perform(get("/api/students/search").param("q", "Mamani")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(unenrolled.toString()))
+            .andExpect(jsonPath("$.content[0].grade").doesNotExist())
+            .andExpect(jsonPath("$.content[0].academicYear").doesNotExist());
+    }
+
+    /** The same when a gestión was named outright, and not just defaulted to. */
+    @Test
+    void studentWithNoEnrolmentYet_survivesAnExplicitGestion() throws Exception {
+        UUID unenrolled = seedNamedStudent("Ana", "Mamani", "7777777777777");
+
+        mvc.perform(get("/api/students/search")
+                .param("academicYearId", String.valueOf(academicYearId(2025)))
+                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(unenrolled.toString()));
+    }
+
     /** A scope the catalog does not have is a caller mistake, not an empty page. */
     @Test
     void unknownScope_returns400() throws Exception {

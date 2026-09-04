@@ -78,10 +78,12 @@ public class StudentRepositoryAdapter implements IStudentDomain {
         String q = query.q();
         if (q == null || q.isBlank()) {
             return SpringPaging.toPageResult(repo.listDirectory(
-                query.courseId(), query.gradeId(), query.parallelId(), status, pageable));
+                query.courseId(), query.gradeId(), query.parallelId(), query.academicYearId(),
+                status, pageable));
         }
         return SpringPaging.toPageResult(repo.searchDirectory(
-            q.trim(), query.courseId(), query.gradeId(), query.parallelId(), status, pageable));
+            q.trim(), query.courseId(), query.gradeId(), query.parallelId(),
+            query.academicYearId(), status, pageable));
     }
 
     @Override

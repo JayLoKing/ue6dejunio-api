@@ -14,11 +14,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusCha
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +32,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,19 +43,21 @@ class StudentServiceTest {
     @Mock private IStudentDomain studentDomain;
     @Mock private ICourseEnrollmentDomain courseEnrollmentDomain;
     @Mock private IDomainEventPublisher events;
+    @Mock private IAcademicYearDomain academicYearDomain;
     @InjectMocks private StudentService studentService;
+
+    private final PageQuery pageQuery = PageQuery.of(0, 30);
+    private final PageResult<StudentDirectoryItem> emptyPage = new PageResult<>(List.of(), 0, 30, 0);
 
     @Test
     void search_delegatesToDomain() {
         UUID courseId = UUID.randomUUID();
-        PageQuery pageQuery = PageQuery.of(0, 30);
         StudentDirectoryQuery query = StudentDirectoryQuery.of("Lopez", courseId);
-        PageResult<StudentDirectoryItem> expected = new PageResult<>(List.of(), 0, 30, 0);
-        when(studentDomain.searchDirectory(query, pageQuery)).thenReturn(expected);
+        when(studentDomain.searchDirectory(query, pageQuery)).thenReturn(emptyPage);
 
         PageResult<StudentDirectoryItem> result = studentService.search(query, pageQuery);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(result).isSameAs(emptyPage);
     }
 
     /**
@@ -62,9 +67,54 @@ class StudentServiceTest {
      */
     @Test
     void directoryQuery_withoutAScope_meansTheOnesStillOnTheRoll() {
-        StudentDirectoryQuery query = new StudentDirectoryQuery(null, null, null, null, null);
+        StudentDirectoryQuery query = new StudentDirectoryQuery(null, null, null, null, null, null);
 
         assertThat(query.scope()).isEqualTo(StudentDirectoryScope.ACTIVE);
+    }
+
+    /**
+     * The directory speaks about one gestión. Without that rule a student who moved up appears once
+     * per enrolment while the total counts them once, and the page disagrees with its own footer.
+     */
+    @Test
+    void search_namingNoGestion_asksAboutTheCurrentOne() {
+        when(academicYearDomain.currentYearId()).thenReturn(7);
+        when(studentDomain.searchDirectory(any(StudentDirectoryQuery.class), eq(pageQuery)))
+            .thenReturn(emptyPage);
+
+        studentService.search(StudentDirectoryQuery.of(null, null), pageQuery);
+
+        ArgumentCaptor<StudentDirectoryQuery> sent =
+            ArgumentCaptor.forClass(StudentDirectoryQuery.class);
+        verify(studentDomain).searchDirectory(sent.capture(), eq(pageQuery));
+        assertThat(sent.getValue().academicYearId()).isEqualTo(7);
+    }
+
+    @Test
+    void search_namingAGestion_keepsTheOneItWasGiven() {
+        StudentDirectoryQuery query = new StudentDirectoryQuery(
+            null, null, null, null, 3, StudentDirectoryScope.ALL);
+        when(studentDomain.searchDirectory(query, pageQuery)).thenReturn(emptyPage);
+
+        studentService.search(query, pageQuery);
+
+        verify(studentDomain).searchDirectory(query, pageQuery);
+        verify(academicYearDomain, never()).currentYearId();
+    }
+
+    /**
+     * A course belongs to exactly one gestión already. Narrowing to the current year on top of it
+     * would answer with nothing for every teacher whose course is not this year's.
+     */
+    @Test
+    void search_pinnedToACourse_doesNotReachForTheCurrentGestion() {
+        StudentDirectoryQuery query = StudentDirectoryQuery.of(null, UUID.randomUUID());
+        when(studentDomain.searchDirectory(query, pageQuery)).thenReturn(emptyPage);
+
+        studentService.search(query, pageQuery);
+
+        verify(studentDomain).searchDirectory(query, pageQuery);
+        verify(academicYearDomain, never()).currentYearId();
     }
 
     private static WithdrawStudentCommand withdrawal(UUID id, StudentWithdrawalReason reason,

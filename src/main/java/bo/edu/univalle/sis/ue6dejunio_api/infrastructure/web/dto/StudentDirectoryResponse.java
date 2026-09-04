@@ -8,6 +8,7 @@ import java.util.UUID;
  * @param grade the course the student sits in, or sat in before leaving. Null for a student with
  *              no enrolment at all
  * @param status "Effective" or "Withdrawn" — a listing that spans the school shows both
+ * @param academicYear the gestión the grade and parallel are true of
  */
 public record StudentDirectoryResponse(
     UUID id,
@@ -17,11 +18,12 @@ public record StudentDirectoryResponse(
     String grade,
     String parallel,
     String level,
-    String status
+    String status,
+    Integer academicYear
 ) {
     public static StudentDirectoryResponse from(StudentDirectoryItem item) {
         return new StudentDirectoryResponse(
             item.id(), item.rudeCode(), item.identityCard(), item.fullName(),
-            item.grade(), item.parallel(), item.level(), item.status());
+            item.grade(), item.parallel(), item.level(), item.status(), item.academicYear());
     }
 }

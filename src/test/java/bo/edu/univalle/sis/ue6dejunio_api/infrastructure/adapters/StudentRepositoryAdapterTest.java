@@ -57,21 +57,21 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_blankQ_routesToListDirectory() {
         UUID courseId = UUID.randomUUID();
-        when(repo.listDirectory(eq(courseId), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
-            .thenReturn(emptyPage(pageable));
+        when(repo.listDirectory(eq(courseId), isNull(), isNull(), isNull(), eq(ACTIVE),
+            eq(pageable))).thenReturn(emptyPage(pageable));
 
         PageResult<StudentDirectoryItem> result = adapter.searchDirectory(
             StudentDirectoryQuery.of("", courseId), pageQuery);
 
         assertThat(result.content()).isEmpty();
         assertThat(result.size()).isEqualTo(30);
-        verify(repo, times(1)).listDirectory(courseId, null, null, ACTIVE, pageable);
-        verify(repo, never()).searchDirectory(any(), any(), any(), any(), any(), any());
+        verify(repo, times(1)).listDirectory(courseId, null, null, null, ACTIVE, pageable);
+        verify(repo, never()).searchDirectory(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void searchDirectory_nullQ_routesToListDirectory() {
-        when(repo.listDirectory(isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
+        when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
             .thenReturn(emptyPage(pageable));
 
         PageResult<StudentDirectoryItem> result = adapter.searchDirectory(
@@ -79,13 +79,13 @@ class StudentRepositoryAdapterTest {
 
         assertThat(result.content()).isEmpty();
         assertThat(result.size()).isEqualTo(30);
-        verify(repo, times(1)).listDirectory(null, null, null, ACTIVE, pageable);
-        verify(repo, never()).searchDirectory(any(), any(), any(), any(), any(), any());
+        verify(repo, times(1)).listDirectory(null, null, null, null, ACTIVE, pageable);
+        verify(repo, never()).searchDirectory(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void searchDirectory_nonBlankQ_routesToLikeSearch() {
-        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), eq(ACTIVE),
+        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), isNull(), eq(ACTIVE),
             eq(pageable))).thenReturn(emptyPage(pageable));
 
         PageResult<StudentDirectoryItem> result = adapter.searchDirectory(
@@ -93,53 +93,76 @@ class StudentRepositoryAdapterTest {
 
         assertThat(result.content()).isEmpty();
         assertThat(result.size()).isEqualTo(30);
-        verify(repo, times(1)).searchDirectory("Lopez", null, null, null, ACTIVE, pageable);
-        verify(repo, never()).listDirectory(any(), any(), any(), any(), any());
+        verify(repo, times(1)).searchDirectory("Lopez", null, null, null, null, ACTIVE, pageable);
+        verify(repo, never()).listDirectory(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void searchDirectory_whitespaceOnlyQ_routesToListDirectory() {
-        when(repo.listDirectory(isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
+        when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
             .thenReturn(emptyPage(pageable));
 
         adapter.searchDirectory(StudentDirectoryQuery.of("   ", null), pageQuery);
 
-        verify(repo, times(1)).listDirectory(null, null, null, ACTIVE, pageable);
-        verify(repo, never()).searchDirectory(any(), any(), any(), any(), any(), any());
+        verify(repo, times(1)).listDirectory(null, null, null, null, ACTIVE, pageable);
+        verify(repo, never()).searchDirectory(any(), any(), any(), any(), any(), any(), any());
     }
 
     /** Typing spaces around a surname is typing, not part of the surname. */
     @Test
     void searchDirectory_trimsWhatWasTyped() {
-        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), eq(ACTIVE),
+        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), isNull(), eq(ACTIVE),
             eq(pageable))).thenReturn(emptyPage(pageable));
 
         adapter.searchDirectory(StudentDirectoryQuery.of("  Lopez  ", null), pageQuery);
 
-        verify(repo, times(1)).searchDirectory("Lopez", null, null, null, ACTIVE, pageable);
+        verify(repo, times(1)).searchDirectory("Lopez", null, null, null, null, ACTIVE, pageable);
     }
 
     /** ALL narrows to nothing: a null status is how the query says "whatever they are now". */
     @Test
     void searchDirectory_spanningEverybody_bindsNoStatus() {
-        when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), eq(pageable)))
+        when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), isNull(), eq(pageable)))
             .thenReturn(emptyPage(pageable));
 
         adapter.searchDirectory(new StudentDirectoryQuery(
-            null, null, null, null, StudentDirectoryScope.ALL), pageQuery);
+            null, null, null, null, null, StudentDirectoryScope.ALL), pageQuery);
 
-        verify(repo, times(1)).listDirectory(null, null, null, null, pageable);
+        verify(repo, times(1)).listDirectory(null, null, null, null, null, pageable);
     }
 
     @Test
     void searchDirectory_gradeAndParallel_travelToTheQuery() {
-        when(repo.listDirectory(isNull(), eq(3), eq(2), eq("Withdrawn"), eq(pageable)))
+        when(repo.listDirectory(isNull(), eq(3), eq(2), isNull(), eq("Withdrawn"), eq(pageable)))
             .thenReturn(emptyPage(pageable));
 
         adapter.searchDirectory(new StudentDirectoryQuery(
-            null, null, 3, 2, StudentDirectoryScope.WITHDRAWN), pageQuery);
+            null, null, 3, 2, null, StudentDirectoryScope.WITHDRAWN), pageQuery);
 
-        verify(repo, times(1)).listDirectory(null, 3, 2, "Withdrawn", pageable);
+        verify(repo, times(1)).listDirectory(null, 3, 2, null, "Withdrawn", pageable);
+    }
+
+    /** The gestión reaches both queries: the listing one and the one behind the search box. */
+    @Test
+    void searchDirectory_gestion_travelsToTheListQuery() {
+        when(repo.listDirectory(isNull(), isNull(), isNull(), eq(5), eq(ACTIVE), eq(pageable)))
+            .thenReturn(emptyPage(pageable));
+
+        adapter.searchDirectory(new StudentDirectoryQuery(
+            null, null, null, null, 5, StudentDirectoryScope.ACTIVE), pageQuery);
+
+        verify(repo, times(1)).listDirectory(null, null, null, 5, ACTIVE, pageable);
+    }
+
+    @Test
+    void searchDirectory_gestion_travelsToTheSearchQuery() {
+        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), eq(5), eq(ACTIVE),
+            eq(pageable))).thenReturn(emptyPage(pageable));
+
+        adapter.searchDirectory(new StudentDirectoryQuery(
+            "Lopez", null, null, null, 5, StudentDirectoryScope.ACTIVE), pageQuery);
+
+        verify(repo, times(1)).searchDirectory("Lopez", null, null, null, 5, ACTIVE, pageable);
     }
 
     @Test

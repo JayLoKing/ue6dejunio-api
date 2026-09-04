@@ -45,26 +45,38 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
      * Director filter withdrawn students by the grade they were in. Joined on 'Effective' alone,
      * every withdrawn row came back with no course at all and the grade filter excluded them all.
      *
-     * Known limit: a student holding two enrolments of the same status — two courses, or the same
-     * course across two academic years — comes back as two content rows while the count query
-     * counts them once. The duplication predates this join; what it needs is a rule about which
-     * year the directory is about, and that is a decision, not a fix.
+     * The gestión is what keeps a student who moved up to one row. They hold an enrolment per year,
+     * all of them of the same status, so without this predicate the same person came back once per
+     * enrolment while COUNT(DISTINCT s) counted them once and the page disagreed with its own
+     * total. The application supplies the current year when the caller names neither a year nor a
+     * course.
+     *
+     * `y.id IS NULL` is the escape for a student who is registered but not yet enrolled: they
+     * belong to no gestión, and without it every year filter — including the default one — would
+     * drop the very students the secretariat still has work to do on.
+     *
+     * Narrower limit, still open: two enrolments of the same status inside ONE year — a mid-year
+     * course change — are still two content rows against a count of one. The year closes the
+     * duplication across gestiones, not this one, which needs a rule about which enrolment of a
+     * year the directory means.
      */
 
     @Query(value = """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
             s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
-            g.name, p.name, l.name, s.status)
+            g.name, p.name, l.name, s.status, y.year)
         FROM StudentEntity s
         LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
         LEFT JOIN c.grade g
         LEFT JOIN c.parallel p
+        LEFT JOIN c.academicYear y
         LEFT JOIN g.level l
         WHERE (:status IS NULL OR s.status = :status)
               AND (:courseId IS NULL OR c.id = :courseId)
               AND (:gradeId IS NULL OR g.id = :gradeId)
               AND (:parallelId IS NULL OR p.id = :parallelId)
+              AND (:academicYearId IS NULL OR y.id = :academicYearId OR y.id IS NULL)
         """,
         countQuery = """
         SELECT COUNT(DISTINCT s) FROM StudentEntity s
@@ -72,31 +84,36 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
         LEFT JOIN ce.course c
         LEFT JOIN c.grade g
         LEFT JOIN c.parallel p
+        LEFT JOIN c.academicYear y
         WHERE (:status IS NULL OR s.status = :status)
               AND (:courseId IS NULL OR c.id = :courseId)
               AND (:gradeId IS NULL OR g.id = :gradeId)
               AND (:parallelId IS NULL OR p.id = :parallelId)
+              AND (:academicYearId IS NULL OR y.id = :academicYearId OR y.id IS NULL)
         """)
     Page<StudentDirectoryItem> listDirectory(@Param("courseId") UUID courseId,
                                              @Param("gradeId") Integer gradeId,
                                              @Param("parallelId") Integer parallelId,
+                                             @Param("academicYearId") Integer academicYearId,
                                              @Param("status") String status,
                                              Pageable pageable);
 
     @Query(value = """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
             s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
-            g.name, p.name, l.name, s.status)
+            g.name, p.name, l.name, s.status, y.year)
         FROM StudentEntity s
         LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
         LEFT JOIN c.grade g
         LEFT JOIN c.parallel p
+        LEFT JOIN c.academicYear y
         LEFT JOIN g.level l
         WHERE (:status IS NULL OR s.status = :status)
               AND (:courseId IS NULL OR c.id = :courseId)
               AND (:gradeId IS NULL OR g.id = :gradeId)
               AND (:parallelId IS NULL OR p.id = :parallelId)
+              AND (:academicYearId IS NULL OR y.id = :academicYearId OR y.id IS NULL)
               AND (LOWER(s.names) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%'))
@@ -108,10 +125,12 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
         LEFT JOIN ce.course c
         LEFT JOIN c.grade g
         LEFT JOIN c.parallel p
+        LEFT JOIN c.academicYear y
         WHERE (:status IS NULL OR s.status = :status)
               AND (:courseId IS NULL OR c.id = :courseId)
               AND (:gradeId IS NULL OR g.id = :gradeId)
               AND (:parallelId IS NULL OR p.id = :parallelId)
+              AND (:academicYearId IS NULL OR y.id = :academicYearId OR y.id IS NULL)
               AND (LOWER(s.names) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%'))
@@ -121,6 +140,7 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
                                                @Param("courseId") UUID courseId,
                                                @Param("gradeId") Integer gradeId,
                                                @Param("parallelId") Integer parallelId,
+                                               @Param("academicYearId") Integer academicYearId,
                                                @Param("status") String status,
                                                Pageable pageable);
 }
