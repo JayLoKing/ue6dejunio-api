@@ -37,6 +37,17 @@ public interface IClassGroupDomain {
 
     ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId);
     Optional<ClassGroup> findById(UUID id);
+
+    /**
+     * The same lookup for a whole set at once.
+     *
+     * <p>For the callers that hold a handful of class group ids and need every one of them named —
+     * a run announcing its results across the subjects it touched. Asked one at a time that is a
+     * query per subject inside a loop.
+     *
+     * @return only the ones that exist, in no particular order
+     */
+    List<ClassGroup> findByIdIn(Collection<UUID> ids);
     List<ClassGroup> byCourse(UUID courseId);
     List<ClassGroup> byTeacher(UUID teacherId);
     UUID courseIdOfClassGroup(UUID classGroupId);

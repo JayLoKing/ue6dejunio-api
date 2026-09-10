@@ -15,6 +15,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDom
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -62,6 +63,7 @@ public class AuthorizationComponent {
     private final IPdcDomain pdcDomain;
     private final INotificationDomain notificationDomain;
     private final IAdaptationDomain adaptationDomain;
+    private final IRiskPredictionDomain riskPredictionDomain;
 
     public AuthorizationComponent(
         IClassGroupDomain classGroupDomain,
@@ -72,7 +74,8 @@ public class AuthorizationComponent {
         ICourseDomain courseDomain,
         IPdcDomain pdcDomain,
         INotificationDomain notificationDomain,
-        IAdaptationDomain adaptationDomain
+        IAdaptationDomain adaptationDomain,
+        IRiskPredictionDomain riskPredictionDomain
     ) {
         this.classGroupDomain = classGroupDomain;
         this.assessmentEventDomain = assessmentEventDomain;
@@ -83,6 +86,27 @@ public class AuthorizationComponent {
         this.pdcDomain = pdcDomain;
         this.notificationDomain = notificationDomain;
         this.adaptationDomain = adaptationDomain;
+        this.riskPredictionDomain = riskPredictionDomain;
+    }
+
+    /**
+     * Ownership of a risk prediction, resolved through the subject it is about.
+     *
+     * <p>Role alone is not enough here even though the only writable field is a flag: the endpoint
+     * answers with the prediction, so a teacher who guessed an id would read another course's
+     * student, their level and their probability of failing. Enumerating ids would walk the risk
+     * roster of the whole school.
+     */
+    public boolean canWriteRiskPrediction(Authentication authentication, UUID predictionId) {
+        if (authentication == null || predictionId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        return riskPredictionDomain.findById(predictionId)
+            .map(prediction -> canWriteClassGroup(authentication, prediction.classGroupId()))
+            .orElse(false);
     }
 
     public boolean canWriteClassGroup(Authentication authentication, UUID classGroupId) {

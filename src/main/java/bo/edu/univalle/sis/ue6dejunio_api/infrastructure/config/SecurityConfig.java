@@ -58,6 +58,11 @@ public class SecurityConfig {
                     .hasAnyRole("Director", "Teacher", "Secretary")
                 .requestMatchers(HttpMethod.GET, "/api/courses/*/overview")
                     .hasAnyRole("Director", "Teacher")
+                // Stated before the Director-only rule below, which would otherwise swallow it: a
+                // course risk panel a teacher cannot open is a panel written for nobody, and the
+                // @PreAuthorize behind it would never run to say so.
+                .requestMatchers(HttpMethod.GET, "/api/courses/*/risk")
+                    .hasAnyRole("Director", "Teacher", "Secretary")
                 .requestMatchers("/api/courses/**").hasRole("Director")
                 .requestMatchers("/api/levels/**").hasRole("Director")
                 .requestMatchers("/api/grades/**").hasRole("Director")
@@ -97,6 +102,15 @@ public class SecurityConfig {
                     .hasAnyRole("Director", "Teacher", "Secretary")
                 .requestMatchers("/api/gradebook/**").hasAnyRole("Director", "Teacher")
                 .requestMatchers("/api/pdc/**").hasAnyRole("Director", "Teacher")
+                // Academic risk. Declared here like every other route rather than left to
+                // anyRequest(), because this is where a route's reach is read from: running the
+                // model over the whole school is the Director's, a subject's own panel and rerun
+                // belong to whoever teaches it, and the secretariat reads without writing.
+                .requestMatchers("/api/risk/**").hasRole("Director")
+                .requestMatchers(HttpMethod.GET, "/api/class-groups/*/risk")
+                    .hasAnyRole("Director", "Teacher", "Secretary")
+                .requestMatchers("/api/class-groups/*/risk/**").hasAnyRole("Director", "Teacher")
+                .requestMatchers("/api/risk-predictions/**").hasAnyRole("Director", "Teacher")
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwtAuthConverter)));

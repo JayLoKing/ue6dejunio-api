@@ -16,6 +16,15 @@ Base package: `bo.edu.univalle.sis.ue6dejunio_api`.
   `@Transactional(readOnly = true)` (and per-method `@Transactional` on writes) as a
   persistence optimization — this is the established repository-adapter convention here
   and is not a violation.
+  - Exempt: a use case whose critical section is an **outbound call to another process**
+    leaves the boundary to the adapter that writes, and says so in its javadoc. Wrapping it
+    would pin a pooled connection for the length of a call this side does not control — a
+    sweep of the school is one HTTP request carrying hundreds of vectors, and the pool would
+    be hostage to whether that service is up. `RiskPredictionService.predictYear` is the
+    case this was written for.
+  - Do not "fix" such a method by splitting it into annotated helpers on the same bean:
+    `@Transactional` is proxy-based, so a call from one method of a bean to another of its
+    own bypasses the interceptor entirely. That reads as compliant and does nothing.
 - `infrastructure`: adapters (implement domain ports), JPA `entities`, Spring Data
   `repositories`, `web` (controllers + DTOs), `mappers`, `security`, `config`, `mail`.
 - Flag any import that crosses a boundary the wrong way: JPA/`entities`, `jakarta.*`

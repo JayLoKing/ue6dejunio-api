@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenExc
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -72,6 +73,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req);
+    }
+
+    /**
+     * The prediction model is down, misconfigured, or answering something unreadable.
+     *
+     * <p>503 and not 500, because nothing here is broken: another service is, and the caller can
+     * try again once somebody starts it. A 500 tells the Director his school's system failed and
+     * sends him looking in the wrong place.
+     */
+    @ExceptionHandler(RiskModelUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleModelUnavailable(RiskModelUnavailableException ex,
+                                                                HttpServletRequest req) {
+        log.error("The prediction model could not be used", ex);
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable",
+            "El modelo de predicción no está disponible en este momento.", req);
     }
 
     /** Postgres for "a unique constraint said no". The one integrity failure the caller caused. */

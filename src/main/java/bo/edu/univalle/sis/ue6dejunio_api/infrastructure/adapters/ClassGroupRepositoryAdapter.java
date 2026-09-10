@@ -126,6 +126,20 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         return classGroupRepo.findById(id).map(this::toDomain);
     }
 
+    /**
+     * {@code findByIdIn} and not {@code findAllById}: the to-one associations are EAGER on the
+     * entity and a plain lookup does not join-fetch them, so Hibernate would resolve the course,
+     * its grade and parallel, the subject and the teacher with a follow-up select each, per row.
+     * The named finder carries the graph that keeps it one query.
+     */
+    @Override
+    public List<ClassGroup> findByIdIn(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return classGroupRepo.findByIdIn(ids).stream().map(this::toDomain).toList();
+    }
+
     @Override
     public List<ClassGroup> byCourse(UUID courseId) {
         return classGroupRepo.findByCourse_IdOrderBySubject_Name(courseId).stream().map(this::toDomain).toList();

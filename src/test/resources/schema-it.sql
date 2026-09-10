@@ -242,13 +242,23 @@ CREATE TABLE IF NOT EXISTS academic_trimesters (
     CONSTRAINT chk_trimester_dates CHECK (end_date >= start_date)
 );
 
+-- One row per student, per subject, per trimester: the model judges a student IN a class group,
+-- so a single run produces one of these per subject the student sits. See V15.
 CREATE TABLE IF NOT EXISTS risk_predictions (
     id_risk_prediction uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_student uuid REFERENCES students(id_student) ON DELETE CASCADE,
-    trimester integer, risk_level varchar(20), probability_score numeric(5,4),
-    is_attended boolean DEFAULT false, features_analyzed jsonb, predicted_at timestamp DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_risk_pred UNIQUE (id_student, trimester)
+    id_student uuid NOT NULL REFERENCES students(id_student) ON DELETE CASCADE,
+    id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
+    trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
+    risk_level varchar(20) NOT NULL
+        CHECK (risk_level IN ('RiesgoCritico','EnRiesgo','SinRiesgo','Sobresaliente')),
+    p_fail numeric(5,4) NOT NULL CHECK (p_fail BETWEEN 0 AND 1),
+    p_outstanding numeric(5,4) NOT NULL CHECK (p_outstanding BETWEEN 0 AND 1),
+    is_attended boolean NOT NULL DEFAULT false,
+    features_analyzed jsonb, predicted_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_risk_pred UNIQUE (id_student, id_class_group, trimester)
 );
+CREATE INDEX IF NOT EXISTS ix_risk_pred_group_trimester
+    ON risk_predictions (id_class_group, trimester);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id_notification uuid PRIMARY KEY DEFAULT gen_random_uuid(),

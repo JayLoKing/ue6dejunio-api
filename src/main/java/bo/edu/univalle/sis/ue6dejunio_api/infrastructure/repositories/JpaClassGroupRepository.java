@@ -25,8 +25,16 @@ public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity,
     @EntityGraph(attributePaths = {"course", "course.grade", "course.parallel", "subject", "subject.area", "teacher"})
     List<ClassGroupEntity> findByTeacher_IdOrderBySubject_Name(UUID teacherId);
 
-    /** The groups a plan opens its blocks over, read with the associations the block heading names. */
-    @EntityGraph(attributePaths = {"course", "subject", "subject.area", "teacher"})
+    /**
+     * The groups a plan opens its blocks over, and the ones a risk run announces its results for.
+     *
+     * <p>Carries the same graph as the two listings above, {@code course.grade} and
+     * {@code course.parallel} included: every caller maps these through the adapter's
+     * {@code toDomain}, which reads the grade and the parallel to name the course. Left out of the
+     * graph they are two more selects per row — the follow-up-per-row this graph exists to stop,
+     * just further down.
+     */
+    @EntityGraph(attributePaths = {"course", "course.grade", "course.parallel", "subject", "subject.area", "teacher"})
     List<ClassGroupEntity> findByIdIn(Collection<UUID> ids);
 
     /**
