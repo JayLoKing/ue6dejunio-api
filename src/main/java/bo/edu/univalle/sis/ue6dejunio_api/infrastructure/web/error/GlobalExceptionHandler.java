@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenExc
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -73,6 +74,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req);
+    }
+
+    /**
+     * The model answered, and refused the batch.
+     *
+     * <p>Declared before the unavailable handler it extends, because Spring picks the most specific
+     * one and these two must not collapse. 502 and not 503: the model is up and reachable, so
+     * "try again later" is advice that will never come true. What is wrong is the batch this API
+     * assembled, and that is a defect here.
+     *
+     * <p>The model's own reason goes to the log and not to the caller — it names vectors by index,
+     * which means nothing to a teacher and everything to whoever reads the log next.
+     */
+    @ExceptionHandler(RiskModelRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleModelRejected(RiskModelRejectedException ex,
+                                                             HttpServletRequest req) {
+        log.error("The prediction model refused the batch", ex);
+        return build(HttpStatus.BAD_GATEWAY, "Bad Gateway",
+            "El modelo rechazó los datos enviados. No es una caída del servicio: hay un "
+                + "desacuerdo entre lo que el sistema mandó y lo que el modelo acepta.", req);
     }
 
     /**

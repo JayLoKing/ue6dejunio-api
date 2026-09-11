@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -16,12 +17,17 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * The model, over HTTP.
@@ -43,6 +49,15 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * field nobody wrote.
      */
     private static final int MAX_BATCH = 500;
+
+    /**
+     * How much of a refusal to keep. FastAPI's own {@code detail} is one short sentence, but a
+     * schema rejection echoes the input back, and that input is a whole class's marks.
+     */
+    private static final int MAX_REASON = 500;
+
+    /** Enough to see the pattern. A refused batch of five hundred is five hundred of the same bug. */
+    private static final int SHAPES_LOGGED = 3;
 
     private final RestClient restClient;
     private final String token;
@@ -114,11 +129,20 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
                 .body(new BatchRequest(chunk.stream().map(FeatureDto::from).toList()))
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (request, response) -> {
-                    log.error("The model rejected a batch of {}: {} {}", chunk.size(),
-                        response.getStatusCode(), response.getStatusText());
-                    throw new RiskModelUnavailableException(
-                        "The model answered " + response.getStatusCode() + " to a batch of "
-                            + chunk.size() + " vectors.");
+                    String reason = reasonFrom(response);
+                    log.error("The model answered {} to a batch of {}: {}",
+                        response.getStatusCode(), chunk.size(), reason);
+
+                    String message = "The model answered " + response.getStatusCode()
+                        + " to a batch of " + chunk.size() + " vectors: " + reason
+                        + ". Sent " + shapeOf(chunk);
+
+                    // A 4xx is a refusal, not an outage: the service answered, and it answered that
+                    // this batch breaks a rule it enforces. Retrying cannot change that, and saying
+                    // "unavailable" sends somebody to restart a process that never stopped.
+                    throw response.getStatusCode().is4xxClientError()
+                        ? new RiskModelRejectedException(message)
+                        : new RiskModelUnavailableException(message);
                 })
                 .body(new ParameterizedTypeReference<List<PredictionResponse>>() {});
         } catch (RiskModelUnavailableException e) {
@@ -126,6 +150,49 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
         } catch (RuntimeException e) {
             log.error("Could not reach the model service", e);
             throw new RiskModelUnavailableException("Could not reach the model service.", e);
+        }
+    }
+
+    /**
+     * How many marks went into each dimension, for the first few vectors of a refused batch.
+     *
+     * <p>Counts and not marks, on purpose. A refusal is logged, and a log is not a place for a
+     * class's grades — but the question a refusal raises is whether the four lists were populated
+     * on this side at all, and a count answers exactly that while a grade answers nothing. With it,
+     * "the model says the vector is empty" and "the vector left here full" are distinguishable,
+     * which is the difference between a bug in the assembler and a bug on the wire.
+     */
+    private static String shapeOf(List<RiskFeatures> chunk) {
+        return chunk.stream()
+            .limit(SHAPES_LOGGED)
+            .map(v -> "[being=" + v.being().size() + " knowing=" + v.knowing().size()
+                + " doing=" + v.doing().size() + " deciding=" + v.deciding().size()
+                + " attendance=" + (v.attendancePct() == null ? "null" : "set")
+                + " planned=" + v.plannedCriteria() + "]")
+            .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Why the model refused, in its own words.
+     *
+     * <p>FastAPI puts it in {@code detail}, and for this endpoint that string names the offending
+     * vectors. It is read here because the body is a one-shot stream: past this handler the answer
+     * is gone, and the only fact worth having is gone with it.
+     *
+     * <p>Never throws. This runs while another failure is already being reported, and a client that
+     * dies reading the explanation replaces a diagnosable error with an unrelated one.
+     */
+    private static String reasonFrom(ClientHttpResponse response) {
+        try (InputStream body = response.getBody()) {
+            String raw = new String(body.readAllBytes(), StandardCharsets.UTF_8).trim();
+            if (raw.isEmpty()) {
+                return "no body";
+            }
+            // Trimmed because the whole batch can come back inside a validation error, and the
+            // marks of a class are not something to copy into a log line.
+            return raw.length() > MAX_REASON ? raw.substring(0, MAX_REASON) + "…" : raw;
+        } catch (IOException | RuntimeException e) {
+            return "body unreadable: " + e.getMessage();
         }
     }
 

@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -170,8 +171,80 @@ class RiskModelHttpClientAdapterTest {
             .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelUnavailableException.class)
+            .isInstanceOf(RiskModelRejectedException.class)
             .hasMessageContaining("422");
+    }
+
+    /**
+     * The model says why in the body, and that sentence is the whole diagnosis.
+     *
+     * <p>A 422 from this endpoint names the offending items — "Items sin nota en alguna dimension:
+     * [0]" — which is the difference between knowing the batch disagreed with the model's own rule
+     * and knowing nothing at all. Read and discarded, the one fact worth having is thrown away at
+     * the only moment it exists, and whoever debugs it next has to reproduce the call by hand.
+     */
+    @Test
+    void predictBatch_theModelSaysWhyItRefused_keepsThatReason() {
+        server.expect(requestTo(BASE_URL + "/predict/batch"))
+            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"detail\":\"Items sin nota en alguna dimension: [0]\"}"));
+
+        assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
+            .isInstanceOf(RiskModelRejectedException.class)
+            .hasMessageContaining("Items sin nota en alguna dimension: [0]");
+    }
+
+    /**
+     * What this side believed it was sending, next to what the model says it received.
+     *
+     * <p>Counts and not marks. The two only disagree through serialization, and the question that
+     * settles it is whether the four lists were populated here at all — which a count answers and a
+     * student's grades do not. Without it the same refusal has two unrelated causes, a vector this
+     * side assembled short and a body that lost its fields on the wire, and no way to choose.
+     */
+    @Test
+    void predictBatch_refused_saysWhatShapeItBelievedItWasSending() {
+        server.expect(requestTo(BASE_URL + "/predict/batch"))
+            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+
+        assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
+            .isInstanceOf(RiskModelRejectedException.class)
+            .hasMessageContaining("being=1")
+            .hasMessageContaining("knowing=2")
+            .hasMessageContaining("doing=1")
+            .hasMessageContaining("deciding=1")
+            .hasMessageContaining("planned=8");
+    }
+
+    /** Counts, never marks: a refusal is logged, and a log is not a place for a class's grades. */
+    @Test
+    void predictBatch_refused_doesNotPutTheMarksThemselvesInTheMessage() {
+        server.expect(requestTo(BASE_URL + "/predict/batch"))
+            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+
+        assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
+            .isInstanceOf(RiskModelRejectedException.class)
+            .hasMessageNotContaining("87.50")
+            .hasMessageNotContaining("35");
+    }
+
+    /**
+     * A refusal and an outage are different problems for different people.
+     *
+     * <p>A 4xx means the model was reached, understood the request and refused it: the batch this
+     * side built disagrees with the rule the model enforces, and that is a defect here. A 5xx or a
+     * dead socket means nobody could answer. Collapsing both into "the model is unavailable" sends
+     * a teacher to restart a service that was running the whole time.
+     */
+    @Test
+    void predictBatch_theModelIsDown_isNotTheSameFailureAsBeingRefused() {
+        server.expect(requestTo(BASE_URL + "/predict/batch"))
+            .andRespond(withServerError());
+
+        assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
+            .isInstanceOf(RiskModelUnavailableException.class)
+            .isNotInstanceOf(RiskModelRejectedException.class);
     }
 
     @Test
