@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -319,8 +320,23 @@ class RiskModelHttpClientAdapterTest {
      */
     @Test
     void predictionHttpClient_offersOnlyTheVersionTheModelSpeaks() {
-        assertThat(RiskModelHttpClientAdapter.predictionHttpClient().version())
+        assertThat(RiskModelHttpClientAdapter.predictionHttpClient(Duration.ofSeconds(5)).version())
             .isEqualTo(HttpClient.Version.HTTP_1_1);
+    }
+
+    /**
+     * A model that stops answering must not take a request thread with it.
+     *
+     * <p>Java's client waits forever by default. The sweep runs outside a transaction and calls the
+     * model once per chunk of five hundred, so a service that accepts the connection and then goes
+     * quiet parks a thread per chunk with nothing to end it — and the run neither finishes nor
+     * fails, which is worse than failing.
+     */
+    @Test
+    void predictionHttpClient_givesUpOnAModelThatNeverAnswers() {
+        HttpClient client = RiskModelHttpClientAdapter.predictionHttpClient(Duration.ofSeconds(7));
+
+        assertThat(client.connectTimeout()).hasValue(Duration.ofSeconds(7));
     }
 
     /** Position is the pairing. A short answer is not a partial result, it is a misfiling. */

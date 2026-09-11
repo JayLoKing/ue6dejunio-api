@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
@@ -82,16 +83,40 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * client reads JSON the way the rest of the application does. Optional rather than required:
      * this application does not currently define one, and a missing builder is a default worth
      * falling back to, not a reason for the whole context to refuse to start.
+     *
+     * @param connectTimeout how long to wait for the model to accept a connection. Short: either
+     *                       the process is listening on the other side of loopback or it is not.
+     * @param readTimeout    how long to wait for it to answer once it has. Generous by comparison,
+     *                       because the first call of the day loads TensorFlow before it predicts
+     *                       anything, and a timeout that fires on a cold start would make the
+     *                       feature look broken every morning.
      */
     @Autowired
     public RiskModelHttpClientAdapter(
         ObjectProvider<RestClient.Builder> builders,
         @Value("${app.prediction.url}") String baseUrl,
-        @Value("${app.prediction.token}") String token
+        @Value("${app.prediction.token}") String token,
+        @Value("${app.prediction.connect-timeout:5s}") Duration connectTimeout,
+        @Value("${app.prediction.read-timeout:60s}") Duration readTimeout
     ) {
         this(builders.getIfAvailable(RestClient::builder)
-                .requestFactory(new JdkClientHttpRequestFactory(predictionHttpClient())),
+                .requestFactory(requestFactory(connectTimeout, readTimeout)),
             baseUrl, token);
+    }
+
+    /**
+     * The transport, pinned on both counts the defaults get wrong.
+     *
+     * <p>Set on the production path only. The package-private constructor leaves the transport to
+     * whoever builds it, so a test can put a stub behind this client.
+     */
+    private static JdkClientHttpRequestFactory requestFactory(Duration connect, Duration read) {
+        JdkClientHttpRequestFactory factory =
+            new JdkClientHttpRequestFactory(predictionHttpClient(connect));
+        // The connect timeout belongs to the client and covers only the handshake. Everything after
+        // it — a model that accepted the socket and then went quiet — is bounded here or not at all.
+        factory.setReadTimeout(read);
+        return factory;
     }
 
     /**
@@ -104,11 +129,16 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * never seen by anything. The error names a field and not a protocol, which is exactly what
      * makes it expensive to find.
      *
-     * <p>Set on the production path only. The package-private constructor leaves the transport to
-     * whoever builds it, so a test can put a stub behind this client.
+     * <p>It also waits forever by default. The sweep runs outside a transaction and calls the model
+     * once per chunk of five hundred, so a service that accepts the connection and then stops
+     * answering parks a thread per chunk with nothing to end it — and the run neither finishes nor
+     * fails, which is the worse of the two.
      */
-    static HttpClient predictionHttpClient() {
-        return HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+    static HttpClient predictionHttpClient(Duration connectTimeout) {
+        return HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(connectTimeout)
+            .build();
     }
 
     /** Takes the builder directly, so a test can put a stub server behind this client. */
