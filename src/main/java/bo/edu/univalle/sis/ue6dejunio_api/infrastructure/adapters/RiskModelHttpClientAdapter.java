@@ -21,12 +21,15 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 /**
@@ -58,6 +61,16 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
 
     /** Enough to see the pattern. A refused batch of five hundred is five hundred of the same bug. */
     private static final int SHAPES_LOGGED = 3;
+
+    /**
+     * For reading the model's error bodies, and nothing else.
+     *
+     * <p>Its own mapper rather than the application's, on purpose: parsing another service's
+     * failure must not shift because somebody changed how this application serializes its own
+     * responses. Defaults are the whole configuration — it reads two well-known fields out of a
+     * document this side did not write.
+     */
+    private static final JsonMapper ERROR_JSON = JsonMapper.builder().build();
 
     private final RestClient restClient;
     private final String token;
@@ -173,27 +186,66 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
     }
 
     /**
-     * Why the model refused, in its own words.
+     * Why the model refused, in its own words — and only the words that explain it.
      *
-     * <p>FastAPI puts it in {@code detail}, and for this endpoint that string names the offending
-     * vectors. It is read here because the body is a one-shot stream: past this handler the answer
-     * is gone, and the only fact worth having is gone with it.
+     * <p>FastAPI answers two shapes under {@code detail}. A raised refusal puts a sentence there,
+     * and for this endpoint that sentence names the offending vectors. A schema rejection puts a
+     * list of errors instead, each carrying {@code loc} and {@code msg} — the diagnosis — beside
+     * {@code input}, which is the batch echoed back: the marks of real students.
+     *
+     * <p>So this reads the explanation and leaves the evidence. {@code input} never reaches a log,
+     * truncated or otherwise, because a shorter excerpt of a child's grades is still a child's
+     * grades. A body of an unrecognised shape is reported by size alone for the same reason: an
+     * unknown shape is one nobody has checked for private data.
      *
      * <p>Never throws. This runs while another failure is already being reported, and a client that
      * dies reading the explanation replaces a diagnosable error with an unrelated one.
      */
     private static String reasonFrom(ClientHttpResponse response) {
+        byte[] raw;
         try (InputStream body = response.getBody()) {
-            String raw = new String(body.readAllBytes(), StandardCharsets.UTF_8).trim();
-            if (raw.isEmpty()) {
-                return "no body";
-            }
-            // Trimmed because the whole batch can come back inside a validation error, and the
-            // marks of a class are not something to copy into a log line.
-            return raw.length() > MAX_REASON ? raw.substring(0, MAX_REASON) + "…" : raw;
+            raw = body.readAllBytes();
         } catch (IOException | RuntimeException e) {
-            return "body unreadable: " + e.getMessage();
+            return "body unreadable: " + e.getClass().getSimpleName();
         }
+
+        if (raw.length == 0) {
+            return "no body";
+        }
+
+        try {
+            JsonNode detail = ERROR_JSON.readTree(raw).path("detail");
+            if (detail.isTextual()) {
+                return trimmed(detail.stringValue());
+            }
+            if (detail.isArray()) {
+                return trimmed(describeValidationErrors(detail));
+            }
+        } catch (RuntimeException e) {
+            // Falls through to the size-only report: an unparseable body is one whose contents
+            // nobody has classified, and quoting it is how the marks get out through the path
+            // that was never reasoned about.
+            log.debug("The model's error body was not JSON this side understands", e);
+        }
+
+        return "unreadable body of " + raw.length + " bytes";
+    }
+
+    /** Each validation error as {@code where: what}, with the rejected value left behind. */
+    private static String describeValidationErrors(JsonNode errors) {
+        List<String> described = new ArrayList<>();
+        for (JsonNode error : errors) {
+            StringJoiner where = new StringJoiner(".");
+            for (JsonNode part : error.path("loc")) {
+                where.add(part.asString());
+            }
+            described.add(where + ": " + error.path("msg").asString());
+        }
+        return String.join("; ", described);
+    }
+
+    private static String trimmed(String reason) {
+        return reason.length() > MAX_REASON ? reason.substring(0, MAX_REASON) + "…" : reason;
     }
 
     private static RiskScore toScore(PredictionResponse answer) {

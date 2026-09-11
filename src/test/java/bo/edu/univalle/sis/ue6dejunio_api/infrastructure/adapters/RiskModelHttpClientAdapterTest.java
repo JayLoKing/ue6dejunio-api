@@ -230,6 +230,53 @@ class RiskModelHttpClientAdapterTest {
     }
 
     /**
+     * A schema refusal answers with the input that broke it, and that input is a class's marks.
+     *
+     * <p>FastAPI's validation errors carry {@code loc}, {@code msg} and {@code input}. The first
+     * two are the diagnosis; the third is the vectors echoed back — the grades of real children,
+     * on their way into a log file that outlives the request and gets copied into bug reports.
+     * Kept out entirely rather than truncated: a shorter excerpt of a student's marks is still a
+     * student's marks.
+     */
+    @Test
+    void predictBatch_refusedOnSchema_keepsTheDiagnosisAndDropsTheMarks() {
+        server.expect(requestTo(BASE_URL + "/predict/batch"))
+            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                    {"detail":[{"type":"less_than_equal",
+                                "loc":["body","items",0,"attendance_pct"],
+                                "msg":"Input should be less than or equal to 100",
+                                "input":137.5}]}"""));
+
+        assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
+            .isInstanceOf(RiskModelRejectedException.class)
+            .hasMessageContaining("body.items.0.attendance_pct")
+            .hasMessageContaining("Input should be less than or equal to 100")
+            .hasMessageNotContaining("137.5");
+    }
+
+    /**
+     * An answer this side cannot parse says how big it was and nothing else.
+     *
+     * <p>Echoing an unrecognised body verbatim is how the marks get out through the one path that
+     * was never reasoned about. If the shape is unknown, so is whether it holds anything private.
+     */
+    @Test
+    void predictBatch_refusedWithAnUnreadableBody_quotesNoneOfIt() {
+        server.expect(requestTo(BASE_URL + "/predict/batch"))
+            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+                .contentType(MediaType.TEXT_PLAIN)
+                .body("Ana Quispe 87.5 / Luis Mamani 42.0"));
+
+        assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
+            .isInstanceOf(RiskModelRejectedException.class)
+            .hasMessageNotContaining("Ana Quispe")
+            .hasMessageNotContaining("87.5")
+            .hasMessageContaining("unreadable");
+    }
+
+    /**
      * A refusal and an outage are different problems for different people.
      *
      * <p>A 4xx means the model was reached, understood the request and refused it: the batch this
