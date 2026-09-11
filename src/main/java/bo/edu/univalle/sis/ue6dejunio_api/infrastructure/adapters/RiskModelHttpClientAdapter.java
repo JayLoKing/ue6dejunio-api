@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -27,6 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
@@ -87,7 +89,26 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
         @Value("${app.prediction.url}") String baseUrl,
         @Value("${app.prediction.token}") String token
     ) {
-        this(builders.getIfAvailable(RestClient::builder), baseUrl, token);
+        this(builders.getIfAvailable(RestClient::builder)
+                .requestFactory(new JdkClientHttpRequestFactory(predictionHttpClient())),
+            baseUrl, token);
+    }
+
+    /**
+     * A client that offers HTTP/1.1 and nothing else, because that is all the model speaks.
+     *
+     * <p>Java's own client defaults to HTTP/2. Over plaintext that is an h2c upgrade, and uvicorn —
+     * which serves the model — does not implement it: it logs "Unsupported upgrade request" and
+     * falls back to 1.1, but the request body does not survive the exchange. FastAPI then rejects
+     * the call for a missing body, and the vector this side spent three queries assembling is
+     * never seen by anything. The error names a field and not a protocol, which is exactly what
+     * makes it expensive to find.
+     *
+     * <p>Set on the production path only. The package-private constructor leaves the transport to
+     * whoever builds it, so a test can put a stub behind this client.
+     */
+    static HttpClient predictionHttpClient() {
+        return HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
     }
 
     /** Takes the builder directly, so a test can put a stub server behind this client. */

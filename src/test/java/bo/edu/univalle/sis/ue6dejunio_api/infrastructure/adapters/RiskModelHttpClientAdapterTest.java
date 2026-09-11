@@ -14,6 +14,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -302,6 +303,24 @@ class RiskModelHttpClientAdapterTest {
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
             .isInstanceOf(RiskModelUnavailableException.class)
             .hasMessageContaining("500");
+    }
+
+    /**
+     * The model speaks HTTP/1.1 and only HTTP/1.1, so this client must not offer anything else.
+     *
+     * <p>Java's own client defaults to HTTP/2, and over plaintext that means opening with an h2c
+     * upgrade. Uvicorn answers "Unsupported upgrade request" and carries on in 1.1 — but the body
+     * is gone by then, and FastAPI rejects the request for a missing body while the marks that
+     * were supposed to be in it never left this side. The failure names a field, not a protocol,
+     * which is what made it cost a day.
+     *
+     * <p>Pinned here because nothing else catches it: every test in this file stubs the transport,
+     * so the version is invisible until it meets the real server.
+     */
+    @Test
+    void predictionHttpClient_offersOnlyTheVersionTheModelSpeaks() {
+        assertThat(RiskModelHttpClientAdapter.predictionHttpClient().version())
+            .isEqualTo(HttpClient.Version.HTTP_1_1);
     }
 
     /** Position is the pairing. A short answer is not a partial result, it is a misfiling. */
