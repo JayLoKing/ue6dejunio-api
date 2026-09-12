@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ClassGroupEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEntity;
@@ -143,6 +144,19 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Override
     public List<ClassGroup> byCourse(UUID courseId) {
         return classGroupRepo.findByCourse_IdOrderBySubject_Name(courseId).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<ClassGroupField> knowledgeFieldsByCourse(UUID courseId) {
+        // The plan-order query already fetches subject.area through an entity graph, so this is one
+        // query and not one per subject — every to-one on this entity is EAGER, and reaching the
+        // area through a plain findAll would be the N+1 that graph exists to prevent.
+        return classGroupRepo.findActiveOfCourseInPlanOrder(courseId).stream()
+            .map(cg -> new ClassGroupField(cg.getId(),
+                cg.getSubject().getArea().getId(),
+                cg.getSubject().getArea().getName(),
+                cg.getSubject().getArea().getDisplayOrder()))
+            .toList();
     }
 
     @Override

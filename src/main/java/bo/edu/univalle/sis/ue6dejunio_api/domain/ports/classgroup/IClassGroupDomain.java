@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
 
 import java.util.Collection;
 import java.util.List;
@@ -49,6 +50,15 @@ public interface IClassGroupDomain {
      */
     List<ClassGroup> findByIdIn(Collection<UUID> ids);
     List<ClassGroup> byCourse(UUID courseId);
+
+    /**
+     * The field of knowledge each of a course's class groups belongs to, in one query.
+     *
+     * <p>For the documents that group the areas under their field — the libreta does, and the
+     * centralizer does not. Asked for the course rather than per class group, because a libreta
+     * that looked this up per subject would run a query per row it prints.
+     */
+    List<ClassGroupField> knowledgeFieldsByCourse(UUID courseId);
     List<ClassGroup> byTeacher(UUID teacherId);
     UUID courseIdOfClassGroup(UUID classGroupId);
     UUID teacherIdOfClassGroup(UUID classGroupId);

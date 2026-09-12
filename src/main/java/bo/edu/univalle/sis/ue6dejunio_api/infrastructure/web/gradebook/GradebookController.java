@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookServi
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentAnnualSummaryResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentReportCardResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -60,6 +61,17 @@ public class GradebookController {
         PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.centralizer(courseId, trimester, p).map(StudentSummaryResponse::from)));
+    }
+
+    @GetMapping("/report-card")
+    @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
+    @Operation(summary = "Libreta del estudiante: areas agrupadas por campo de saberes, promedio "
+        + "anual en numeral y literal, y areas aprobadas y reprobadas por trimestre")
+    public ResponseEntity<StudentReportCardResponse> reportCard(
+        @RequestParam("id_course_enrollment") UUID courseEnrollmentId
+    ) {
+        return ResponseEntity.ok(StudentReportCardResponse.from(
+            gradebookService.reportCard(courseEnrollmentId)));
     }
 
     @GetMapping("/annual-centralizer")

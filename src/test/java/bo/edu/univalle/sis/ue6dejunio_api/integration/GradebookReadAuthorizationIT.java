@@ -95,6 +95,49 @@ class GradebookReadAuthorizationIT extends AbstractIntegrationTest {
             .andExpect(status().isUnauthorized());
     }
 
+    // ---- report-card: one student's libreta, so it is guarded like the other per-student read ----
+
+    @Test
+    void reportCard_nonOwnerTeacher_forbidden() throws Exception {
+        UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
+
+        // The libreta carries a child's whole year and their RUDE. Guessing an enrollment id must
+        // not be enough to read it.
+        mvc.perform(get("/api/gradebook/report-card")
+                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                .param("id_course_enrollment", enrollmentInA.toString()))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void reportCard_homeroomTeacher_ok() throws Exception {
+        UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
+
+        mvc.perform(get("/api/gradebook/report-card")
+                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                .param("id_course_enrollment", enrollmentInA.toString()))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void reportCard_director_ok() throws Exception {
+        UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
+
+        mvc.perform(get("/api/gradebook/report-card")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .param("id_course_enrollment", enrollmentInA.toString()))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void reportCard_unauthenticated_401() throws Exception {
+        UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
+
+        mvc.perform(get("/api/gradebook/report-card")
+                .param("id_course_enrollment", enrollmentInA.toString()))
+            .andExpect(status().isUnauthorized());
+    }
+
     // ---- annual-centralizer: the year-end sheet reads the same course, so it is the same guard ----
 
     @Test

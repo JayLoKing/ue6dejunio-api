@@ -5,14 +5,20 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualSubjectScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.GradeInWords;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.KnowledgeFieldRow;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PassingMark;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentAnnualSummary;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentReportCard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentTrimesterSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.SubjectScore;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.TrimesterOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.AcademicScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
@@ -26,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -184,6 +191,101 @@ public class GradebookService implements IGradebookService {
             averageOfTotals(ofTrimester(allScores, 2)),
             averageOfTotals(ofTrimester(allScores, 3)),
             mean(areaAverages));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StudentReportCard reportCard(UUID courseEnrollmentId) {
+        CourseStudent cs = enrollmentDomain.courseStudentById(courseEnrollmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId));
+        UUID courseId = enrollmentDomain.courseOfEnrollment(courseEnrollmentId);
+        Course course = courseService.getById(courseId);
+        StudentAnnualSummary annual = buildAnnualSummary(courseEnrollmentId, cs.studentId(),
+            cs.fullName(), scoreDomain.findByCourseEnrollment(courseEnrollmentId));
+
+        Map<UUID, ClassGroupField> fieldOfClassGroup = classGroupDomain
+            .knowledgeFieldsByCourse(courseId).stream()
+            .collect(Collectors.toMap(ClassGroupField::classGroupId, f -> f, (first, dup) -> first));
+
+        return new StudentReportCard(courseEnrollmentId, cs.studentId(), cs.rudeCode(),
+            cs.fullName(), course.gradeName(), course.parallelName(), course.year(),
+            fieldRows(annual.subjects(), fieldOfClassGroup),
+            annual.trimester1Average(), annual.trimester2Average(), annual.trimester3Average(),
+            annual.finalAverage(), GradeInWords.of(annual.finalAverage()),
+            outcomes(annual.subjects()));
+    }
+
+    /**
+     * The student's areas under their field of knowledge, in the order the school's sheet reads.
+     *
+     * <p>A field the student has no marked area in never appears: a heading over nothing reads as
+     * a subject whose marks went missing. An area whose class group is no longer active has no
+     * field to hang under, and is kept in a trailing row rather than dropped — those marks were
+     * given, and a libreta that quietly loses a subject is worse than one with an unnamed row.
+     *
+     * <p>Grouped by the field's id and never by its {@code displayOrder}. Nothing holds the order
+     * unique — the Director types it in by hand — and two fields sharing one would otherwise fold
+     * into a single row under whichever name arrived first, printing a heading over somebody
+     * else's areas and dropping a field off the document with nothing to show it had happened.
+     */
+    private static List<KnowledgeFieldRow> fieldRows(List<AnnualSubjectScore> subjects,
+                                                     Map<UUID, ClassGroupField> fieldOfClassGroup) {
+        Map<Integer, List<AnnualSubjectScore>> areasOfField = new LinkedHashMap<>();
+        Map<Integer, ClassGroupField> fieldById = new LinkedHashMap<>();
+        for (AnnualSubjectScore subject : subjects) {
+            ClassGroupField field = fieldOfClassGroup.get(subject.classGroupId());
+            Integer fieldId = field == null ? null : field.fieldId();
+            areasOfField.computeIfAbsent(fieldId, k -> new ArrayList<>()).add(subject);
+            if (field != null) {
+                fieldById.putIfAbsent(fieldId, field);
+            }
+        }
+        return areasOfField.entrySet().stream()
+            .map(e -> {
+                ClassGroupField field = fieldById.get(e.getKey());
+                return new KnowledgeFieldRow(field == null ? null : field.fieldName(),
+                    field == null ? null : field.displayOrder(), e.getValue());
+            })
+            // Two fields sharing an order keep their own rows; the tie is broken by name so the
+            // document at least reads the same way twice.
+            .sorted(Comparator
+                .comparing(KnowledgeFieldRow::displayOrder,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(KnowledgeFieldRow::fieldName,
+                    Comparator.nullsLast(Comparator.naturalOrder())))
+            .toList();
+    }
+
+    /** Always three, one per trimester, even before the year is over. */
+    private static List<TrimesterOutcome> outcomes(List<AnnualSubjectScore> subjects) {
+        List<TrimesterOutcome> outcomes = new ArrayList<>(3);
+        for (int trimester = 1; trimester <= 3; trimester++) {
+            int passed = 0;
+            int failed = 0;
+            for (AnnualSubjectScore subject : subjects) {
+                BigDecimal mark = markOf(subject, trimester);
+                if (mark == null) {
+                    // Never marked that trimester. Counted in neither: calling it failed would tell
+                    // a parent their child failed a subject nobody judged.
+                    continue;
+                }
+                if (PassingMark.reachedBy(mark)) {
+                    passed++;
+                } else {
+                    failed++;
+                }
+            }
+            outcomes.add(new TrimesterOutcome(trimester, passed, failed));
+        }
+        return List.copyOf(outcomes);
+    }
+
+    private static BigDecimal markOf(AnnualSubjectScore subject, int trimester) {
+        return switch (trimester) {
+            case 1 -> subject.trimester1();
+            case 2 -> subject.trimester2();
+            default -> subject.trimester3();
+        };
     }
 
     /** One area's year: its total per trimester, and the mean of the trimesters it was graded in. */
