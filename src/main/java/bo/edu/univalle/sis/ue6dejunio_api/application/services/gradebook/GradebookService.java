@@ -7,8 +7,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualSubjectScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentAnnualSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentTrimesterSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.SubjectScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.score.AcademicScore;
@@ -24,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -64,13 +67,31 @@ public class GradebookService implements IGradebookService {
     @Transactional(readOnly = true)
     public PageResult<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, PageQuery pageQuery) {
         PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
+        Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
+        return page.map(cs -> buildSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), trimester,
+            grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<StudentAnnualSummary> annualCentralizer(UUID courseId, PageQuery pageQuery) {
+        // No gestión parameter: the course already belongs to one academic year, so asking for the
+        // year again would only let a caller contradict the course it just named. The batched load
+        // is the same one the trimester centralizer does — it never filtered by trimester in SQL —
+        // so reading the whole year costs the same single query.
+        PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
+        Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
+        return page.map(cs -> buildAnnualSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(),
+            grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+    }
+
+    /** One batched load for the whole page, then in-memory grouping — never a query per student. */
+    private Map<UUID, List<AcademicScore>> scoresByEnrollment(PageResult<CourseStudent> page) {
         List<UUID> ids = page.content().stream().map(CourseStudent::courseEnrollmentId).toList();
-        Map<UUID, List<AcademicScore>> grouped = ids.isEmpty()
+        return ids.isEmpty()
             ? Map.of()
             : scoreDomain.findByCourseEnrollmentIn(ids).stream()
                 .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
-        return page.map(cs -> buildSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), trimester,
-            grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
     }
 
     @Override
@@ -128,20 +149,94 @@ public class GradebookService implements IGradebookService {
     private StudentTrimesterSummary buildSummary(UUID courseEnrollmentId, UUID studentId,
                                                  String fullName, Integer trimester,
                                                  List<AcademicScore> allScores) {
-        List<AcademicScore> scores = allScores.stream()
-            .filter(s -> trimester.equals(s.trimester()))
+        List<AcademicScore> scores = ofTrimester(allScores, trimester);
+        List<SubjectScore> subjects = scores.stream()
+            .map(s -> new SubjectScore(s.classGroupId(), s.subjectName(), s.totalScore(),
+                s.totalScore() != null))
             .toList();
-        List<SubjectScore> subjects = new ArrayList<>();
-        BigDecimal sum = BigDecimal.ZERO;
-        for (AcademicScore s : scores) {
-            BigDecimal total = s.totalScore();
-            boolean graded = total != null;
-            sum = sum.add(graded ? total : BigDecimal.ZERO);
-            subjects.add(new SubjectScore(s.classGroupId(), s.subjectName(), total, graded));
+        return new StudentTrimesterSummary(courseEnrollmentId, studentId, fullName, trimester,
+            subjects, averageOfTotals(scores));
+    }
+
+    private StudentAnnualSummary buildAnnualSummary(UUID courseEnrollmentId, UUID studentId,
+                                                    String fullName, List<AcademicScore> allScores) {
+        List<AnnualSubjectScore> subjects = allScores.stream()
+            .collect(Collectors.groupingBy(AcademicScore::classGroupId, LinkedHashMap::new,
+                Collectors.toList()))
+            .values().stream()
+            .map(GradebookService::annualSubject)
+            // A report whose columns move between two loads is unreadable, and the order a batched
+            // query answers in is not guaranteed. The class group breaks ties so two areas sharing
+            // a name still land somewhere fixed.
+            .sorted(Comparator
+                .comparing(AnnualSubjectScore::subjectName,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(s -> s.classGroupId().toString()))
+            .toList();
+        // No null filter here: a group exists because it had at least one row, so
+        // averageOfTotals never answered null for it. Guarding against it would be dead code
+        // claiming a case the grouping cannot produce.
+        List<BigDecimal> areaAverages = subjects.stream()
+            .map(AnnualSubjectScore::average)
+            .toList();
+        return new StudentAnnualSummary(courseEnrollmentId, studentId, fullName, subjects,
+            averageOfTotals(ofTrimester(allScores, 1)),
+            averageOfTotals(ofTrimester(allScores, 2)),
+            averageOfTotals(ofTrimester(allScores, 3)),
+            mean(areaAverages));
+    }
+
+    /** One area's year: its total per trimester, and the mean of the trimesters it was graded in. */
+    private static AnnualSubjectScore annualSubject(List<AcademicScore> rowsOfOneClassGroup) {
+        AcademicScore any = rowsOfOneClassGroup.get(0);
+        return new AnnualSubjectScore(any.classGroupId(), any.subjectName(),
+            totalOfTrimester(rowsOfOneClassGroup, 1),
+            totalOfTrimester(rowsOfOneClassGroup, 2),
+            totalOfTrimester(rowsOfOneClassGroup, 3),
+            averageOfTotals(rowsOfOneClassGroup));
+    }
+
+    private static List<AcademicScore> ofTrimester(List<AcademicScore> scores, Integer trimester) {
+        return scores.stream().filter(s -> trimester.equals(s.trimester())).toList();
+    }
+
+    /**
+     * That trimester's total for this area, or null when the area has no row there at all — an
+     * area that starts mid-year never had those trimesters, and a zero would say it failed them.
+     *
+     * <p>Returning the first match is safe rather than arbitrary: {@code academic_scores} carries
+     * {@code uq_academic_score UNIQUE (id_course_enrollment, id_class_group, trimester)}, so a
+     * second row for the same area and trimester cannot exist. Were it reachable, this would
+     * disagree with {@link #averageOfTotals} — which counts every row — and the area's marks would
+     * stop adding up to the average printed beside them. It is the constraint that rules that out,
+     * not this loop, so dropping the constraint has to come back here.
+     */
+    private static BigDecimal totalOfTrimester(List<AcademicScore> rows, Integer trimester) {
+        for (AcademicScore s : rows) {
+            if (trimester.equals(s.trimester())) {
+                return s.totalScore();
+            }
         }
-        BigDecimal general = subjects.isEmpty()
-            ? null
-            : sum.divide(BigDecimal.valueOf(subjects.size()), 2, RoundingMode.HALF_UP);
-        return new StudentTrimesterSummary(courseEnrollmentId, studentId, fullName, trimester, subjects, general);
+        return null;
+    }
+
+    /**
+     * Mean of these rows' totals, or null when there are none. A row that exists but carries no
+     * total counts as a zero and still occupies the denominator: the teacher opened that subject
+     * and has not closed it, which is what the trimester sheet has always reported. Both views
+     * share this one method so they can never disagree about a student.
+     */
+    private static BigDecimal averageOfTotals(List<AcademicScore> rows) {
+        return mean(rows.stream()
+            .map(s -> s.totalScore() == null ? BigDecimal.ZERO : s.totalScore())
+            .toList());
+    }
+
+    private static BigDecimal mean(List<BigDecimal> values) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        BigDecimal sum = values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(values.size()), 2, RoundingMode.HALF_UP);
     }
 }

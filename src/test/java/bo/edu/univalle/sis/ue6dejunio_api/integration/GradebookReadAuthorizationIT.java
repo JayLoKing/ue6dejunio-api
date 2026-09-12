@@ -95,6 +95,41 @@ class GradebookReadAuthorizationIT extends AbstractIntegrationTest {
             .andExpect(status().isUnauthorized());
     }
 
+    // ---- annual-centralizer: the year-end sheet reads the same course, so it is the same guard ----
+
+    @Test
+    void annualCentralizer_director_ok() throws Exception {
+        mvc.perform(get("/api/gradebook/annual-centralizer")
+                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                .param("id_course", courseA.toString()))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void annualCentralizer_homeroomTeacher_ok() throws Exception {
+        mvc.perform(get("/api/gradebook/annual-centralizer")
+                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                .param("id_course", courseA.toString()))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void annualCentralizer_nonOwnerTeacher_forbidden() throws Exception {
+        // The annual sheet carries every trimester at once. Leaving it unguarded would hand a
+        // stranger the whole year of a course the trimester endpoint already refuses them.
+        mvc.perform(get("/api/gradebook/annual-centralizer")
+                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                .param("id_course", courseA.toString()))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void annualCentralizer_unauthenticated_401() throws Exception {
+        mvc.perform(get("/api/gradebook/annual-centralizer")
+                .param("id_course", courseA.toString()))
+            .andExpect(status().isUnauthorized());
+    }
+
     @Test
     void attendance_director_ok() throws Exception {
         mvc.perform(get("/api/gradebook/attendance")

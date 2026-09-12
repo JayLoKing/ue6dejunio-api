@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentAnnualSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -59,6 +60,22 @@ public class GradebookController {
         PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.centralizer(courseId, trimester, p).map(StudentSummaryResponse::from)));
+    }
+
+    @GetMapping("/annual-centralizer")
+    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
+    @Operation(summary = "Centralizador anual del curso: por area los tres trimestres y su "
+        + "promedio, mas los promedios trimestrales y el promedio final")
+    public ResponseEntity<PagedResponse<StudentAnnualSummaryResponse>> annualCentralizer(
+        @RequestParam("id_course") UUID courseId,
+        @RequestParam(defaultValue = "1") @Min(1) int offset,
+        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
+    ) {
+        // No trimester and no gestión: the course already names its academic year, and the sheet
+        // is the whole year by definition.
+        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
+        return ResponseEntity.ok(PagedResponse.of(
+            gradebookService.annualCentralizer(courseId, p).map(StudentAnnualSummaryResponse::from)));
     }
 
     @GetMapping("/attendance")
