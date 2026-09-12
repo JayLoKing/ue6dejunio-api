@@ -290,11 +290,14 @@ INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C') ON CONFLICT DO NOTHING;
 -- a listing that picked the right one from a listing that has no rule at all. 2026 is the current
 -- one everywhere: every helper that does not name a year resolves the latest.
 INSERT INTO academic_years (year) VALUES (2025), (2026) ON CONFLICT DO NOTHING;
+-- display_order is the order the school's own libreta and centralizador read, opening with
+-- COMUNIDAD Y SOCIEDAD and closing with COSMOS Y PENSAMIENTO. Kept in step with V16 so a test
+-- asserting the sheet's order is asserting what production actually holds.
 INSERT INTO knowledge_areas (name, display_order) VALUES
-    ('Cosmos y Pensamiento', 1),
-    ('Comunidad y Sociedad', 2),
+    ('Comunidad y Sociedad', 1),
+    ('Ciencia Tecnología y Producción', 2),
     ('Vida Tierra y Territorio', 3),
-    ('Ciencia Tecnología y Producción', 4)
+    ('Cosmos y Pensamiento', 4)
     ON CONFLICT DO NOTHING;
 -- Fixture names, deliberately the short ones the tests look up by. The production rename to the
 -- curriculum's wording is a data migration, not a change to what these fixtures are called.
