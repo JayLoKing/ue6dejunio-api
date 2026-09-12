@@ -305,7 +305,7 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
                 "The model answered a category this system does not know: " + answer.riskLevel()
                     + ". A retrained model with a new category has to be taught here before its "
                     + "answers can be stored."));
-        return new RiskScore(level, answer.pReprueba(), answer.pSobresaliente());
+        return new RiskScore(level, answer.pFail(), answer.pOutstanding());
     }
 
     /** The endpoint takes the vectors wrapped in {@code items}; it answers with a bare list. */
@@ -318,6 +318,10 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * <p>{@code gestion} is deliberately not sent. Absent, the model normalises against the
      * weighting in force, which is the only one this system's marks are ever on — it exists for
      * historical spreadsheets, and naming it here would be declaring a scale nobody is using.
+     *
+     * <p>The wire names the model speaks are Spanish; the components here are named as the domain
+     * names them. The {@code @JsonProperty} annotations are the whole translation, so a reader of
+     * this class never has to hold two vocabularies at once to follow a field.
      */
     private record FeatureDto(
         List<BigDecimal> being,
@@ -325,7 +329,7 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
         List<BigDecimal> doing,
         List<BigDecimal> deciding,
         @JsonProperty("attendance_pct") BigDecimal attendancePct,
-        @JsonProperty("criterios_planificados") Integer criteriosPlanificados
+        @JsonProperty("criterios_planificados") Integer plannedCriteria
     ) {
         static FeatureDto from(RiskFeatures features) {
             return new FeatureDto(
@@ -350,8 +354,8 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record PredictionResponse(
         @JsonProperty("risk_level") String riskLevel,
-        @JsonProperty("p_reprueba") BigDecimal pReprueba,
-        @JsonProperty("p_sobresaliente") BigDecimal pSobresaliente
+        @JsonProperty("p_reprueba") BigDecimal pFail,
+        @JsonProperty("p_sobresaliente") BigDecimal pOutstanding
     ) {
     }
 }
