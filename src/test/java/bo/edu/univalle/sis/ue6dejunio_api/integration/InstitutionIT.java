@@ -51,6 +51,19 @@ class InstitutionIT extends AbstractIntegrationTest {
         assertThat(institutionService.current().directorName()).isEqualTo(fullNameOf(inOffice));
     }
 
+    // The libreta and the informe pedagógico both head themselves with more than the district and
+    // the school: they print the department, the dependency, the shift and the level of education.
+    // None of those vary by course or by student, so they belong to the heading and not to a query.
+    @Test
+    void carriesEveryFieldTheOfficialDocumentsPrint() {
+        Institution heading = institutionService.current();
+
+        assertThat(heading.department()).isNotBlank();
+        assertThat(heading.dependency()).isNotBlank();
+        assertThat(heading.shift()).isNotBlank();
+        assertThat(heading.educationLevel()).isNotBlank();
+    }
+
     private String fullNameOf(UUID userId) {
         return jdbc.queryForObject(
             "SELECT names || ' ' || last_names FROM users WHERE id_user = ?", String.class, userId);

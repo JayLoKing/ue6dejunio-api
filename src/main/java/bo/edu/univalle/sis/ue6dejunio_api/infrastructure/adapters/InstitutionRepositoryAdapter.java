@@ -17,13 +17,26 @@ public class InstitutionRepositoryAdapter implements IInstitutionDomain {
     private final JpaUserRepository userRepo;
     private final String district;
     private final String school;
+    private final String department;
+    private final String dependency;
+    private final String shift;
+    private final String educationLevel;
 
-    public InstitutionRepositoryAdapter(JpaUserRepository userRepo,
-                                        @Value("${app.institution.district}") String district,
-                                        @Value("${app.institution.school}") String school) {
+    public InstitutionRepositoryAdapter(
+        JpaUserRepository userRepo,
+        @Value("${app.institution.district}") String district,
+        @Value("${app.institution.school}") String school,
+        @Value("${app.institution.department}") String department,
+        @Value("${app.institution.dependency}") String dependency,
+        @Value("${app.institution.shift}") String shift,
+        @Value("${app.institution.education-level}") String educationLevel) {
         this.userRepo = userRepo;
         this.district = district;
         this.school = school;
+        this.department = department;
+        this.dependency = dependency;
+        this.shift = shift;
+        this.educationLevel = educationLevel;
     }
 
     @Override
@@ -35,7 +48,8 @@ public class InstitutionRepositoryAdapter implements IInstitutionDomain {
             .findFirstByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE)
             .map(InstitutionRepositoryAdapter::fullName)
             .orElse(null);
-        return new Institution(district, school, directorName);
+        return new Institution(district, school, directorName,
+            department, dependency, shift, educationLevel);
     }
 
     private static String fullName(UserEntity u) {
