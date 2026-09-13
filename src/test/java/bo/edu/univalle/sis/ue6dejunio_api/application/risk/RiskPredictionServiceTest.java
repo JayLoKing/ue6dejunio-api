@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain.CriterionScoreRow;
@@ -61,6 +62,7 @@ class RiskPredictionServiceTest {
     @Mock private IRiskPredictionDomain predictionDomain;
     @Mock private INotificationService notifications;
     @Mock private IClassGroupDomain classGroupDomain;
+    @Mock private ICourseService courseService;
 
     private RiskPredictionService service;
 
@@ -76,7 +78,7 @@ class RiskPredictionServiceTest {
     @BeforeEach
     void buildService() {
         service = new RiskPredictionService(featureDomain, modelClient, predictionDomain,
-            notifications, classGroupDomain);
+            notifications, classGroupDomain, courseService);
     }
 
     // ---------------------------------------------------------------- fixtures

@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.risk;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
@@ -72,6 +73,12 @@ class RiskPredictionControllerWebTest {
         return new StudentRisk(prediction, "Ana", "Alvarez", "Matematicas");
     }
 
+    private static InstitutionRiskEntry institutionEntry() {
+        return new InstitutionRiskEntry(1, UUID.randomUUID(), STUDENT, "Alvarez Ana",
+            COURSE, "Quinto", "B", CLASS_GROUP, "Matematicas",
+            RiskLevel.RIESGO_CRITICO, new BigDecimal("0.9100"), false);
+    }
+
     @Test
     void byClassGroup_namesTheStudentAndTheSubject() throws Exception {
         when(predictionService.byClassGroup(eq(CLASS_GROUP), anyInt()))
@@ -128,6 +135,59 @@ class RiskPredictionControllerWebTest {
         mvc.perform(get("/api/students/{id}/risk", STUDENT))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].subjectName").value("Matematicas"));
+    }
+
+    /**
+     * The Director's list. Its grain is one row per student, so unlike the panels above it carries
+     * the classroom — a school-wide list of names with no classroom beside them names nobody.
+     */
+    @Test
+    void institutionRisk_namesTheStudentTheirWorstSubjectAndTheirClassroom() throws Exception {
+        when(predictionService.institutionRisk(eq(7), anyInt(), anyInt()))
+            .thenReturn(List.of(institutionEntry()));
+
+        mvc.perform(get("/api/risk/institution")
+                .param("id_academic_year", "7")
+                .param("trimester", "1")
+                .param("places", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].position").value(1))
+            .andExpect(jsonPath("$[0].fullName").value("Alvarez Ana"))
+            .andExpect(jsonPath("$[0].subjectName").value("Matematicas"))
+            .andExpect(jsonPath("$[0].gradeName").value("Quinto"))
+            .andExpect(jsonPath("$[0].parallelName").value("B"))
+            .andExpect(jsonPath("$[0].riskLevel").value("RiesgoCritico"))
+            .andExpect(jsonPath("$[0].pFail").value(0.9100))
+            .andExpect(jsonPath("$[0].attended").value(false));
+    }
+
+    /** The row has to be actionable: attending is per prediction, not per screen. */
+    @Test
+    void institutionRisk_carriesThePredictionTheRowStandsFor() throws Exception {
+        InstitutionRiskEntry entry = institutionEntry();
+        when(predictionService.institutionRisk(eq(7), anyInt(), anyInt()))
+            .thenReturn(List.of(entry));
+
+        mvc.perform(get("/api/risk/institution")
+                .param("id_academic_year", "7")
+                .param("trimester", "1"))
+            .andExpect(jsonPath("$[0].predictionId").value(entry.predictionId().toString()))
+            .andExpect(jsonPath("$[0].classGroupId").value(entry.classGroupId().toString()));
+    }
+
+    /** The gestión is what keeps the list inside one year. Without it there is no list to build. */
+    @Test
+    void institutionRisk_withoutAGestion_isRefused() throws Exception {
+        mvc.perform(get("/api/risk/institution").param("trimester", "1"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void institutionRisk_aTrimesterThatDoesNotExist_isRefused() throws Exception {
+        mvc.perform(get("/api/risk/institution")
+                .param("id_academic_year", "7")
+                .param("trimester", "4"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test

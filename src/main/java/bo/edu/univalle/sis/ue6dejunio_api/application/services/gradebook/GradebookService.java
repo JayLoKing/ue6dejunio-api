@@ -53,8 +53,6 @@ public class GradebookService implements IGradebookService {
      * real classroom is one page, and the loop around it is what keeps a larger one correct.
      */
     private static final int ROSTER_PAGE_SIZE = 200;
-    /** As {@link #ROSTER_PAGE_SIZE}, for the school's courses while the whole-school podium reads. */
-    private static final int COURSE_PAGE_SIZE = 200;
 
     private final ICourseEnrollmentDomain enrollmentDomain;
     private final IScoreDomain scoreDomain;
@@ -160,7 +158,7 @@ public class GradebookService implements IGradebookService {
     public List<HonorRollEntry> institutionHonorRoll(Integer academicYearId, int places) {
         // Without a gestión the course query answers every year at once, and the podium would rank
         // a student of 2024 against one of 2026 — two years the school never compared. It is also
-        // what makes the course paging below sound: see coursesOfYear.
+        // what makes the paged course read sound: see ICourseService.allOfYear.
         if (academicYearId == null) {
             throw new ValidationException("A school-wide honour roll needs the gestión it belongs to");
         }
@@ -172,7 +170,7 @@ public class GradebookService implements IGradebookService {
          * rows per course.
          */
         List<HonorRollEntry> best = new ArrayList<>();
-        for (Course course : coursesOfYear(academicYearId)) {
+        for (Course course : courseService.allOfYear(academicYearId)) {
             best.addAll(podiumOf(course, places));
         }
         return ranked(best, places);
@@ -246,29 +244,6 @@ public class GradebookService implements IGradebookService {
                 all.add(buildAnnualSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(),
                     grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
             }
-            if (readEverything(all.size(), page.content().size(), page.totalElements())) {
-                return all;
-            }
-            pageIndex++;
-        }
-    }
-
-    /**
-     * Every course of the academic year, read page by page for the same reason the roster is.
-     *
-     * <p>No sort is passed because the query carries its own {@code ORDER BY c.grade.id,
-     * c.parallel.id}, and inside one gestión that is already total:
-     * {@code UNIQUE (id_grade, id_parallel, id_academic_year)} rules out two courses sharing both
-     * keys. It is the constraint that makes the paging sound, not this loop — across years those
-     * keys tie, which is the second reason the gestión is required above.
-     */
-    private List<Course> coursesOfYear(Integer academicYearId) {
-        List<Course> all = new ArrayList<>();
-        int pageIndex = 0;
-        while (true) {
-            PageResult<Course> page = courseService
-                .list(academicYearId, PageQuery.of(pageIndex, COURSE_PAGE_SIZE));
-            all.addAll(page.content());
             if (readEverything(all.size(), page.content().size(), page.totalElements())) {
                 return all;
             }

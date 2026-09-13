@@ -1,9 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskAssessed;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
@@ -11,6 +14,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
@@ -25,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,8 +37,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Runs the model over the school and keeps what it said.
@@ -54,19 +61,22 @@ public class RiskPredictionService implements IRiskPredictionService {
     private final IRiskPredictionDomain predictionDomain;
     private final INotificationService notifications;
     private final IClassGroupDomain classGroupDomain;
+    private final ICourseService courseService;
 
     public RiskPredictionService(
         IRiskFeatureDomain featureDomain,
         IRiskModelClient modelClient,
         IRiskPredictionDomain predictionDomain,
         INotificationService notifications,
-        IClassGroupDomain classGroupDomain
+        IClassGroupDomain classGroupDomain,
+        ICourseService courseService
     ) {
         this.featureDomain = featureDomain;
         this.modelClient = modelClient;
         this.predictionDomain = predictionDomain;
         this.notifications = notifications;
         this.classGroupDomain = classGroupDomain;
+        this.courseService = courseService;
     }
 
     @Override
@@ -89,6 +99,101 @@ public class RiskPredictionService implements IRiskPredictionService {
     @Transactional(readOnly = true)
     public List<StudentRisk> byCourse(UUID courseId, int trimester) {
         return predictionDomain.byCourseAndTrimester(courseId, trimester);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InstitutionRiskEntry> institutionRisk(Integer academicYearId, int trimester, int places) {
+        if (academicYearId == null) {
+            throw new ValidationException("A school-wide risk list needs the gestión it belongs to");
+        }
+        /*
+         * The worst of each course first, then the worst of those. Taking `places` from a course
+         * before merging is exact and not an approximation: a student who is eleventh in their own
+         * classroom already has ten worse children ahead of them there, so they cannot be in the
+         * school's worst ten on that row. It is also what keeps this bounded — the whole school
+         * never lands in memory at once, only a few rows per course.
+         *
+         * The collapse to one row per student then runs twice, and the second pass is not
+         * redundant. `course_enrollments` is unique on student and course, not on student and
+         * gestión: a child moved between parallels mid-year keeps an enrolment in both, and the
+         * predictions filed against their old classroom do not disappear with the move.
+         */
+        List<InstitutionRiskEntry> worst = new ArrayList<>();
+        for (Course course : courseService.allOfYear(academicYearId)) {
+            worst.addAll(worstOf(course, trimester, places));
+        }
+        return ranked(collapsedByStudent(worst), places);
+    }
+
+    /** One row per student, keeping the worst of whatever rows they hold. */
+    private static List<InstitutionRiskEntry> collapsedByStudent(List<InstitutionRiskEntry> entries) {
+        Map<UUID, InstitutionRiskEntry> byStudent = new LinkedHashMap<>();
+        for (InstitutionRiskEntry entry : entries) {
+            byStudent.merge(entry.studentId(), entry, WORST_SUBJECT);
+        }
+        return List.copyOf(byStudent.values());
+    }
+
+    /** One course's worst students, one row each, read from every subject of the course. */
+    private List<InstitutionRiskEntry> worstOf(Course course, int trimester, int places) {
+        List<InstitutionRiskEntry> rows = new ArrayList<>();
+        for (StudentRisk risk : predictionDomain.byCourseAndTrimester(course.id(), trimester)) {
+            // A prediction the model never scored cannot be placed against ones it did. Sorting it
+            // as a zero would say the model looked at the child and found them safe.
+            if (risk.prediction().pFail() == null) {
+                continue;
+            }
+            rows.add(entryOf(course, risk));
+        }
+        return ranked(collapsedByStudent(rows), places);
+    }
+
+    /**
+     * Which of two of the same student's subjects the row keeps: the worse one.
+     *
+     * <p>The tie is broken on the subject's own name rather than left to whichever the query
+     * returned first. Two subjects can sit on the same probability, and kept by arrival order the
+     * row would name Lenguaje on one reading and Matematicas on the next off the same unchanged
+     * predictions — the same reason the list itself breaks its ties on something the reader can see.
+     */
+    private static final BinaryOperator<InstitutionRiskEntry> WORST_SUBJECT = (kept, candidate) -> {
+        int byProbability = candidate.pFail().compareTo(kept.pFail());
+        if (byProbability != 0) {
+            return byProbability > 0 ? candidate : kept;
+        }
+        return candidate.subjectName().compareTo(kept.subjectName()) < 0 ? candidate : kept;
+    };
+
+    private static InstitutionRiskEntry entryOf(Course course, StudentRisk risk) {
+        RiskPrediction prediction = risk.prediction();
+        return new InstitutionRiskEntry(0, prediction.id(), prediction.studentId(),
+            risk.studentFullName(), course.id(), course.gradeName(), course.parallelName(),
+            prediction.classGroupId(), risk.subjectName(), prediction.riskLevel(),
+            prediction.pFail(), prediction.attended());
+    }
+
+    /**
+     * The worst {@code places} of what it is given, numbered from one.
+     *
+     * <p>The tie is broken on the name the list itself shows, so two students on the same
+     * probability come out in the same order on two readings and what decides it is something the
+     * reader can see.
+     */
+    private static List<InstitutionRiskEntry> ranked(List<InstitutionRiskEntry> entries, int places) {
+        List<InstitutionRiskEntry> sorted = entries.stream()
+            .sorted(Comparator.comparing(InstitutionRiskEntry::pFail).reversed()
+                .thenComparing(InstitutionRiskEntry::fullName))
+            .limit(places)
+            .toList();
+        return IntStream.range(0, sorted.size())
+            .mapToObj(i -> {
+                InstitutionRiskEntry e = sorted.get(i);
+                return new InstitutionRiskEntry(i + 1, e.predictionId(), e.studentId(), e.fullName(),
+                    e.courseId(), e.gradeName(), e.parallelName(), e.classGroupId(), e.subjectName(),
+                    e.riskLevel(), e.pFail(), e.attended());
+            })
+            .toList();
     }
 
     @Override

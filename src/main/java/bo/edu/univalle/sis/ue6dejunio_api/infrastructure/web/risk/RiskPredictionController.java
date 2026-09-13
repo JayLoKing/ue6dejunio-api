@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.InstitutionRiskEntryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RiskPredictionResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RiskRunResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentRiskResponse;
@@ -95,6 +96,29 @@ public class RiskPredictionController {
         @RequestParam @Min(1) @Max(3) int trimester
     ) {
         return ResponseEntity.ok(toResponses(predictionService.byCourse(courseId, trimester)));
+    }
+
+    /**
+     * The Director's list: the students of the whole school closest to failing, worst first.
+     *
+     * <p>The one endpoint here gated on role alone, and it is the right gate for this one: the
+     * answer spans every course of the gestión, so there is no single course to resolve ownership
+     * against. Nobody below the Director has a scope that covers it.
+     */
+    @GetMapping("/risk/institution")
+    @PreAuthorize("hasRole('Director')")
+    @Operation(summary = "Estudiantes en riesgo de toda la unidad educativa en una gestion: un "
+        + "estudiante por fila con su peor materia, el de peor riesgo primero")
+    public ResponseEntity<List<InstitutionRiskEntryResponse>> institutionRisk(
+        // Required, unlike the listings above: a list spanning gestiones would rank a student of one
+        // year against a student of another, and the paged course read is only sound inside one.
+        @RequestParam("id_academic_year") Integer academicYearId,
+        @RequestParam @Min(1) @Max(3) int trimester,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(50) int places
+    ) {
+        return ResponseEntity.ok(
+            predictionService.institutionRisk(academicYearId, trimester, places).stream()
+                .map(InstitutionRiskEntryResponse::from).toList());
     }
 
     /** One student across every subject they sit — the view a tutor opens before talking to them. */

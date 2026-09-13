@@ -17,12 +17,16 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class CourseService implements ICourseService {
+
+    /** How many courses one read brings back while a whole-school report walks the gestión. */
+    private static final int COURSE_PAGE_SIZE = 200;
 
     private final ICourseDomain courseDomain;
     private final IClassGroupService classGroupService;
@@ -107,6 +111,32 @@ public class CourseService implements ICourseService {
     @Transactional(readOnly = true)
     public PageResult<Course> list(Integer academicYearId, PageQuery pageQuery) {
         return courseDomain.list(academicYearId, pageQuery);
+    }
+
+    /**
+     * No sort is asked for because the listing already carries one: it orders by grade and parallel,
+     * and within a single gestión that pair is unique, so no row can appear on two pages or on none.
+     * Across gestiones the pair ties, which is why every whole-school report requires one.
+     *
+     * <p>The loop asks how many rows are still missing rather than how many pages the store reports,
+     * because {@code totalPages} is derived from the size that was asked for and answers one for any
+     * set that fits in a single page — which is every set, until it is not. The empty page is the
+     * other exit: a store that keeps answering nothing would otherwise be read forever.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Course> allOfYear(Integer academicYearId) {
+        List<Course> all = new ArrayList<>();
+        int pageIndex = 0;
+        while (true) {
+            PageResult<Course> page = courseDomain
+                .list(academicYearId, PageQuery.of(pageIndex, COURSE_PAGE_SIZE));
+            all.addAll(page.content());
+            if (page.content().isEmpty() || all.size() >= page.totalElements()) {
+                return all;
+            }
+            pageIndex++;
+        }
     }
 
     @Override

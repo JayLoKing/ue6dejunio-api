@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 
@@ -26,6 +27,23 @@ public interface IRiskPredictionService {
     List<StudentRisk> byClassGroup(UUID classGroupId, int trimester);
 
     List<StudentRisk> byCourse(UUID courseId, int trimester);
+
+    /**
+     * The students of the whole school closest to failing this trimester, worst first.
+     *
+     * <p>One row per student, unlike every listing above it. Those are read by somebody who teaches
+     * the subjects and wants each one; this one is a fixed number of places, and spent at subject
+     * grain they can all go to a single child while the others it displaced are the ones the reader
+     * opened it to find. The subject that comes with each student is their worst.
+     *
+     * @param academicYearId the gestión, required. Without it the course listing answers every year
+     *                       at once, and the list would rank a student of 2024 beside one of 2026.
+     * @param places         how many students the list holds. Taken from every course first and then
+     *                       once more from the merge, which is exact rather than an approximation: a
+     *                       student who is eleventh in their own classroom has ten worse ahead of
+     *                       them and cannot be in the school's worst ten.
+     */
+    List<InstitutionRiskEntry> institutionRisk(Integer academicYearId, int trimester, int places);
 
     List<StudentRisk> byStudent(UUID studentId);
 

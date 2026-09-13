@@ -247,8 +247,7 @@ class GradebookServiceHonorRollTest {
     }
 
     private void coursesOfTheYear(Course... courses) {
-        when(courseService.list(eq(ACADEMIC_YEAR_ID), any(PageQuery.class)))
-            .thenReturn(new PageResult<>(List.of(courses), 0, 200, courses.length));
+        when(courseService.allOfYear(ACADEMIC_YEAR_ID)).thenReturn(List.of(courses));
     }
 
     private void rosterOf(CourseStudent... students) {
