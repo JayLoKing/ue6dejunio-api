@@ -2,7 +2,9 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
@@ -12,6 +14,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualSubjectS
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.GradeInWords;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.HonorRollEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.KnowledgeFieldRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PassingMark;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentAnnualSummary;
@@ -40,9 +43,18 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 public class GradebookService implements IGradebookService {
+
+    /**
+     * How much of a roster one read brings back while a podium is being built. Big enough that a
+     * real classroom is one page, and the loop around it is what keeps a larger one correct.
+     */
+    private static final int ROSTER_PAGE_SIZE = 200;
+    /** As {@link #ROSTER_PAGE_SIZE}, for the school's courses while the whole-school podium reads. */
+    private static final int COURSE_PAGE_SIZE = 200;
 
     private final ICourseEnrollmentDomain enrollmentDomain;
     private final IScoreDomain scoreDomain;
@@ -135,6 +147,145 @@ public class GradebookService implements IGradebookService {
             }
             return new CourseAttendanceRow(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), att);
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HonorRollEntry> honorRoll(UUID courseId, int places) {
+        return podiumOf(courseService.getById(courseId), places);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HonorRollEntry> institutionHonorRoll(Integer academicYearId, int places) {
+        // Without a gestión the course query answers every year at once, and the podium would rank
+        // a student of 2024 against one of 2026 — two years the school never compared. It is also
+        // what makes the course paging below sound: see coursesOfYear.
+        if (academicYearId == null) {
+            throw new ValidationException("A school-wide honour roll needs the gestión it belongs to");
+        }
+        /*
+         * The best of each course first, then the best of those. Taking `places` from every course
+         * before merging is exact and not an approximation: a student who is eleventh in their own
+         * classroom already has ten ahead of them, so they cannot be in the school's top ten. It is
+         * also what keeps this bounded — the whole school never lands in memory at once, only a few
+         * rows per course.
+         */
+        List<HonorRollEntry> best = new ArrayList<>();
+        for (Course course : coursesOfYear(academicYearId)) {
+            best.addAll(podiumOf(course, places));
+        }
+        return ranked(best, places);
+    }
+
+    /** One course's podium, read from the whole roster rather than from its first page. */
+    private List<HonorRollEntry> podiumOf(Course course, int places) {
+        List<HonorRollEntry> candidates = new ArrayList<>();
+        for (StudentAnnualSummary annual : annualSummariesOf(course.id())) {
+            // Nothing graded is not a bad year: it is a year nobody judged, and last place would
+            // say otherwise. They hold no place at all.
+            if (annual.finalAverage() != null) {
+                candidates.add(new HonorRollEntry(0, annual.courseEnrollmentId(), annual.studentId(),
+                    annual.fullName(), course.id(), course.gradeName(), course.parallelName(),
+                    annual.finalAverage()));
+            }
+        }
+        return ranked(candidates, places);
+    }
+
+    /**
+     * Best average first, cut at {@code places}, numbered from one.
+     *
+     * <p>The name breaks a tie. Two students on the same average would otherwise come out in
+     * whatever order the batch answered in, and the school would print two different podiums from
+     * one year. It breaks on the name the podium itself shows, so what decides the order is
+     * something the reader can see.
+     */
+    private static List<HonorRollEntry> ranked(List<HonorRollEntry> entries, int places) {
+        List<HonorRollEntry> sorted = entries.stream()
+            .sorted(Comparator.comparing(HonorRollEntry::finalAverage).reversed()
+                .thenComparing(HonorRollEntry::fullName))
+            .limit(places)
+            .toList();
+        return IntStream.range(0, sorted.size())
+            .mapToObj(i -> {
+                HonorRollEntry e = sorted.get(i);
+                return new HonorRollEntry(i + 1, e.courseEnrollmentId(), e.studentId(), e.fullName(),
+                    e.courseId(), e.gradeName(), e.parallelName(), e.finalAverage());
+            })
+            .toList();
+    }
+
+    /**
+     * Every student of the course with their year worked out, read page by page.
+     *
+     * <p>Paged rather than asked for in one go, because a podium built from the first page only is
+     * a podium that silently drops the best student of a large course. Each page still costs the
+     * same two queries the annual centralizer pays — the roster and one batched load of its scores.
+     *
+     * <p>The ordering is what makes reading it page by page sound, and it has to be <em>total</em>.
+     * {@code LIMIT/OFFSET} with no {@code ORDER BY} lets Postgres hand the same row back on two
+     * pages and never hand back another; the loop would then stop on an inflated count with a
+     * student unread. The name alone is not enough either — two students who share one would tie,
+     * and a tie is where the order is free to move again. The enrollment id closes it.
+     *
+     * <p>Every enrolment, not only the ones still in force. A student who withdrew in November
+     * still earned the marks they earned, and the libreta and the centralizer both count them; a
+     * podium that quietly disagreed with the sheets beside it would be the odd one out.
+     */
+    private List<StudentAnnualSummary> annualSummariesOf(UUID courseId) {
+        List<StudentAnnualSummary> all = new ArrayList<>();
+        int pageIndex = 0;
+        while (true) {
+            PageResult<CourseStudent> page = enrollmentDomain
+                .studentsByCourse(courseId, PageQuery.of(pageIndex, ROSTER_PAGE_SIZE,
+                    SortField.asc("student.lastNames"), SortField.asc("student.names"),
+                    SortField.asc("id")));
+            Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
+            for (CourseStudent cs : page.content()) {
+                all.add(buildAnnualSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(),
+                    grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+            }
+            if (readEverything(all.size(), page.content().size(), page.totalElements())) {
+                return all;
+            }
+            pageIndex++;
+        }
+    }
+
+    /**
+     * Every course of the academic year, read page by page for the same reason the roster is.
+     *
+     * <p>No sort is passed because the query carries its own {@code ORDER BY c.grade.id,
+     * c.parallel.id}, and inside one gestión that is already total:
+     * {@code UNIQUE (id_grade, id_parallel, id_academic_year)} rules out two courses sharing both
+     * keys. It is the constraint that makes the paging sound, not this loop — across years those
+     * keys tie, which is the second reason the gestión is required above.
+     */
+    private List<Course> coursesOfYear(Integer academicYearId) {
+        List<Course> all = new ArrayList<>();
+        int pageIndex = 0;
+        while (true) {
+            PageResult<Course> page = courseService
+                .list(academicYearId, PageQuery.of(pageIndex, COURSE_PAGE_SIZE));
+            all.addAll(page.content());
+            if (readEverything(all.size(), page.content().size(), page.totalElements())) {
+                return all;
+            }
+            pageIndex++;
+        }
+    }
+
+    /**
+     * Whether there is anything left to page through.
+     *
+     * <p>It asks how many rows are still missing rather than how many pages the store reports,
+     * because {@code totalPages} is derived from the size that was asked for and answers one for
+     * any set that fits in a single page — which is every set, until it is not. The empty page is
+     * the other exit: a store that keeps answering nothing would otherwise be read forever.
+     */
+    private static boolean readEverything(int gathered, int lastPageSize, long totalElements) {
+        return lastPageSize == 0 || gathered >= totalElements;
     }
 
     @Override

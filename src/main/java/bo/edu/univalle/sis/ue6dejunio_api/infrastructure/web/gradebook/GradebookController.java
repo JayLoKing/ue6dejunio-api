@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HonorRollEntryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentAnnualSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentReportCardResponse;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -88,6 +90,32 @@ public class GradebookController {
         PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
         return ResponseEntity.ok(PagedResponse.of(
             gradebookService.annualCentralizer(courseId, p).map(StudentAnnualSummaryResponse::from)));
+    }
+
+    @GetMapping("/honor-roll")
+    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
+    @Operation(summary = "Cuadro de honor del curso: los mejores promedios finales, el mejor primero")
+    public ResponseEntity<List<HonorRollEntryResponse>> honorRoll(
+        @RequestParam("id_course") UUID courseId,
+        @RequestParam(defaultValue = "3") @Min(1) @Max(50) int places
+    ) {
+        return ResponseEntity.ok(gradebookService.honorRoll(courseId, places).stream()
+            .map(HonorRollEntryResponse::from).toList());
+    }
+
+    @GetMapping("/honor-roll/institution")
+    @PreAuthorize("hasRole('Director')")
+    @Operation(summary = "Cuadro de honor de toda la unidad educativa en una gestion: los mejores "
+        + "promedios finales del colegio, el mejor primero")
+    public ResponseEntity<List<HonorRollEntryResponse>> institutionHonorRoll(
+        // Required, unlike the course listing: a podium of every gestión at once would rank a
+        // student of one year against a student of another, which the school never does.
+        @RequestParam("id_academic_year") Integer academicYearId,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(50) int places
+    ) {
+        return ResponseEntity.ok(
+            gradebookService.institutionHonorRoll(academicYearId, places).stream()
+                .map(HonorRollEntryResponse::from).toList());
     }
 
     @GetMapping("/attendance")
