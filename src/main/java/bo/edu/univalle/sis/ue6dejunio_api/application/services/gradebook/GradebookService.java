@@ -40,6 +40,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -168,12 +169,48 @@ public class GradebookService implements IGradebookService {
          * classroom already has ten ahead of them, so they cannot be in the school's top ten. It is
          * also what keeps this bounded — the whole school never lands in memory at once, only a few
          * rows per course.
+         *
+         * The collapse to one row per student is not redundant with that cut. `course_enrollments`
+         * is unique on student and course, not on student and gestión: a child moved between
+         * parallels mid-year keeps an enrolment in both, and the marks filed against the old
+         * classroom do not vanish with the move. Left alone, that one child would hold two of the
+         * school's ten places, and the student they displaced is the one this podium exists to name.
          */
         List<HonorRollEntry> best = new ArrayList<>();
         for (Course course : courseService.allOfYear(academicYearId)) {
             best.addAll(podiumOf(course, places));
         }
-        return ranked(best, places);
+        return ranked(collapsedByStudent(best), places);
+    }
+
+    /** One entry per student, keeping the best of whatever enrolments they hold in the gestión. */
+    private static List<HonorRollEntry> collapsedByStudent(List<HonorRollEntry> entries) {
+        Map<UUID, HonorRollEntry> byStudent = new LinkedHashMap<>();
+        for (HonorRollEntry entry : entries) {
+            byStudent.merge(entry.studentId(), entry, BEST_ENROLMENT);
+        }
+        return List.copyOf(byStudent.values());
+    }
+
+    /**
+     * Which of two enrolments of the same student the podium keeps: the better average.
+     *
+     * <p>A tie is broken on the classroom as the podium prints it, not left to whichever course the
+     * loop reached first. Two enrolments can land on the same average, and by arrival order the
+     * entry would name one classroom on one reading and the other on the next, off marks that never
+     * changed — the same rule the ranking already applies to the student's name.
+     */
+    private static final BinaryOperator<HonorRollEntry> BEST_ENROLMENT = (kept, candidate) -> {
+        int byAverage = candidate.finalAverage().compareTo(kept.finalAverage());
+        if (byAverage != 0) {
+            return byAverage > 0 ? candidate : kept;
+        }
+        return classroomOf(candidate).compareTo(classroomOf(kept)) < 0 ? candidate : kept;
+    };
+
+    /** The classroom the way the podium shows it, which is what makes the tie-break readable. */
+    private static String classroomOf(HonorRollEntry entry) {
+        return entry.gradeName() + " " + entry.parallelName();
     }
 
     /** One course's podium, read from the whole roster rather than from its first page. */

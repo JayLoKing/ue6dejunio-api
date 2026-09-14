@@ -222,6 +222,66 @@ class GradebookServiceHonorRollTest {
         assertThat(podium).extracting(HonorRollEntry::position).containsExactly(1, 2);
     }
 
+    /**
+     * One student, one place, even when they sat in two classrooms of the same gestión.
+     *
+     * <p>{@code course_enrollments} is unique on student and course, not on student and gestión, so
+     * a child moved between parallels mid-year keeps an enrolment in both and the marks filed
+     * against the old classroom do not vanish with the move. Concatenating the courses' podiums
+     * would let that one child hold two of the school's ten places, and the student they displaced
+     * is the one the podium exists to name.
+     */
+    @Test
+    void institutionHonorRoll_givesAStudentOnePlaceEvenAcrossTwoClassroomsOfTheSameYear() {
+        UUID otherCourseId = UUID.randomUUID();
+        coursesOfTheYear(course(courseId, "Quinto", "B"), course(otherCourseId, "Sexto", "A"));
+
+        // The same student on both rosters: one enrolment per course, one child.
+        UUID movedStudent = UUID.randomUUID();
+        CourseStudent beforeMove = studentOf(movedStudent, "Ana", "Perez");
+        CourseStudent afterMove = studentOf(movedStudent, "Ana", "Perez");
+        rosterOfCourse(courseId, beforeMove);
+        rosterOfCourse(otherCourseId, afterMove);
+        batched(oneAreaWorth(beforeMove, "70.00"), oneAreaWorth(afterMove, "91.00"));
+
+        List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID, 10);
+
+        assertThat(podium).singleElement().satisfies(entry -> {
+            assertThat(entry.studentId()).isEqualTo(movedStudent);
+            // The better of the two years they were graded in, and the classroom that earned it.
+            assertThat(entry.finalAverage()).isEqualByComparingTo("91.00");
+            assertThat(entry.parallelName()).isEqualTo("A");
+            assertThat(entry.position()).isEqualTo(1);
+        });
+    }
+
+    /**
+     * The same tie, one level down. Two enrolments of one student can land on the same average, and
+     * whichever course the loop reached first is not an answer — the podium would name one
+     * classroom on one reading and the other on the next. The classroom's own name breaks it, which
+     * is the same rule the podium already uses on the student's name: something the reader can see.
+     */
+    @Test
+    void institutionHonorRoll_breaksATieBetweenAStudentsTwoClassroomsByName() {
+        UUID otherCourseId = UUID.randomUUID();
+        coursesOfTheYear(course(courseId, "Quinto", "B"), course(otherCourseId, "Sexto", "A"));
+
+        UUID movedStudent = UUID.randomUUID();
+        CourseStudent inQuinto = studentOf(movedStudent, "Ana", "Perez");
+        CourseStudent inSexto = studentOf(movedStudent, "Ana", "Perez");
+        rosterOfCourse(courseId, inQuinto);
+        rosterOfCourse(otherCourseId, inSexto);
+        batched(oneAreaWorth(inQuinto, "88.00"), oneAreaWorth(inSexto, "88.00"));
+
+        List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID, 10);
+
+        // "Quinto B" before "Sexto A": the classroom as the podium prints it, compared as a name.
+        assertThat(podium).singleElement().satisfies(entry -> {
+            assertThat(entry.gradeName()).isEqualTo("Quinto");
+            assertThat(entry.parallelName()).isEqualTo("B");
+        });
+    }
+
     /** A school-wide podium that does not say which classroom a student came from is unreadable. */
     @Test
     void institutionHonorRoll_namesTheCourseEachStudentCameFrom() {
@@ -275,7 +335,15 @@ class GradebookServiceHonorRollTest {
     }
 
     private static CourseStudent student(String names, String lastNames) {
-        return new CourseStudent(UUID.randomUUID(), UUID.randomUUID(), "RUDE", "ID",
+        return studentOf(UUID.randomUUID(), names, lastNames);
+    }
+
+    /**
+     * The same child on two rosters: one enrolment per course, one student id. What a transfer
+     * between parallels leaves behind.
+     */
+    private static CourseStudent studentOf(UUID studentId, String names, String lastNames) {
+        return new CourseStudent(UUID.randomUUID(), studentId, "RUDE", "ID",
             names, lastNames, "Effective", "F");
     }
 
