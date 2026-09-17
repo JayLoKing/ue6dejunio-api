@@ -414,6 +414,30 @@ public class AuthorizationComponent {
     }
 
     /**
+     * Who may write a course's informe pedagógico. Its homeroom teacher, and nobody else.
+     *
+     * <p>Narrower than {@link #canWritePdcForCourse} on purpose: a specialist plans the subject
+     * they run, but the informe is a statement about the whole classroom, and the school's own form
+     * carries one DOCENTE on it — the homeroom teacher, who closes it with "esto es lo que puedo
+     * dar fe" over their signature. A subject teacher writing inside it would put their account of
+     * one area under somebody else's name.
+     *
+     * <p>The Director is not here either, for the same reason they open no plans: the office reads
+     * what the classroom hands in. Reading it is {@link #canReadCourse}, which the Director and the
+     * secretariat already pass — this guard is only about who signs.
+     */
+    public boolean canWritePedagogicalReport(Authentication authentication, UUID courseId) {
+        if (authentication == null || courseId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        UUID teacherId = userId(authentication);
+        if (teacherId == null) {
+            return false;
+        }
+        return courseDomain.isHomeroomTeacherOfAny(teacherId, List.of(courseId));
+    }
+
+    /**
      * Ownership of a curricular plan. A PDC belongs to a course and covers several subjects, so a
      * teacher has a stake in it either by running the course or by teaching one of its subjects —
      * a specialist has to reach the plan to write their own block. Read-only staff writes nowhere.

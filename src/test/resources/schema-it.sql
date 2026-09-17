@@ -277,6 +277,37 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_notification_inbox ON notifications (receiver_id, created_at DESC);
 
+-- The informe pedagógico is the one report of the five that is not derived: sections II and the
+-- "acciones" column of section IV are prose the teacher writes. Everything else on the sheet is
+-- read from the institution, the course and the marks at render time. See V17 for why each of
+-- those four things is deliberately not a column here.
+CREATE TABLE IF NOT EXISTS pedagogical_reports (
+    id_pedagogical_report uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE CASCADE,
+    trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
+    -- Nullable on purpose: a half-written report has to be savable.
+    achievements text,
+    difficulties text,
+    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_pedagogical_report UNIQUE (id_course, trimester)
+);
+
+-- Section IV, one row per failing student. The areas they failed and the marks are not here: they
+-- come from academic_scores when the sheet is drawn.
+CREATE TABLE IF NOT EXISTS pedagogical_report_failures (
+    id_pedagogical_report_failure uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_pedagogical_report uuid NOT NULL
+        REFERENCES pedagogical_reports(id_pedagogical_report) ON DELETE CASCADE,
+    id_course_enrollment uuid NOT NULL
+        REFERENCES course_enrollments(id_course_enrollment) ON DELETE CASCADE,
+    actions text,
+    verification_source text,
+    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_pedagogical_report_failure UNIQUE (id_pedagogical_report, id_course_enrollment)
+);
+
 -- The catalog seed runs once per Spring context, and more than one context is created against the
 -- same shared container (ProdProfileHardeningIT activates a second profile). Every statement here
 -- is therefore idempotent: re-running the script must be a no-op, not a duplicate-key failure.

@@ -86,8 +86,8 @@ public abstract class AbstractIntegrationTest {
     private static final String[] TRANSACTIONAL_TABLES = {
         "notifications", "risk_predictions", "attendance", "academic_scores", "assessment_scores",
         "assessment_events", "evaluation_criteria", "curriculum_adaptations",
-        "curriculum_plan_progress", "curriculum_plans", "class_groups", "course_enrollments",
-        "courses", "students", "users"
+        "curriculum_plan_progress", "curriculum_plans", "pedagogical_report_failures",
+        "pedagogical_reports", "class_groups", "course_enrollments", "courses", "students", "users"
     };
 
     /** The gestiones schema-it.sql seeds. Anything else in the table was made up by a test. */

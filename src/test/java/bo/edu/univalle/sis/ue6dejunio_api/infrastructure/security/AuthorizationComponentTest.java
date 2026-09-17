@@ -802,6 +802,54 @@ class AuthorizationComponentTest {
             .isFalse();
     }
 
+    // ---- canWritePedagogicalReport ----
+    // The informe pedagógico carries one DOCENTE and closes over their signature, so writing it is
+    // narrower than writing a plan: the homeroom teacher, and not a specialist who runs one of the
+    // course's subjects. The office and the secretariat read it and sign nothing.
+
+    @Test
+    void canWritePedagogicalReport_homeroomTeacherOfTheCourse_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseDomain.isHomeroomTeacherOfAny(teacher, List.of(courseId))).thenReturn(true);
+
+        assertThat(authz.canWritePedagogicalReport(token(teacher, "Teacher"), courseId)).isTrue();
+    }
+
+    @Test
+    void canWritePedagogicalReport_teacherWhoOnlyRunsASubjectOfTheCourse_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseDomain.isHomeroomTeacherOfAny(teacher, List.of(courseId))).thenReturn(false);
+
+        assertThat(authz.canWritePedagogicalReport(token(teacher, "Teacher"), courseId)).isFalse();
+        // Never asked: teaching a subject there is beside the point, unlike canWritePdcForCourse.
+        verify(classGroupDomain, never()).teachesInAnyCourse(any(), any());
+    }
+
+    @Test
+    void canWritePedagogicalReport_director_false() {
+        assertThat(authz.canWritePedagogicalReport(
+            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void canWritePedagogicalReport_secretary_false() {
+        assertThat(authz.canWritePedagogicalReport(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void canWritePedagogicalReport_noCourse_false() {
+        assertThat(authz.canWritePedagogicalReport(token(UUID.randomUUID(), "Teacher"), null))
+            .isFalse();
+    }
+
+    @Test
+    void canWritePedagogicalReport_noAuthentication_false() {
+        assertThat(authz.canWritePedagogicalReport(null, UUID.randomUUID())).isFalse();
+    }
+
     @Test
     void canWritePdcSubject_director_false() {
         assertThat(authz.canWritePdcSubject(
