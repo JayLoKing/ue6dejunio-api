@@ -9,11 +9,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentSco
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.DimensionAvg;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.SetScoreCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,17 +37,20 @@ public class AssessmentScoreService implements IAssessmentScoreService {
     private final ICriterionDomain criterionDomain;
     private final IScoreDomain academicScoreDomain;
     private final IClassGroupDomain classGroupDomain;
+    private final IDomainEventPublisher events;
 
     public AssessmentScoreService(IAssessmentScoreDomain scoreDomain,
                                   IAssessmentEventDomain eventDomain,
                                   ICriterionDomain criterionDomain,
                                   IScoreDomain academicScoreDomain,
-                                  IClassGroupDomain classGroupDomain) {
+                                  IClassGroupDomain classGroupDomain,
+                                  IDomainEventPublisher events) {
         this.scoreDomain = scoreDomain;
         this.eventDomain = eventDomain;
         this.criterionDomain = criterionDomain;
         this.academicScoreDomain = academicScoreDomain;
         this.classGroupDomain = classGroupDomain;
+        this.events = events;
     }
 
     /**
@@ -192,6 +197,13 @@ public class AssessmentScoreService implements IAssessmentScoreService {
         UUID academicScoreId = academicScoreDomain.ensureAcademicScore(
             courseEnrollmentId, classGroupId, trimester, createdBy);
         academicScoreDomain.setDimensions(academicScoreId, being, knowing, doing, deciding);
+
+        // Every path that writes, corrects or removes a mark ends here, which is why the risk model
+        // is told here and not at each of them. It is stated, not acted on: what a changed mark
+        // means for a prediction is the model's business, and this service does not know one exists.
+        if (trimester != null) {
+            events.publish(new RiskInputsChanged(classGroupId, trimester));
+        }
     }
 
     private void checkCap(BigDecimal value, String dimension) {

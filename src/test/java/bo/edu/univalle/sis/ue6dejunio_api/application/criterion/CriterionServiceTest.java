@@ -7,8 +7,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.CreateCriterionCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.UpdateCriterionCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -35,6 +37,7 @@ class CriterionServiceTest {
 
     @Mock private ICriterionDomain criterionDomain;
     @Mock private IAssessmentEventDomain eventDomain;
+    @Mock private IDomainEventPublisher events;
     @InjectMocks private CriterionService criterionService;
 
     private final UUID classGroupId = UUID.randomUUID();
@@ -59,6 +62,34 @@ class CriterionServiceTest {
 
         assertThat(created.isActivityBased()).isFalse();
         verifyNoInteractions(eventDomain);
+    }
+
+    /**
+     * Planning a criterion moves a model input without a mark changing: progress is marks over what
+     * was planned, and three of three and three of seven are the same count meaning opposite things.
+     */
+    @Test
+    void create_saysTheModelsInputsChanged() {
+        UUID id = UUID.randomUUID();
+        when(criterionDomain.classGroupExists(classGroupId)).thenReturn(true);
+        when(criterionDomain.create(classGroupId, 1, "Doing", "Participacion", null, null))
+            .thenReturn(criterion(id, "Participacion", null));
+
+        criterionService.create(command("Participacion", null, null));
+
+        verify(events).publish(new RiskInputsChanged(classGroupId, 1));
+    }
+
+    /** Removing one moves the same denominator the other way. */
+    @Test
+    void delete_saysTheModelsInputsChanged() {
+        UUID id = UUID.randomUUID();
+        when(criterionDomain.findById(id)).thenReturn(Optional.of(criterion(id, "Participacion", null)));
+        when(criterionDomain.hasScoresForCriterion(id)).thenReturn(false);
+
+        criterionService.delete(id);
+
+        verify(events).publish(new RiskInputsChanged(classGroupId, 1));
     }
 
     @Test

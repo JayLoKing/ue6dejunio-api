@@ -84,7 +84,8 @@ public abstract class AbstractIntegrationTest {
      * periods that several tests depend on hang off academic_years.
      */
     private static final String[] TRANSACTIONAL_TABLES = {
-        "notifications", "risk_predictions", "attendance", "academic_scores", "assessment_scores",
+        "notifications", "risk_predictions", "risk_prediction_queue", "attendance",
+        "academic_scores", "assessment_scores",
         "assessment_events", "evaluation_criteria", "curriculum_adaptations",
         "curriculum_plan_progress", "curriculum_plans", "pedagogical_report_failures",
         "pedagogical_reports", "class_groups", "course_enrollments", "courses", "students", "users"

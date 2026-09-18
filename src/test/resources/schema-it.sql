@@ -260,6 +260,16 @@ CREATE TABLE IF NOT EXISTS risk_predictions (
 CREATE INDEX IF NOT EXISTS ix_risk_pred_group_trimester
     ON risk_predictions (id_class_group, trimester);
 
+-- Class groups whose model inputs changed since the last sweep. One row per subject and trimester:
+-- the primary key is what collapses thirty saves into one prediction run.
+CREATE TABLE IF NOT EXISTS risk_prediction_queue (
+    id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
+    trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
+    -- clock_timestamp(), not CURRENT_TIMESTAMP: the latter is the transaction's start time.
+    marked_at timestamp NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (id_class_group, trimester)
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
     id_notification uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     sender_id uuid REFERENCES users(id_user) ON DELETE CASCADE,

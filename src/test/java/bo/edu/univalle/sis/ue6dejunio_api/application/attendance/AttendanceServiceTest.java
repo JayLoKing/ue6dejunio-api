@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +59,7 @@ class AttendanceServiceTest {
 
     @Mock private IAttendanceDomain attendanceDomain;
     @Mock private ITrimesterPeriodDomain trimesterPeriodDomain;
+    @Mock private IDomainEventPublisher events;
 
     private AttendanceService attendanceService;
 
@@ -66,7 +68,8 @@ class AttendanceServiceTest {
     }
 
     private void initWith(Clock clock) {
-        attendanceService = new AttendanceService(attendanceDomain, trimesterPeriodDomain, clock);
+        attendanceService =
+            new AttendanceService(attendanceDomain, trimesterPeriodDomain, events, clock);
     }
 
     @Test

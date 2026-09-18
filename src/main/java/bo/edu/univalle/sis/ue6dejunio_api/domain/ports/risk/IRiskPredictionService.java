@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntr
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,6 +15,19 @@ public interface IRiskPredictionService {
 
     /** Predicts one subject, for when a teacher wants an answer now rather than at the next sweep. */
     RunSummary predictClassGroup(UUID classGroupId, int trimester);
+
+    /**
+     * Predicts a set of subjects that share a trimester. What the queue sweep spends its marks on.
+     *
+     * <p>A collection and not a loop over {@link #predictClassGroup}, because the features of any
+     * number of class groups are read in the same four queries and sent in the same batch. Called
+     * once per subject, a drain of twenty classrooms would be twenty round trips to a model that
+     * would have taken them in one.
+     *
+     * @param classGroupIds the subjects to predict. Empty is a no-op, not an error: a sweep that
+     *                      found nothing has nothing to ask.
+     */
+    RunSummary predictClassGroups(Collection<UUID> classGroupIds, int trimester);
 
     /**
      * The standing predictions of one subject, worst first, each with the names that make it

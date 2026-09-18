@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.MonthlyAttend
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.TrimesterAttendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.TrimesterPeriod;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,7 @@ class AttendanceStatsServiceTest {
 
     @Mock private IAttendanceDomain attendanceDomain;
     @Mock private ITrimesterPeriodDomain trimesterPeriodDomain;
+    @Mock private IDomainEventPublisher events;
 
     private AttendanceService service;
     private UUID courseId;
@@ -61,7 +63,7 @@ class AttendanceStatsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AttendanceService(attendanceDomain, trimesterPeriodDomain, FIXED_CLOCK);
+        service = new AttendanceService(attendanceDomain, trimesterPeriodDomain, events, FIXED_CLOCK);
         courseId = UUID.randomUUID();
         lenient().when(attendanceDomain.courseExists(courseId)).thenReturn(true);
         lenient().when(attendanceDomain.academicYearOfCourse(courseId)).thenReturn(YEAR_ID);

@@ -9,9 +9,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyBatchRes
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyStatusCount;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.MonthlyAttendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.TrimesterAttendance;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.DailyAttendanceRecorded;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SessionAttendanceRecorded;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.TrimesterPeriod;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,12 +47,15 @@ public class AttendanceService implements IAttendanceService {
 
     private final IAttendanceDomain attendanceDomain;
     private final ITrimesterPeriodDomain trimesterPeriodDomain;
+    private final IDomainEventPublisher events;
     private final Clock clock;
 
     public AttendanceService(IAttendanceDomain attendanceDomain,
-                             ITrimesterPeriodDomain trimesterPeriodDomain, Clock clock) {
+                             ITrimesterPeriodDomain trimesterPeriodDomain,
+                             IDomainEventPublisher events, Clock clock) {
         this.attendanceDomain = attendanceDomain;
         this.trimesterPeriodDomain = trimesterPeriodDomain;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -60,7 +66,9 @@ public class AttendanceService implements IAttendanceService {
         if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
             throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }
-        return attendanceDomain.upsertDaily(courseEnrollmentId, date, status);
+        Attendance saved = attendanceDomain.upsertDaily(courseEnrollmentId, date, status);
+        events.publish(new DailyAttendanceRecorded(List.of(courseEnrollmentId), date));
+        return saved;
     }
 
     @Override
@@ -91,6 +99,10 @@ public class AttendanceService implements IAttendanceService {
 
         // One bounded query for existing rows + one batch save instead of a find+save per mark.
         attendanceDomain.upsertDailyBatch(date, statusByCourseEnrollmentId);
+        // The deduplicated keys and not `marks`: the same enrolment listed twice is one student
+        // whose attendance changed once, and the queue would collapse the repeat anyway.
+        events.publish(new DailyAttendanceRecorded(
+            List.copyOf(statusByCourseEnrollmentId.keySet()), date));
         return new DailyBatchResult(marks.size(), statusByCourseEnrollmentId.size());
     }
 
@@ -126,6 +138,7 @@ public class AttendanceService implements IAttendanceService {
             statusByCourseEnrollmentId.put(m.courseEnrollmentId(), m.status());
         }
         attendanceDomain.upsertSessionBatch(classGroupId, date, statusByCourseEnrollmentId);
+        events.publish(new SessionAttendanceRecorded(classGroupId, date));
         return new DailyBatchResult(marks.size(), statusByCourseEnrollmentId.size());
     }
 
@@ -164,7 +177,9 @@ public class AttendanceService implements IAttendanceService {
         if (!ceCourse.equals(cgCourse)) {
             throw new ConflictException("El estudiante no pertenece al curso de la materia");
         }
-        return attendanceDomain.upsertSession(courseEnrollmentId, classGroupId, date, status);
+        Attendance saved = attendanceDomain.upsertSession(courseEnrollmentId, classGroupId, date, status);
+        events.publish(new SessionAttendanceRecorded(classGroupId, date));
+        return saved;
     }
 
     @Override

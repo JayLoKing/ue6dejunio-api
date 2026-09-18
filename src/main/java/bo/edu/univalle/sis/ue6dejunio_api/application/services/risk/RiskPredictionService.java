@@ -86,7 +86,12 @@ public class RiskPredictionService implements IRiskPredictionService {
 
     @Override
     public RunSummary predictClassGroup(UUID classGroupId, int trimester) {
-        return runFor(List.of(classGroupId), trimester);
+        return predictClassGroups(List.of(classGroupId), trimester);
+    }
+
+    @Override
+    public RunSummary predictClassGroups(Collection<UUID> classGroupIds, int trimester) {
+        return runFor(classGroupIds, trimester);
     }
 
     @Override

@@ -12,6 +12,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEve
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +43,7 @@ class AssessmentScoreServiceTest {
     @Mock private ICriterionDomain criterionDomain;
     @Mock private IScoreDomain academicScoreDomain;
     @Mock private IClassGroupDomain classGroupDomain;
+    @Mock private IDomainEventPublisher events;
     @InjectMocks private AssessmentScoreService service;
 
     private final UUID enrollment = UUID.randomUUID();
@@ -116,6 +119,44 @@ class AssessmentScoreServiceTest {
         verify(academicScoreDomain).setDimensions(eq(academicScoreId), any(), any(), doing.capture(), any());
         assertThat(doing.getValue()).isEqualByComparingTo("33.5");
         verify(scoreDomain, never()).upsertForEvent(any(), any(), any());
+    }
+
+    /**
+     * RF 30's automatic half, from this side of the wall. The service does not predict and does not
+     * know a model exists — it states that what the model reads has changed, and stops. Consolidate
+     * is where every write path ends, which is why one statement covers direct scores, activity
+     * items and deletes alike.
+     */
+    @Test
+    void setScore_saysTheModelsInputsChanged() {
+        UUID criterionId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+            .thenReturn(Optional.of(directCriterion(criterionId, "Doing")));
+        sameCourse();
+        when(scoreDomain.upsertForCriterion(enrollment, criterionId, new BigDecimal("35")))
+            .thenReturn(new AssessmentScore(
+                UUID.randomUUID(), enrollment, null, criterionId, new BigDecimal("35"), null, null));
+        when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of(
+            new DimensionAvg("Doing", new BigDecimal("33.5"))));
+        when(academicScoreDomain.ensureAcademicScore(eq(enrollment), eq(classGroup), eq(1), any()))
+            .thenReturn(UUID.randomUUID());
+
+        service.setScore(onCriterion(criterionId, "35"));
+
+        verify(events).publish(new RiskInputsChanged(classGroup, 1));
+    }
+
+    /** A refused score changed nothing, so there is nothing for the model to be told about. */
+    @Test
+    void setScore_whenRefused_saysNothingToTheModel() {
+        UUID criterionId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+            .thenReturn(Optional.of(activityCriterion(criterionId, "Doing")));
+
+        assertThatThrownBy(() -> service.setScore(onCriterion(criterionId, "35")))
+            .isInstanceOf(ConflictException.class);
+
+        verify(events, never()).publish(any());
     }
 
     @Test

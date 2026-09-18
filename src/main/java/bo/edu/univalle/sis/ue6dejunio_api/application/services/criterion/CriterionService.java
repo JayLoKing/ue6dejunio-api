@@ -7,9 +7,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentDim
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.CreateCriterionCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.UpdateCriterionCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +27,13 @@ public class CriterionService implements ICriterionService {
 
     private final ICriterionDomain criterionDomain;
     private final IAssessmentEventDomain eventDomain;
+    private final IDomainEventPublisher events;
 
-    public CriterionService(ICriterionDomain criterionDomain, IAssessmentEventDomain eventDomain) {
+    public CriterionService(ICriterionDomain criterionDomain, IAssessmentEventDomain eventDomain,
+                            IDomainEventPublisher events) {
         this.criterionDomain = criterionDomain;
         this.eventDomain = eventDomain;
+        this.events = events;
     }
 
     /**
@@ -70,6 +75,10 @@ public class CriterionService implements ICriterionService {
         for (String item : items) {
             eventDomain.create(created.id(), item);
         }
+        // A criterion is the denominator of the model's progress feature: three marks out of three
+        // and three out of seven are the same count and mean opposite things. Planning one changes
+        // what the model would say about every student of this subject, without a mark moving.
+        events.publish(new RiskInputsChanged(created.classGroupId(), created.trimester()));
         return created;
     }
 
@@ -103,12 +112,15 @@ public class CriterionService implements ICriterionService {
     @Override
     @Transactional
     public void delete(UUID id) {
-        getById(id);
+        // Read before the delete, not after: the criterion is what names the subject and trimester
+        // the model has to be told about, and afterwards there is nothing left to ask.
+        EvaluationCriterion deleted = getById(id);
         if (criterionDomain.hasScoresForCriterion(id)) {
             throw new ConflictException(
                 "El criterio no puede eliminarse porque ya cuenta con calificaciones registradas");
         }
         criterionDomain.deleteById(id);
+        events.publish(new RiskInputsChanged(deleted.classGroupId(), deleted.trimester()));
     }
 
     /**
