@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The sweep queue, as four statements.
+ * The sweep queue, as five statements.
  *
  * <p>Plain SQL and not JPA, because every one of these is set-based. Marking a course's subjects is
  * an {@code INSERT ... SELECT} over a join; through entities it would be a query for the class

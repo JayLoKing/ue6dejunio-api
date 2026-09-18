@@ -10,7 +10,12 @@ import java.util.UUID;
 
 public interface IRiskPredictionService {
 
-    /** Predicts every subject of every active class group in the year. What the sweep runs. */
+    /**
+     * Predicts every subject of every active class group in the year.
+     *
+     * <p>The whole school at once, on demand. Not what the scheduled sweep runs — that spends the
+     * queue through {@link #predictClassGroups}, and only on the subjects something changed in.
+     */
     RunSummary predictYear(int academicYear, int trimester);
 
     /** Predicts one subject, for when a teacher wants an answer now rather than at the next sweep. */
