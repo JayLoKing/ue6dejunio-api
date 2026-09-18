@@ -312,8 +312,35 @@ public class RiskPredictionService implements IRiskPredictionService {
      * loop is how a run turns into hundreds of round trips.
      */
     private void announce(List<RiskAssessed> transitions, int trimester) {
-        List<RiskAssessed> critical = transitions.stream()
+        List<RiskAssessed> demanding = transitions.stream()
             .filter(transition -> transition.currentLevel().demandsAttention())
+            .toList();
+        if (demanding.isEmpty()) {
+            return;
+        }
+
+        /*
+         * Every one of these is a real transition, and the run is right about all of them. What is
+         * bounded here is how often a teacher is told.
+         *
+         * Since the sweep runs within minutes of every save, a student whose level oscillates while
+         * their marks are being entered — at risk after two, not after five, at risk again after
+         * six — crosses into a demanding category once per crossing, and each crossing used to be a
+         * message. Four messages about the same child in one afternoon is how a teacher learns to
+         * dismiss the bell, and the notice that mattered then arrives to somebody who has stopped
+         * reading. Once a day per student and subject; the prediction row is already that grain.
+         *
+         * Claiming and filtering in one call, not "ask then record": two runs that both asked
+         * before either recorded would both announce, which is the duplicate this is preventing.
+         */
+        LocalDateTime now = LocalDateTime.now();
+        Set<UUID> announceable = predictionDomain.claimForNotification(
+            demanding.stream().map(RiskAssessed::predictionId).toList(),
+            now,
+            now.toLocalDate().atStartOfDay());
+
+        List<RiskAssessed> critical = demanding.stream()
+            .filter(transition -> announceable.contains(transition.predictionId()))
             .toList();
         if (critical.isEmpty()) {
             return;

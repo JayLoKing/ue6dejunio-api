@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -128,6 +129,29 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
             return List.of();
         }
         return toViews(repository.findByIdsWithNames(predictionIds));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Stamp first, then read back what carries this run's instant. The other order — read who is
+     * un-announced, then stamp them — leaves both of two overlapping runs holding the same list and
+     * writing to the same teacher.
+     *
+     * <p>{@code flushAutomatically} and {@code clearAutomatically} are not decoration on a
+     * {@code @Modifying} query: without the flush a pending write could be applied after the bulk
+     * update and undo the stamp, and without the clear the entities already in the persistence
+     * context would still hold the previous value.
+     */
+    @Override
+    @Transactional
+    public Set<UUID> claimForNotification(Collection<UUID> predictionIds, LocalDateTime now,
+                                          LocalDateTime notBefore) {
+        if (predictionIds == null || predictionIds.isEmpty()) {
+            return Set.of();
+        }
+        repository.claimForNotification(predictionIds, now, notBefore);
+        return Set.copyOf(repository.findIdsNotifiedAt(predictionIds, now));
     }
 
     @Override

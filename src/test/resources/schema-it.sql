@@ -255,6 +255,9 @@ CREATE TABLE IF NOT EXISTS risk_predictions (
     p_outstanding numeric(5,4) NOT NULL CHECK (p_outstanding BETWEEN 0 AND 1),
     is_attended boolean NOT NULL DEFAULT false,
     features_analyzed jsonb, predicted_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- When this prediction last caused a notification. NULL means never. Bounds the announcement
+    -- to once a day per student and subject, now that the sweep runs within minutes of every save.
+    last_notified_at timestamp,
     CONSTRAINT uq_risk_pred UNIQUE (id_student, id_class_group, trimester)
 );
 CREATE INDEX IF NOT EXISTS ix_risk_pred_group_trimester

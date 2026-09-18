@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -269,5 +270,93 @@ class RiskPredictionPersistenceIT extends AbstractIntegrationTest {
     @Test
     void upsertAll_nothingToWrite_touchesNothing() {
         assertThat(riskPredictions.upsertAll(List.of())).isEmpty();
+    }
+
+    // ------------------------------------------------- the once-a-day announcement bound
+
+    /**
+     * A prediction nobody has announced yet is claimable, and claiming it stamps the row.
+     *
+     * <p>A mocked port proves none of this. The claim is a bulk {@code UPDATE} followed by a read
+     * of what it wrote, and both halves live in the database: whether the stamp actually lands,
+     * whether the persistence context still holds the old value afterwards, and whether the second
+     * caller of the day correctly gets nothing.
+     */
+    @Test
+    void claimForNotification_firstTimeToday_isGrantedAndStamped() {
+        UUID id = riskPredictions.upsertAll(List.of(
+            prediction(ana, mathGroup, RiskLevel.RIESGO_CRITICO, "0.8100", "0.0000")))
+            .get(0).stored().id();
+        LocalDateTime now = LocalDateTime.of(2026, 4, 10, 9, 30);
+
+        Set<UUID> claimed = riskPredictions.claimForNotification(
+            List.of(id), now, now.toLocalDate().atStartOfDay());
+
+        assertThat(claimed).containsExactly(id);
+        assertThat(jdbc.queryForObject(
+            "SELECT last_notified_at FROM risk_predictions WHERE id_risk_prediction = ?",
+            LocalDateTime.class, id)).isEqualTo(now);
+    }
+
+    /** The whole point: the same student in the same subject is not announced twice in a day. */
+    @Test
+    void claimForNotification_secondTimeSameDay_isRefused() {
+        UUID id = riskPredictions.upsertAll(List.of(
+            prediction(ana, mathGroup, RiskLevel.RIESGO_CRITICO, "0.8100", "0.0000")))
+            .get(0).stored().id();
+        LocalDateTime morning = LocalDateTime.of(2026, 4, 10, 9, 30);
+        LocalDateTime startOfDay = morning.toLocalDate().atStartOfDay();
+        riskPredictions.claimForNotification(List.of(id), morning, startOfDay);
+
+        Set<UUID> second = riskPredictions.claimForNotification(
+            List.of(id), morning.plusHours(3), startOfDay);
+
+        assertThat(second).isEmpty();
+        // And the first claim's instant survives: a refused claim must not move the stamp, or the
+        // bound would slide forward for as long as the teacher keeps editing.
+        assertThat(jdbc.queryForObject(
+            "SELECT last_notified_at FROM risk_predictions WHERE id_risk_prediction = ?",
+            LocalDateTime.class, id)).isEqualTo(morning);
+    }
+
+    /** It is a daily bound, not a permanent one: tomorrow the same student may be announced again. */
+    @Test
+    void claimForNotification_theNextDay_isGrantedAgain() {
+        UUID id = riskPredictions.upsertAll(List.of(
+            prediction(ana, mathGroup, RiskLevel.RIESGO_CRITICO, "0.8100", "0.0000")))
+            .get(0).stored().id();
+        LocalDateTime today = LocalDateTime.of(2026, 4, 10, 9, 30);
+        riskPredictions.claimForNotification(
+            List.of(id), today, today.toLocalDate().atStartOfDay());
+        LocalDateTime tomorrow = today.plusDays(1);
+
+        Set<UUID> next = riskPredictions.claimForNotification(
+            List.of(id), tomorrow, tomorrow.toLocalDate().atStartOfDay());
+
+        assertThat(next).containsExactly(id);
+    }
+
+    /** One student's bound must not silence another's, nor one subject another's. */
+    @Test
+    void claimForNotification_grantsOnlyTheRowsThatHaveNotSpokenToday() {
+        List<IRiskPredictionDomain.UpsertResult> rows = riskPredictions.upsertAll(List.of(
+            prediction(ana, mathGroup, RiskLevel.RIESGO_CRITICO, "0.8100", "0.0000"),
+            prediction(bruno, languageGroup, RiskLevel.RIESGO_CRITICO, "0.7700", "0.0000")));
+        UUID anaInMath = rows.get(0).stored().id();
+        UUID brunoInLanguage = rows.get(1).stored().id();
+        LocalDateTime morning = LocalDateTime.of(2026, 4, 10, 9, 30);
+        LocalDateTime startOfDay = morning.toLocalDate().atStartOfDay();
+        riskPredictions.claimForNotification(List.of(anaInMath), morning, startOfDay);
+
+        Set<UUID> claimed = riskPredictions.claimForNotification(
+            List.of(anaInMath, brunoInLanguage), morning.plusHours(1), startOfDay);
+
+        assertThat(claimed).containsExactly(brunoInLanguage);
+    }
+
+    @Test
+    void claimForNotification_nothingOffered_claimsNothing() {
+        assertThat(riskPredictions.claimForNotification(
+            List.of(), LocalDateTime.now(), LocalDateTime.now())).isEmpty();
     }
 }

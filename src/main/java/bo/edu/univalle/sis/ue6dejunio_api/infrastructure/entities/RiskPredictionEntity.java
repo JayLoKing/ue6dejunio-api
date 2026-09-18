@@ -69,4 +69,14 @@ public class RiskPredictionEntity {
 
     @Column(name = "predicted_at", nullable = false)
     private LocalDateTime predictedAt;
+
+    /**
+     * When this prediction last caused a notification to its teacher. Null means never.
+     *
+     * <p>Not a delivery receipt — {@code notifications} already holds what was sent. This exists
+     * only to stop the same student being announced twice in one day now that the sweep runs within
+     * minutes of every save, where before somebody had to press a button.
+     */
+    @Column(name = "last_notified_at")
+    private LocalDateTime lastNotifiedAt;
 }

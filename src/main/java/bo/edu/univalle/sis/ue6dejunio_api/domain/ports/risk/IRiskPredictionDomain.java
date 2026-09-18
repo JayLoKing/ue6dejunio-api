@@ -5,9 +5,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface IRiskPredictionDomain {
@@ -38,6 +40,29 @@ public interface IRiskPredictionDomain {
      * difference between a query and a hundred.
      */
     List<StudentRisk> byIds(Collection<UUID> predictionIds);
+
+    /**
+     * Of these predictions, the ones that may be announced now — and marks them announced.
+     *
+     * <p>Both halves in one call on purpose. Asking "which of these were already announced today"
+     * and then separately recording that they have been leaves a window where two runs both get the
+     * same answer and both write to the same teacher, which is the duplicate this exists to stop.
+     *
+     * <p>Why it exists at all: the announcement fires on a transition into a category that demands
+     * attention, and since the sweep runs within minutes of every save, a student whose level
+     * oscillates while their teacher enters marks crosses that line several times an afternoon.
+     * Each crossing is a real transition, and each one was a message. A teacher told four times
+     * about the same child stops reading any of it.
+     *
+     * <p>The grain is the prediction row, which is already unique on student, subject and
+     * trimester — so it is exactly "once a day per student per subject" without a second key.
+     *
+     * @param notBefore predictions announced at or after this instant are left out. The start of
+     *                  today, for a once-a-day bound.
+     * @return the ids the caller may announce. Everything else has already been said today.
+     */
+    Set<UUID> claimForNotification(Collection<UUID> predictionIds, LocalDateTime now,
+                                   LocalDateTime notBefore);
 
     /** Everyone predicted in one subject this trimester, worst first. */
     List<StudentRisk> byClassGroupAndTrimester(UUID classGroupId, int trimester);

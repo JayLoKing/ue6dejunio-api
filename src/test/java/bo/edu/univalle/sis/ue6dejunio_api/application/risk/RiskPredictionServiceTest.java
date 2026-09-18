@@ -28,9 +28,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,10 +119,23 @@ class RiskPredictionServiceTest {
             "Matematicas", teacherId, "Prof. Quispe", true);
     }
 
-    /** Wires the two batch reads the announcement side makes, for the given standing rows. */
+    /**
+     * Wires the reads the announcement side makes, for the given standing rows.
+     *
+     * <p>Includes the once-a-day claim, granted here for everything asked. The bound itself is what
+     * {@code aStudentAlreadyAnnouncedToday_isNotAnnouncedAgain} is for; every other test is about
+     * what gets announced when nothing is holding it back.
+     */
     private void givenAnnouncementLookups(ClassGroup subject, StudentRisk... rows) {
         when(classGroupDomain.findByIdIn(anyCollection())).thenReturn(List.of(subject));
         when(predictionDomain.byIds(anyCollection())).thenReturn(List.of(rows));
+        grantTheDailyClaim();
+    }
+
+    /** Every prediction offered is claimable: nothing was announced earlier today. */
+    private void grantTheDailyClaim() {
+        when(predictionDomain.claimForNotification(anyCollection(), any(), any()))
+            .thenAnswer(call -> Set.copyOf(call.getArgument(0, Collection.class)));
     }
 
     // ---------------------------------------------------------------- nothing to do
@@ -277,6 +292,50 @@ class RiskPredictionServiceTest {
 
     // ---------------------------------------------------------------- who gets told
 
+    /**
+     * The bound automation made necessary. The sweep runs within minutes of every save, so a
+     * student whose level oscillates while their marks are entered crosses into a demanding
+     * category several times an afternoon — every crossing a real transition, and every one a
+     * message. A teacher told four times about the same child stops reading the bell.
+     */
+    @Test
+    void predictClassGroup_aStudentAlreadyAnnouncedToday_isNotAnnouncedAgain() {
+        givenMarks(completeMarks(ana, mathGroup), mathGroup);
+        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
+            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00"))));
+        RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
+        when(predictionDomain.upsertAll(anyList()))
+            .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
+        // Nothing left to claim: this prediction already spoke today.
+        when(predictionDomain.claimForNotification(anyCollection(), any(), any()))
+            .thenReturn(Set.of());
+
+        RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
+
+        // The run is unchanged and still reports the transition — only the teacher's inbox is
+        // spared. The prediction itself is written either way.
+        assertThat(summary.changed()).isEqualTo(1);
+        verifyNoInteractions(notifications);
+    }
+
+    /** The claim is asked for once, with today's start, and only about the demanding transitions. */
+    @Test
+    void predictClassGroup_asksToClaimOnlyTheTransitionsItWouldAnnounce() {
+        givenMarks(completeMarks(ana, mathGroup), mathGroup);
+        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
+            new RiskScore(RiskLevel.SIN_RIESGO, new BigDecimal("0.10"), new BigDecimal("0.00"))));
+        RiskPrediction row = stored(ana, mathGroup, RiskLevel.SIN_RIESGO);
+        when(predictionDomain.upsertAll(anyList()))
+            .thenReturn(List.of(new UpsertResult(row, RiskLevel.RIESGO_CRITICO)));
+
+        service.predictClassGroup(mathGroup, TRIMESTER);
+
+        // A student who left the failing band is a transition, and not one anybody is written to
+        // about — so nothing is claimed, and no row is stamped as having spoken today.
+        verify(predictionDomain, never()).claimForNotification(anyCollection(), any(), any());
+        verifyNoInteractions(notifications);
+    }
+
     @Test
     void predictClassGroup_aStudentEnteringTheFailingBand_tellsTheirTeacherByName() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
@@ -423,6 +482,7 @@ class RiskPredictionServiceTest {
         when(predictionDomain.byIds(anyCollection())).thenReturn(List.of(
             new StudentRisk(anaRow, "Ana", "Alvarez", "Matematicas"),
             new StudentRisk(brunoRow, "Bruno", "Bermudez", "Lenguaje")));
+        grantTheDailyClaim();
 
         service.predictYear(YEAR, TRIMESTER);
 

@@ -2,9 +2,11 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.RiskPredictionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -77,6 +79,34 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
         """)
     List<Object[]> findByCourseWithNames(@Param("courseId") UUID courseId,
                                          @Param("trimester") Integer trimester);
+
+    /**
+     * Stamps every one of these predictions that has not been announced since {@code notBefore}.
+     *
+     * <p>The write comes first and the read of what was written comes second, which is the whole of
+     * the concurrency story. Reading the un-announced set and then stamping it would let two runs
+     * both read the same rows and both announce them — the exact duplicate this is here to prevent.
+     * Stamping first makes the database settle it: each row is claimed by whichever run reaches it,
+     * and {@link #findIdsNotifiedAt} then returns only the ones carrying this run's own instant.
+     *
+     * @return how many rows were claimed. The caller wants the ids, not the count, and gets them
+     *     from the read below — this number is only useful to a log.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE RiskPredictionEntity p
+           SET p.lastNotifiedAt = :now
+         WHERE p.id IN :ids
+           AND (p.lastNotifiedAt IS NULL OR p.lastNotifiedAt < :notBefore)
+        """)
+    int claimForNotification(@Param("ids") Collection<UUID> ids,
+                             @Param("now") LocalDateTime now,
+                             @Param("notBefore") LocalDateTime notBefore);
+
+    /** The rows carrying exactly this instant: what {@link #claimForNotification} just won. */
+    @Query("SELECT p.id FROM RiskPredictionEntity p WHERE p.id IN :ids AND p.lastNotifiedAt = :now")
+    List<UUID> findIdsNotifiedAt(@Param("ids") Collection<UUID> ids,
+                                 @Param("now") LocalDateTime now);
 
     /** One student across every subject they sit, worst first, newest trimester first. */
     @Query("""
