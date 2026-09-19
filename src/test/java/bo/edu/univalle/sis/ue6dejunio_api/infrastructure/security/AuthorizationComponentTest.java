@@ -14,6 +14,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
@@ -505,6 +506,165 @@ class AuthorizationComponentTest {
         // the role rule is dead and the documented scope is a lie.
         assertThat(authz.canReadScoreEvent(
             token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+    }
+
+    // ---- canReadClassGroup: the homeroom teacher reads the technical subjects of their own room ----
+
+    private ClassGroup classGroup(UUID id, UUID courseId, UUID teacherId) {
+        return new ClassGroup(id, courseId, "Quinto", "B",
+            UUID.randomUUID(), "Educacion Musical", teacherId, "Tecnico", true);
+    }
+
+    private Course course(UUID id, UUID homeroomTeacherId) {
+        return new Course(id, 5, "Quinto", 2, "B", 1, 2026, homeroomTeacherId, "Aula", true);
+    }
+
+    @Test
+    void canReadClassGroup_homeroomTeacher_readsTechnicalSubjectTaughtBySomebodyElse() {
+        // Musica, Religion and Tecnica Tecnologica are run by a technical teacher, but the homeroom
+        // teacher answers for that classroom as a whole: they sign its libreta, its centralizador
+        // and its informe pedagogico, all of which quote these very marks. Denying the read left
+        // them looking at their own course through a 403.
+        UUID homeroomTeacher = UUID.randomUUID();
+        UUID technicalTeacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.findById(classGroupId))
+            .thenReturn(Optional.of(classGroup(classGroupId, courseId, technicalTeacher)));
+        when(courseDomain.findById(courseId))
+            .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
+
+        assertThat(authz.canReadClassGroup(token(homeroomTeacher, "Teacher"), classGroupId)).isTrue();
+    }
+
+    @Test
+    void canWriteClassGroup_homeroomTeacher_stillCannotWriteATechnicalSubjectSomebodyElseTeaches() {
+        // The read widened; the write did not. Only the teacher the Director put in charge of the
+        // class group records its marks. When that is the homeroom teacher, they own it outright
+        // and this same predicate already lets them through.
+        UUID homeroomTeacher = UUID.randomUUID();
+        UUID technicalTeacher = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(technicalTeacher);
+
+        assertThat(authz.canWriteClassGroup(token(homeroomTeacher, "Teacher"), classGroupId)).isFalse();
+        verify(courseDomain, never()).findById(any());
+    }
+
+    @Test
+    void canReadClassGroup_subjectOwner_neverAsksForTheCourse() {
+        // The teacher who runs the class group is through on the first check. Looking the course up
+        // anyway would add a query to every read of the subject its own teacher opens.
+        UUID teacher = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.findById(classGroupId))
+            .thenReturn(Optional.of(classGroup(classGroupId, UUID.randomUUID(), teacher)));
+
+        assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), classGroupId)).isTrue();
+        verify(courseDomain, never()).findById(any());
+    }
+
+    @Test
+    void canReadClassGroup_teacherOfAnotherCourse_false() {
+        // Neither the subject's teacher nor the homeroom teacher of its course: this is the reading
+        // the guard exists to stop, and widening it for the homeroom teacher must not open it.
+        UUID stranger = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.findById(classGroupId))
+            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+        when(courseDomain.findById(courseId))
+            .thenReturn(Optional.of(course(courseId, UUID.randomUUID())));
+
+        assertThat(authz.canReadClassGroup(token(stranger, "Teacher"), classGroupId)).isFalse();
+    }
+
+    @Test
+    void canReadClassGroup_unknownClassGroup_deniesNotThrows() {
+        UUID teacher = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.findById(classGroupId)).thenReturn(Optional.empty());
+
+        assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), classGroupId)).isFalse();
+    }
+
+    @Test
+    void canReadClassGroup_courseWithNoHomeroomTeacher_false() {
+        // A course between homeroom teachers has a null there. Comparing against it must deny, not
+        // match a caller whose own id failed to parse.
+        UUID teacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.findById(classGroupId))
+            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+        when(courseDomain.findById(courseId)).thenReturn(Optional.of(course(courseId, null)));
+
+        assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), classGroupId)).isFalse();
+    }
+
+    @Test
+    void canReadClassGroup_director_bypassesWithoutLookup() {
+        assertThat(authz.canReadClassGroup(
+            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+        verify(classGroupDomain, never()).findById(any());
+    }
+
+    @Test
+    void canReadClassGroup_secretary_bypassesWithoutLookup() {
+        assertThat(authz.canReadClassGroup(
+            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        verify(classGroupDomain, never()).findById(any());
+    }
+
+    @Test
+    void canReadScoreCriterion_homeroomTeacher_readsATechnicalSubjectsCriterion() {
+        // Same rule one level up: the criteria tab of a technical subject is a read of its class
+        // group, so it resolves through the same predicate.
+        UUID homeroomTeacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId)).thenReturn(Optional.of(
+            new EvaluationCriterion(criterionId, classGroupId, 1, "Knowing", "c", null, null)));
+        when(classGroupDomain.findById(classGroupId))
+            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+        when(courseDomain.findById(courseId))
+            .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
+
+        assertThat(authz.canReadScoreCriterion(token(homeroomTeacher, "Teacher"), criterionId)).isTrue();
+    }
+
+    @Test
+    void canReadScoreCriterion_unknownCriterion_deniesNotThrows() {
+        UUID criterionId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId)).thenReturn(Optional.empty());
+
+        assertThat(authz.canReadScoreCriterion(
+            token(UUID.randomUUID(), "Teacher"), criterionId)).isFalse();
+    }
+
+    @Test
+    void canReadScoreEvent_homeroomTeacher_readsATechnicalSubjectsActivity() {
+        UUID homeroomTeacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        when(assessmentEventDomain.findById(eventId)).thenReturn(Optional.of(
+            new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
+        when(classGroupDomain.findById(classGroupId))
+            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+        when(courseDomain.findById(courseId))
+            .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
+
+        assertThat(authz.canReadScoreEvent(token(homeroomTeacher, "Teacher"), eventId)).isTrue();
+    }
+
+    @Test
+    void canReadScoreEvent_unknownEvent_deniesNotThrows() {
+        UUID eventId = UUID.randomUUID();
+        when(assessmentEventDomain.findById(eventId)).thenReturn(Optional.empty());
+
+        assertThat(authz.canReadScoreEvent(token(UUID.randomUUID(), "Teacher"), eventId)).isFalse();
     }
 
     @Test

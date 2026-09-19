@@ -192,25 +192,85 @@ public class AuthorizationComponent {
         if (isReadOnlyStaff(authentication)) {
             return true;
         }
-        return canWriteScoreEvent(authentication, eventId);
+        if (authentication == null || eventId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        return assessmentEventDomain.findById(eventId)
+            .map(event -> canReadClassGroup(authentication, event.classGroupId()))
+            .orElse(false);
     }
 
     public boolean canReadScoreCriterion(Authentication authentication, UUID criterionId) {
         if (isReadOnlyStaff(authentication)) {
             return true;
         }
-        return canWriteScoreCriterion(authentication, criterionId);
+        if (authentication == null || criterionId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        return criterionDomain.findById(criterionId)
+            .map(criterion -> canReadClassGroup(authentication, criterion.classGroupId()))
+            .orElse(false);
     }
 
     /**
-     * Read side of {@link #canWriteClassGroup}. Listing a class group's criteria is a read, so the
-     * secretariat reaches it; a Teacher stays inside the subjects they run.
+     * Who may read a class group's criteria and marks. Deliberately wider than
+     * {@link #canWriteClassGroup}: two different teachers reach the same subject, and only one of
+     * them may write it.
+     *
+     * <ul>
+     *   <li>The teacher the Director put in charge of the class group — they record its marks, so
+     *       reading them is the smaller half of what they already do.
+     *   <li>The homeroom teacher of the course it belongs to. The technical subjects — Música,
+     *       Religión, Técnica Tecnológica — are run by a technical teacher, but the homeroom
+     *       teacher answers for that classroom as a whole and signs the libreta, the centralizador
+     *       and the informe pedagógico, every one of which quotes these very marks. Gating this on
+     *       ownership denied them their own course's records with a 403.
+     * </ul>
+     *
+     * <p>When the Director assigns a technical subject to the homeroom teacher themselves, the
+     * first case already covers them and they write it like any other.
+     *
+     * <p>Resolved through {@code findById} rather than {@code teacherIdOfClassGroup} so that one
+     * lookup answers both questions; the course is only asked for when the caller turns out not to
+     * be the subject's own teacher.
      */
     public boolean canReadClassGroup(Authentication authentication, UUID classGroupId) {
         if (isReadOnlyStaff(authentication)) {
             return true;
         }
-        return canWriteClassGroup(authentication, classGroupId);
+        if (authentication == null || classGroupId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        UUID userId = userId(authentication);
+        if (userId == null) {
+            return false;
+        }
+        return classGroupDomain.findById(classGroupId)
+            .map(cg -> userId.equals(cg.teacherId()) || isHomeroomTeacherOf(userId, cg.courseId()))
+            .orElse(false);
+    }
+
+    /**
+     * Whether this teacher is the one in charge of that course. A course between homeroom teachers
+     * carries a null there, so the comparison is made from the caller's id and never the other way
+     * round — a null on either side denies.
+     */
+    private boolean isHomeroomTeacherOf(UUID teacherId, UUID courseId) {
+        if (teacherId == null || courseId == null) {
+            return false;
+        }
+        return courseDomain.findById(courseId)
+            .map(course -> teacherId.equals(course.homeroomTeacherId()))
+            .orElse(false);
     }
 
     public boolean canReadEnrollmentScope(Authentication authentication, UUID courseEnrollmentId) {
