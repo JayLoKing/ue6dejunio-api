@@ -40,9 +40,9 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * End-to-end MockMvc test (no DB, no Docker required): exercises the REAL {@link
  * RateLimitingFilter} wired ahead of {@link AuthController} to prove "Filter Ordering Before
- * Authentication" — a throttled request never invokes {@code AuthService}, and a request within
- * the limit still flows through normally (guards the {@code CachedBodyHttpServletRequest} body
- * re-read against breaking {@code @RequestBody}).
+ * Authentication" — a throttled request never invokes {@code AuthService}, and a request within the
+ * limit still flows through normally (guards the {@code CachedBodyHttpServletRequest} body re-read
+ * against breaking {@code @RequestBody}).
  */
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc // filters enabled (default) so the real RateLimitingFilter bean applies
@@ -75,7 +75,7 @@ class RateLimitingFilterWebTest {
         @Bean
         SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
             http.csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+                    .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
             return http.build();
         }
 
@@ -101,8 +101,7 @@ class RateLimitingFilterWebTest {
 
         @Bean
         RateLimitingFilter rateLimitingFilter(
-            RateLimitProperties properties, ClientIpResolver ipResolver, RateLimitStore store
-        ) {
+                RateLimitProperties properties, ClientIpResolver ipResolver, RateLimitStore store) {
             return new RateLimitingFilter(properties, ipResolver, store);
         }
     }
@@ -110,36 +109,41 @@ class RateLimitingFilterWebTest {
     @Test
     void loginAttemptOverLimit_returns429AndNeverInvokesAuthService() throws Exception {
         when(authService.login(any(LoginCommand.class)))
-            .thenReturn(
-                new AuthenticatedUser(
-                    UUID.randomUUID(),
-                    "director@ue6.bo",
-                    "Juan Ortuño",
-                    "DIRECTOR",
-                    "jwt-token",
-                    Instant.now(),
-                    Instant.now().plusSeconds(900),
-                    false,
-                    null,
-                    null,
-                    null,
-                    null));
+                .thenReturn(
+                        new AuthenticatedUser(
+                                UUID.randomUUID(),
+                                "director@ue6.bo",
+                                "Juan Ortuño",
+                                "DIRECTOR",
+                                "jwt-token",
+                                Instant.now(),
+                                Instant.now().plusSeconds(900),
+                                false,
+                                null,
+                                null,
+                                null,
+                                null));
 
         for (int i = 1; i <= LOGIN_CAPACITY; i++) {
             mvc.perform(
-                    post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(new LoginPayload("director@ue6.bo", "secret123"))))
-                .andExpect(status().isOk());
+                            post("/api/auth/login")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            json.writeValueAsString(
+                                                    new LoginPayload(
+                                                            "director@ue6.bo", "secret123"))))
+                    .andExpect(status().isOk());
         }
         verify(authService, times(LOGIN_CAPACITY)).login(any(LoginCommand.class));
 
         mvc.perform(
-                post("/api/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(json.writeValueAsString(new LoginPayload("director@ue6.bo", "secret123"))))
-            .andExpect(status().is(429))
-            .andExpect(header().exists("Retry-After"));
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                new LoginPayload("director@ue6.bo", "secret123"))))
+                .andExpect(status().is(429))
+                .andExpect(header().exists("Retry-After"));
 
         // The (LOGIN_CAPACITY + 1)-th, rejected request must never reach AuthService: the total
         // call count stays at LOGIN_CAPACITY.

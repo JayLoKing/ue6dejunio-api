@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.event.DomainEvent;
-
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -13,5 +12,4 @@ import java.util.UUID;
  * course's own gestión decides. Resolving it here would be this side guessing at a calendar it does
  * not hold.
  */
-public record SessionAttendanceRecorded(UUID classGroupId, LocalDate date) implements DomainEvent {
-}
+public record SessionAttendanceRecorded(UUID classGroupId, LocalDate date) implements DomainEvent {}

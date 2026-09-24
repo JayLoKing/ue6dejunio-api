@@ -1,30 +1,5 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.StudentMapper;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-
-import java.util.Optional;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +9,30 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.StudentMapper;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class StudentRepositoryAdapterTest {
@@ -57,11 +56,12 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_blankQ_routesToListDirectory() {
         UUID courseId = UUID.randomUUID();
-        when(repo.listDirectory(eq(courseId), isNull(), isNull(), isNull(), eq(ACTIVE),
-            eq(pageable))).thenReturn(emptyPage(pageable));
+        when(repo.listDirectory(
+                        eq(courseId), isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
+                .thenReturn(emptyPage(pageable));
 
-        PageResult<StudentDirectoryItem> result = adapter.searchDirectory(
-            StudentDirectoryQuery.of("", courseId), pageQuery);
+        PageResult<StudentDirectoryItem> result =
+                adapter.searchDirectory(StudentDirectoryQuery.of("", courseId), pageQuery);
 
         assertThat(result.content()).isEmpty();
         assertThat(result.size()).isEqualTo(30);
@@ -72,10 +72,10 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_nullQ_routesToListDirectory() {
         when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
-            .thenReturn(emptyPage(pageable));
+                .thenReturn(emptyPage(pageable));
 
-        PageResult<StudentDirectoryItem> result = adapter.searchDirectory(
-            StudentDirectoryQuery.of(null, null), pageQuery);
+        PageResult<StudentDirectoryItem> result =
+                adapter.searchDirectory(StudentDirectoryQuery.of(null, null), pageQuery);
 
         assertThat(result.content()).isEmpty();
         assertThat(result.size()).isEqualTo(30);
@@ -85,11 +85,18 @@ class StudentRepositoryAdapterTest {
 
     @Test
     void searchDirectory_nonBlankQ_routesToLikeSearch() {
-        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), isNull(), eq(ACTIVE),
-            eq(pageable))).thenReturn(emptyPage(pageable));
+        when(repo.searchDirectory(
+                        eq("Lopez"),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        eq(ACTIVE),
+                        eq(pageable)))
+                .thenReturn(emptyPage(pageable));
 
-        PageResult<StudentDirectoryItem> result = adapter.searchDirectory(
-            StudentDirectoryQuery.of("Lopez", null), pageQuery);
+        PageResult<StudentDirectoryItem> result =
+                adapter.searchDirectory(StudentDirectoryQuery.of("Lopez", null), pageQuery);
 
         assertThat(result.content()).isEmpty();
         assertThat(result.size()).isEqualTo(30);
@@ -100,7 +107,7 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_whitespaceOnlyQ_routesToListDirectory() {
         when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), eq(ACTIVE), eq(pageable)))
-            .thenReturn(emptyPage(pageable));
+                .thenReturn(emptyPage(pageable));
 
         adapter.searchDirectory(StudentDirectoryQuery.of("   ", null), pageQuery);
 
@@ -111,8 +118,15 @@ class StudentRepositoryAdapterTest {
     /** Typing spaces around a surname is typing, not part of the surname. */
     @Test
     void searchDirectory_trimsWhatWasTyped() {
-        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), isNull(), eq(ACTIVE),
-            eq(pageable))).thenReturn(emptyPage(pageable));
+        when(repo.searchDirectory(
+                        eq("Lopez"),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        eq(ACTIVE),
+                        eq(pageable)))
+                .thenReturn(emptyPage(pageable));
 
         adapter.searchDirectory(StudentDirectoryQuery.of("  Lopez  ", null), pageQuery);
 
@@ -123,10 +137,11 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_spanningEverybody_bindsNoStatus() {
         when(repo.listDirectory(isNull(), isNull(), isNull(), isNull(), isNull(), eq(pageable)))
-            .thenReturn(emptyPage(pageable));
+                .thenReturn(emptyPage(pageable));
 
-        adapter.searchDirectory(new StudentDirectoryQuery(
-            null, null, null, null, null, StudentDirectoryScope.ALL), pageQuery);
+        adapter.searchDirectory(
+                new StudentDirectoryQuery(null, null, null, null, null, StudentDirectoryScope.ALL),
+                pageQuery);
 
         verify(repo, times(1)).listDirectory(null, null, null, null, null, pageable);
     }
@@ -134,10 +149,11 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_gradeAndParallel_travelToTheQuery() {
         when(repo.listDirectory(isNull(), eq(3), eq(2), isNull(), eq("Withdrawn"), eq(pageable)))
-            .thenReturn(emptyPage(pageable));
+                .thenReturn(emptyPage(pageable));
 
-        adapter.searchDirectory(new StudentDirectoryQuery(
-            null, null, 3, 2, null, StudentDirectoryScope.WITHDRAWN), pageQuery);
+        adapter.searchDirectory(
+                new StudentDirectoryQuery(null, null, 3, 2, null, StudentDirectoryScope.WITHDRAWN),
+                pageQuery);
 
         verify(repo, times(1)).listDirectory(null, 3, 2, null, "Withdrawn", pageable);
     }
@@ -146,21 +162,25 @@ class StudentRepositoryAdapterTest {
     @Test
     void searchDirectory_gestion_travelsToTheListQuery() {
         when(repo.listDirectory(isNull(), isNull(), isNull(), eq(5), eq(ACTIVE), eq(pageable)))
-            .thenReturn(emptyPage(pageable));
+                .thenReturn(emptyPage(pageable));
 
-        adapter.searchDirectory(new StudentDirectoryQuery(
-            null, null, null, null, 5, StudentDirectoryScope.ACTIVE), pageQuery);
+        adapter.searchDirectory(
+                new StudentDirectoryQuery(null, null, null, null, 5, StudentDirectoryScope.ACTIVE),
+                pageQuery);
 
         verify(repo, times(1)).listDirectory(null, null, null, 5, ACTIVE, pageable);
     }
 
     @Test
     void searchDirectory_gestion_travelsToTheSearchQuery() {
-        when(repo.searchDirectory(eq("Lopez"), isNull(), isNull(), isNull(), eq(5), eq(ACTIVE),
-            eq(pageable))).thenReturn(emptyPage(pageable));
+        when(repo.searchDirectory(
+                        eq("Lopez"), isNull(), isNull(), isNull(), eq(5), eq(ACTIVE), eq(pageable)))
+                .thenReturn(emptyPage(pageable));
 
-        adapter.searchDirectory(new StudentDirectoryQuery(
-            "Lopez", null, null, null, 5, StudentDirectoryScope.ACTIVE), pageQuery);
+        adapter.searchDirectory(
+                new StudentDirectoryQuery(
+                        "Lopez", null, null, null, 5, StudentDirectoryScope.ACTIVE),
+                pageQuery);
 
         verify(repo, times(1)).searchDirectory("Lopez", null, null, null, 5, ACTIVE, pageable);
     }
@@ -173,8 +193,8 @@ class StudentRepositoryAdapterTest {
         when(repo.findById(id)).thenReturn(Optional.of(entity));
         when(userRepo.getReferenceById(director)).thenReturn(new UserEntity());
 
-        adapter.updateStatus(id, new StudentStatusChange(
-            "Withdrawn", "Retiro Voluntario", null, director));
+        adapter.updateStatus(
+                id, new StudentStatusChange("Withdrawn", "Retiro Voluntario", null, director));
 
         assertThat(entity.getStatus()).isEqualTo("Withdrawn");
         assertThat(entity.getStatusReason()).isEqualTo("Retiro Voluntario");
@@ -191,8 +211,10 @@ class StudentRepositoryAdapterTest {
         when(repo.findById(id)).thenReturn(Optional.of(entity));
         when(userRepo.getReferenceById(director)).thenReturn(actor);
 
-        adapter.updateStatus(id, new StudentStatusChange(
-            "Withdrawn", "Otro", "Se mudó a Santa Cruz con su familia.", director));
+        adapter.updateStatus(
+                id,
+                new StudentStatusChange(
+                        "Withdrawn", "Otro", "Se mudó a Santa Cruz con su familia.", director));
 
         assertThat(entity.getStatusNote()).isEqualTo("Se mudó a Santa Cruz con su familia.");
         assertThat(entity.getStatusChangedBy()).isSameAs(actor);
@@ -231,8 +253,11 @@ class StudentRepositoryAdapterTest {
         UUID id = UUID.randomUUID();
         when(repo.findById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> adapter.updateStatus(id, new StudentStatusChange(
-            "Withdrawn", "Otro", "x", null)))
-            .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(
+                        () ->
+                                adapter.updateStatus(
+                                        id,
+                                        new StudentStatusChange("Withdrawn", "Otro", "x", null)))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

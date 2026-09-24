@@ -13,8 +13,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * Servlet single-read workaround: fully buffers the request body in the constructor so it can be
  * read once by the rate-limiting filter (e.g. to parse the login email) and then read again,
- * unchanged, by {@code @RequestBody} downstream. Scoped to small JSON auth POST bodies only —
- * never apply to large uploads.
+ * unchanged, by {@code @RequestBody} downstream. Scoped to small JSON auth POST bodies only — never
+ * apply to large uploads.
  */
 public class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 

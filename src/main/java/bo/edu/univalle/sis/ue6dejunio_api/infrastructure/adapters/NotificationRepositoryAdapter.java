@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
@@ -11,11 +11,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseEnrollmentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaNotificationRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashSet;
@@ -24,6 +19,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -33,9 +32,10 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     private final JpaUserRepository userRepo;
     private final JpaCourseEnrollmentRepository enrollmentRepo;
 
-    public NotificationRepositoryAdapter(JpaNotificationRepository notificationRepo,
-                                         JpaUserRepository userRepo,
-                                         JpaCourseEnrollmentRepository enrollmentRepo) {
+    public NotificationRepositoryAdapter(
+            JpaNotificationRepository notificationRepo,
+            JpaUserRepository userRepo,
+            JpaCourseEnrollmentRepository enrollmentRepo) {
         this.notificationRepo = notificationRepo;
         this.userRepo = userRepo;
         this.enrollmentRepo = enrollmentRepo;
@@ -63,28 +63,26 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
 
     @Override
     public Optional<String> roleNameOf(UUID userId) {
-        return userRepo.findById(userId)
-            .map(UserEntity::getRole)
-            .map(role -> role.getName());
+        return userRepo.findById(userId).map(UserEntity::getRole).map(role -> role.getName());
     }
 
     @Override
     public List<UUID> activeDirectorIds() {
         return userRepo.findByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE).stream()
-            .map(UserEntity::getId)
-            .toList();
+                .map(UserEntity::getId)
+                .toList();
     }
 
     /**
      * Two queries rather than one: JPQL has no union that reads as well as this, and the two
-     * questions are genuinely different — who runs the course, and who runs a subject inside it.
-     * A set because a homeroom teacher who also teaches a subject there is one person, and would
+     * questions are genuinely different — who runs the course, and who runs a subject inside it. A
+     * set because a homeroom teacher who also teaches a subject there is one person, and would
      * otherwise get the same notice twice.
      */
     @Override
     public List<UUID> teacherIdsResponsibleForStudent(UUID studentId) {
-        Set<UUID> teachers = new LinkedHashSet<>(
-            enrollmentRepo.findHomeroomTeacherIdsOfStudent(studentId));
+        Set<UUID> teachers =
+                new LinkedHashSet<>(enrollmentRepo.findHomeroomTeacherIdsOfStudent(studentId));
         teachers.addAll(enrollmentRepo.findClassGroupTeacherIdsOfStudent(studentId));
         return List.copyOf(teachers);
     }
@@ -92,8 +90,12 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     @Override
     @Transactional
     public Notification send(SendNotificationCommand c) {
-        UserEntity receiver = userRepo.findById(c.receiverId())
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario receptor", c.receiverId()));
+        UserEntity receiver =
+                userRepo.findById(c.receiverId())
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Usuario receptor", c.receiverId()));
         NotificationEntity e = new NotificationEntity();
         // Null when the system wrote it — a state change, or later the predictive model. Nobody
         // signs those, and inventing a sender would put a person's name on a machine's message.
@@ -120,23 +122,25 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
      *
      * <p>Nothing on the receiver's side reports back, so the only moment the server can honestly
      * say a notification arrived is the moment it hands the bytes over. The statement touches only
-     * rows never delivered, so a receiver polling every thirty seconds writes once per
-     * notification and never again.
+     * rows never delivered, so a receiver polling every thirty seconds writes once per notification
+     * and never again.
      */
     @Override
     @Transactional
-    public PageResult<Notification> listReceived(UUID receiverId, boolean unreadOnly,
-                                                 PageQuery pageQuery) {
+    public PageResult<Notification> listReceived(
+            UUID receiverId, boolean unreadOnly, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
-        Page<NotificationEntity> page = unreadOnly
-            ? notificationRepo.findByReceiver_IdAndReadAtIsNull(receiverId, pageable)
-            : notificationRepo.findByReceiver_Id(receiverId, pageable);
+        Page<NotificationEntity> page =
+                unreadOnly
+                        ? notificationRepo.findByReceiver_IdAndReadAtIsNull(receiverId, pageable)
+                        : notificationRepo.findByReceiver_Id(receiverId, pageable);
 
         LocalDateTime now = nowAsStored();
-        Set<UUID> justDelivered = page.getContent().stream()
-            .filter(e -> e.getDeliveredAt() == null)
-            .map(NotificationEntity::getId)
-            .collect(Collectors.toSet());
+        Set<UUID> justDelivered =
+                page.getContent().stream()
+                        .filter(e -> e.getDeliveredAt() == null)
+                        .map(NotificationEntity::getId)
+                        .collect(Collectors.toSet());
         if (!justDelivered.isEmpty()) {
             notificationRepo.markDelivered(justDelivered, now);
         }
@@ -147,15 +151,26 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     }
 
     /** The row as the receiver now has it, without touching what the persistence context holds. */
-    private Notification delivered(NotificationEntity e, Set<UUID> justDelivered,
-                                   LocalDateTime now) {
+    private Notification delivered(
+            NotificationEntity e, Set<UUID> justDelivered, LocalDateTime now) {
         Notification n = toDomain(e);
         if (!justDelivered.contains(e.getId())) {
             return n;
         }
-        return new Notification(n.id(), n.senderId(), n.senderName(), n.receiverId(),
-            n.receiverName(), n.type(), n.subject(), n.message(), n.resourceType(),
-            n.resourceId(), now, n.readAt(), n.createdAt());
+        return new Notification(
+                n.id(),
+                n.senderId(),
+                n.senderName(),
+                n.receiverId(),
+                n.receiverName(),
+                n.type(),
+                n.subject(),
+                n.message(),
+                n.resourceType(),
+                n.resourceId(),
+                now,
+                n.readAt(),
+                n.createdAt());
     }
 
     @Override
@@ -166,8 +181,10 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     @Override
     @Transactional
     public LocalDateTime markAsRead(UUID id) {
-        NotificationEntity e = notificationRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Notificacion", id));
+        NotificationEntity e =
+                notificationRepo
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Notificacion", id));
         // Reading it a second time does not move the stamp: what is recorded is when the receiver
         // first saw it, not when they last opened it.
         if (e.getReadAt() == null) {
@@ -196,14 +213,18 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
         UserEntity s = e.getSender();
         UserEntity r = e.getReceiver();
         return new Notification(
-            e.getId(),
-            s != null ? s.getId() : null,
-            s != null ? s.getNames() + " " + s.getLastNames() : null,
-            r != null ? r.getId() : null,
-            r != null ? r.getNames() + " " + r.getLastNames() : null,
-            e.getType(), e.getSubject(), e.getMessage(),
-            e.getResourceType(), e.getResourceId(),
-            e.getDeliveredAt(), e.getReadAt(), e.getCreatedAt()
-        );
+                e.getId(),
+                s != null ? s.getId() : null,
+                s != null ? s.getNames() + " " + s.getLastNames() : null,
+                r != null ? r.getId() : null,
+                r != null ? r.getNames() + " " + r.getLastNames() : null,
+                e.getType(),
+                e.getSubject(),
+                e.getMessage(),
+                e.getResourceType(),
+                e.getResourceId(),
+                e.getDeliveredAt(),
+                e.getReadAt(),
+                e.getCreatedAt());
     }
 }

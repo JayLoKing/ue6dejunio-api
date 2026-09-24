@@ -1,21 +1,20 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.gradebook;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.GradeInWords;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-
-import java.math.BigDecimal;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The libreta's "Literal" column, which spells the annual mark out in words beside the numeral.
  *
  * <p>The school's spreadsheet resolves it with a lookup table of 1..100 typed into hidden columns.
  * The expectations below are that table's own wording, read back out of their file — capitalised
- * words with a lowercase "y", the accents where Spanish puts them. A mark is a number on a
- * document a parent signs, so "Veintidos" without its accent is the wrong word, not a near miss.
+ * words with a lowercase "y", the accents where Spanish puts them. A mark is a number on a document
+ * a parent signs, so "Veintidos" without its accent is the wrong word, not a near miss.
  */
 class GradeInWordsTest {
 
@@ -35,12 +34,7 @@ class GradeInWordsTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "16, Dieciséis",
-        "22, Veintidós",
-        "23, Veintitrés",
-        "26, Veintiséis"
-    })
+    @CsvSource({"16, Dieciséis", "22, Veintidós", "23, Veintitrés", "26, Veintiséis"})
     void of_theOnesThatCarryAnAccent_keepIt(int mark, String expected) {
         assertThat(GradeInWords.of(new BigDecimal(mark))).isEqualTo(expected);
     }
@@ -106,9 +100,7 @@ class GradeInWordsTest {
         // The scale runs 0..100 and the sheet has a row for each. A gap would surface as a blank
         // literal beside a real numeral, which reads as a missing mark rather than a missing word.
         for (int mark = 0; mark <= 100; mark++) {
-            assertThat(GradeInWords.of(new BigDecimal(mark)))
-                .as("mark %d", mark)
-                .isNotEmpty();
+            assertThat(GradeInWords.of(new BigDecimal(mark))).as("mark %d", mark).isNotEmpty();
         }
     }
 }

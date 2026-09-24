@@ -1,22 +1,21 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
-import com.jayway.jsonpath.JsonPath;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.jayway.jsonpath.JsonPath;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * The informe pedagógico end to end, over a real Postgres.
@@ -62,12 +61,12 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
         brunoEnrollment = seedEnrollment(bruno, courseId);
         carlaEnrollment = seedEnrollment(carla, courseId);
 
-        gradeArea(anaEnrollment, mathGroup, 10, 40, 35, 5);       // 90
-        gradeArea(anaEnrollment, languageGroup, 10, 40, 30, 5);   // 85
-        gradeArea(brunoEnrollment, mathGroup, 2, 10, 10, 1);      // 23
-        gradeArea(brunoEnrollment, languageGroup, 3, 12, 12, 1);  // 28
-        gradeArea(carlaEnrollment, mathGroup, 10, 40, 35, 5);     // 90
-        gradeArea(carlaEnrollment, languageGroup, 2, 15, 12, 1);  // 30
+        gradeArea(anaEnrollment, mathGroup, 10, 40, 35, 5); // 90
+        gradeArea(anaEnrollment, languageGroup, 10, 40, 30, 5); // 85
+        gradeArea(brunoEnrollment, mathGroup, 2, 10, 10, 1); // 23
+        gradeArea(brunoEnrollment, languageGroup, 3, 12, 12, 1); // 28
+        gradeArea(carlaEnrollment, mathGroup, 10, 40, 35, 5); // 90
+        gradeArea(carlaEnrollment, languageGroup, 2, 15, 12, 1); // 30
     }
 
     private void setGender(UUID studentId, String gender) {
@@ -75,24 +74,31 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
     }
 
     /** One area graded in the first trimester. {@code total_score} is the database's own sum. */
-    private void gradeArea(UUID enrollmentId, UUID classGroupId,
-                           int being, int knowing, int doing, int deciding) {
+    private void gradeArea(
+            UUID enrollmentId, UUID classGroupId, int being, int knowing, int doing, int deciding) {
         jdbc.update(
-            "INSERT INTO academic_scores (id_academic_score, id_course_enrollment, id_class_group, "
-                + "trimester, score_being, score_knowing, score_doing, score_deciding) "
-                + "VALUES (?,?,?,1,?,?,?,?)",
-            UUID.randomUUID(), enrollmentId, classGroupId,
-            BigDecimal.valueOf(being), BigDecimal.valueOf(knowing),
-            BigDecimal.valueOf(doing), BigDecimal.valueOf(deciding));
+                "INSERT INTO academic_scores (id_academic_score, id_course_enrollment, id_class_group, "
+                        + "trimester, score_being, score_knowing, score_doing, score_deciding) "
+                        + "VALUES (?,?,?,1,?,?,?,?)",
+                UUID.randomUUID(),
+                enrollmentId,
+                classGroupId,
+                BigDecimal.valueOf(being),
+                BigDecimal.valueOf(knowing),
+                BigDecimal.valueOf(doing),
+                BigDecimal.valueOf(deciding));
     }
 
     private String sheetAs(UUID userId, String role) throws Exception {
-        return mvc.perform(get("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(userId, role))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return mvc.perform(
+                        get("/api/gradebook/pedagogical-report")
+                                .header("Authorization", "Bearer " + tokenFor(userId, role))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
     }
 
     @Test
@@ -105,7 +111,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
         assertThat(JsonPath.<Integer>read(body, "$.stats.passed.total")).isEqualTo(1);
         assertThat(JsonPath.<Integer>read(body, "$.stats.failed.total")).isEqualTo(2);
         assertThat(new BigDecimal(JsonPath.read(body, "$.stats.failed.percentage").toString()))
-            .isEqualByComparingTo("66.67");
+                .isEqualByComparingTo("66.67");
     }
 
     @Test
@@ -123,16 +129,22 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
         String body = sheetAs(director, "Director");
 
         assertThat(JsonPath.<List<String>>read(body, "$.failingStudents[*].fullName"))
-            .containsExactly("Bruno Bermudez", "Carla Caceres");
+                .containsExactly("Bruno Bermudez", "Carla Caceres");
         assertThat(JsonPath.<List<Integer>>read(body, "$.failingStudents[*].number"))
-            .containsExactly(1, 2);
-        assertThat(JsonPath.<List<String>>read(body, "$.failingStudents[0].failedAreas[*].subjectName"))
-            .containsExactly("Lenguaje", "Matematicas");
-        assertThat(JsonPath.<List<String>>read(body, "$.failingStudents[1].failedAreas[*].subjectName"))
-            .containsExactly("Lenguaje");
-        assertThat(new BigDecimal(
-            JsonPath.read(body, "$.failingStudents[1].failedAreas[0].mark").toString()))
-            .isEqualByComparingTo("30");
+                .containsExactly(1, 2);
+        assertThat(
+                        JsonPath.<List<String>>read(
+                                body, "$.failingStudents[0].failedAreas[*].subjectName"))
+                .containsExactly("Lenguaje", "Matematicas");
+        assertThat(
+                        JsonPath.<List<String>>read(
+                                body, "$.failingStudents[1].failedAreas[*].subjectName"))
+                .containsExactly("Lenguaje");
+        assertThat(
+                        new BigDecimal(
+                                JsonPath.read(body, "$.failingStudents[1].failedAreas[0].mark")
+                                        .toString()))
+                .isEqualByComparingTo("30");
     }
 
     /**
@@ -142,19 +154,22 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
      */
     @Test
     void sheet_withdrawnStudent_isNotAmongTheEffectiveRoster() throws Exception {
-        jdbc.update("UPDATE course_enrollments SET status = 'Withdrawn' "
-            + "WHERE id_course_enrollment = ?", brunoEnrollment);
+        jdbc.update(
+                "UPDATE course_enrollments SET status = 'Withdrawn' "
+                        + "WHERE id_course_enrollment = ?",
+                brunoEnrollment);
 
         String body = sheetAs(director, "Director");
 
         assertThat(JsonPath.<Integer>read(body, "$.stats.effective.total")).isEqualTo(2);
         assertThat(JsonPath.<List<String>>read(body, "$.failingStudents[*].fullName"))
-            .containsExactly("Carla Caceres");
+                .containsExactly("Carla Caceres");
     }
 
     @Test
     void save_thenRead_carriesBackWhatTheTeacherWroteOnEachFailingStudent() throws Exception {
-        String request = """
+        String request =
+                """
             {
               "achievements": "Ana Alvarez sobresale en las dos areas.",
               "difficulties": "Dificultades en operaciones basicas.",
@@ -163,53 +178,68 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
                  "verificationSource": "Cuaderno de seguimiento"}
               ]
             }
-            """.formatted(brunoEnrollment);
+            """
+                        .formatted(brunoEnrollment);
 
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.exists").value(true))
-            .andExpect(jsonPath("$.achievements")
-                .value("Ana Alvarez sobresale en las dos areas."))
-            .andExpect(jsonPath("$.failingStudents[0].actions")
-                .value("Refuerzo en horario alterno"));
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exists").value(true))
+                .andExpect(
+                        jsonPath("$.achievements").value("Ana Alvarez sobresale en las dos areas."))
+                .andExpect(
+                        jsonPath("$.failingStudents[0].actions")
+                                .value("Refuerzo en horario alterno"));
 
         String body = sheetAs(director, "Director");
         assertThat(JsonPath.<String>read(body, "$.difficulties"))
-            .isEqualTo("Dificultades en operaciones basicas.");
+                .isEqualTo("Dificultades en operaciones basicas.");
         assertThat(JsonPath.<String>read(body, "$.failingStudents[0].verificationSource"))
-            .isEqualTo("Cuaderno de seguimiento");
+                .isEqualTo("Cuaderno de seguimiento");
         // Carla is failing too and has nothing written about her yet.
         assertThat(JsonPath.<String>read(body, "$.failingStudents[1].actions")).isNull();
     }
 
-    /** A report half written has to be savable: the teacher fills the prose and comes back later. */
+    /**
+     * A report half written has to be savable: the teacher fills the prose and comes back later.
+     */
     @Test
     void save_withNothingButProse_isAccepted() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "2")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"achievements\":\"Solo los logros por ahora\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.exists").value(true))
-            .andExpect(jsonPath("$.difficulties").doesNotExist());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "2")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"achievements\":\"Solo los logros por ahora\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exists").value(true))
+                .andExpect(jsonPath("$.difficulties").doesNotExist());
     }
 
     private void writeBrunosParagraph() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"failingStudents\":[{\"idCourseEnrollment\":\"" + brunoEnrollment
-                    + "\",\"actions\":\"Refuerzo\",\"verificationSource\":\"Cuaderno\"}]}"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"failingStudents\":[{\"idCourseEnrollment\":\""
+                                                + brunoEnrollment
+                                                + "\",\"actions\":\"Refuerzo\",\"verificationSource\":\"Cuaderno\"}]}"))
+                .andExpect(status().isOk());
     }
 
     /**
@@ -221,22 +251,27 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
     void save_omittingTheFailingStudentsField_leavesTheStoredParagraphsAlone() throws Exception {
         writeBrunosParagraph();
 
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"achievements\":\"Solo cambio los logros\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.failingStudents[0].actions").value("Refuerzo"));
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"achievements\":\"Solo cambio los logros\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.failingStudents[0].actions").value("Refuerzo"));
 
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class))
+                .isEqualTo(1);
         String body = sheetAs(director, "Director");
         assertThat(JsonPath.<String>read(body, "$.achievements"))
-            .isEqualTo("Solo cambio los logros");
+                .isEqualTo("Solo cambio los logros");
         assertThat(JsonPath.<String>read(body, "$.failingStudents[0].verificationSource"))
-            .isEqualTo("Cuaderno");
+                .isEqualTo("Cuaderno");
     }
 
     /** Sending the field empty is the other half of the rule: section IV now holds nothing. */
@@ -244,17 +279,22 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
     void save_withAnEmptyFailingStudentsList_clearsSectionFour() throws Exception {
         writeBrunosParagraph();
 
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"failingStudents\":[]}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.failingStudents[0].actions").doesNotExist());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"failingStudents\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.failingStudents[0].actions").doesNotExist());
 
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class)).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class))
+                .isZero();
     }
 
     /**
@@ -265,13 +305,16 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
      */
     @Test
     void save_withANullElementInFailingStudents_isRejected() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"failingStudents\":[null]}"))
-            .andExpect(status().isBadRequest());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"failingStudents\":[null]}"))
+                .andExpect(status().isBadRequest());
     }
 
     /**
@@ -284,16 +327,24 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
         UUID otherCourse = seedCourse(anotherTeacher, "B");
         UUID stranger = seedEnrollment(seedStudent("Dario", "Duran"), otherCourse);
 
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"failingStudents\":[{\"idCourseEnrollment\":\"" + stranger + "\"}]}"))
-            .andExpect(status().isBadRequest());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"failingStudents\":[{\"idCourseEnrollment\":\""
+                                                + stranger
+                                                + "\"}]}"))
+                .andExpect(status().isBadRequest());
 
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class)).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class))
+                .isZero();
     }
 
     /**
@@ -302,83 +353,104 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
      */
     @Test
     void save_byTheDirector_isForbidden() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"achievements\":\"Escrito desde direccion\"}"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"achievements\":\"Escrito desde direccion\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void save_byATeacherWhoIsNotTheHomeroomOfTheCourse_isForbidden() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(anotherTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"achievements\":\"Escrito por otro docente\"}"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(anotherTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"achievements\":\"Escrito por otro docente\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void sheet_byATeacherWhoIsNotTheHomeroomOfTheCourse_isForbidden() throws Exception {
-        mvc.perform(get("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(anotherTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(anotherTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
-    /** Saving twice leaves one document: {@code uq_pedagogical_report} makes the second a correction. */
+    /**
+     * Saving twice leaves one document: {@code uq_pedagogical_report} makes the second a
+     * correction.
+     */
     @Test
     void save_twice_leavesOneDocumentAndTheLaterText() throws Exception {
         for (String text : List.of("Primer borrador", "Version final")) {
-            mvc.perform(put("/api/gradebook/pedagogical-report")
-                    .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                    .param("id_course", courseId.toString())
-                    .param("trimester", "1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"achievements\":\"" + text + "\"}"))
-                .andExpect(status().isOk());
+            mvc.perform(
+                            put("/api/gradebook/pedagogical-report")
+                                    .header(
+                                            "Authorization",
+                                            "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                    .param("id_course", courseId.toString())
+                                    .param("trimester", "1")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"achievements\":\"" + text + "\"}"))
+                    .andExpect(status().isOk());
         }
 
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pedagogical_reports WHERE id_course = ?", Integer.class, courseId))
-            .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM pedagogical_reports WHERE id_course = ?",
+                                Integer.class,
+                                courseId))
+                .isEqualTo(1);
         assertThat(JsonPath.<String>read(sheetAs(director, "Director"), "$.achievements"))
-            .isEqualTo("Version final");
+                .isEqualTo("Version final");
     }
 
     /** Three trimesters, three documents. The second must not reach into the first. */
     @Test
     void save_onlyTouchesTheTrimesterItNames() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"achievements\":\"Logros del primero\"}"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"achievements\":\"Logros del primero\"}"))
+                .andExpect(status().isOk());
 
-        mvc.perform(get("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "2"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.exists").value(false))
-            .andExpect(jsonPath("$.achievements").doesNotExist());
+        mvc.perform(
+                        get("/api/gradebook/pedagogical-report")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exists").value(false))
+                .andExpect(jsonPath("$.achievements").doesNotExist());
     }
 
     /** Outside the three trimesters the school has, there is no document to ask for. */
     @Test
     void sheet_trimesterOutsideTheYear_isRejected() throws Exception {
-        mvc.perform(get("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "4"))
-            .andExpect(status().isBadRequest());
+        mvc.perform(
+                        get("/api/gradebook/pedagogical-report")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "4"))
+                .andExpect(status().isBadRequest());
     }
 
     /**
@@ -389,27 +461,33 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
     void save_proseLongerThanTheDeclaredCeiling_isRejected() throws Exception {
         String tooLong = "a".repeat(4001);
 
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"achievements\":\"" + tooLong + "\"}"))
-            .andExpect(status().isBadRequest());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"achievements\":\"" + tooLong + "\"}"))
+                .andExpect(status().isBadRequest());
 
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pedagogical_reports", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pedagogical_reports", Integer.class))
+                .isZero();
     }
 
     /** A note attached to nobody could never be shown again, so it is refused at the edge. */
     @Test
     void save_noteWithoutAnEnrolment_isRejected() throws Exception {
-        mvc.perform(put("/api/gradebook/pedagogical-report")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"failingStudents\":[{\"actions\":\"Sin matricula\"}]}"))
-            .andExpect(status().isBadRequest());
+        mvc.perform(
+                        put("/api/gradebook/pedagogical-report")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"failingStudents\":[{\"actions\":\"Sin matricula\"}]}"))
+                .andExpect(status().isBadRequest());
     }
 }

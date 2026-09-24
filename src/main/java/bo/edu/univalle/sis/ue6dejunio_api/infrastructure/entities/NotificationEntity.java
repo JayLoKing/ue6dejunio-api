@@ -10,12 +10,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "notifications")
@@ -48,10 +47,10 @@ public class NotificationEntity {
     private String message;
 
     /**
-     * What the notification is about, held as a loose reference with no foreign key on purpose.
-     * The target is a plan today and a risk prediction tomorrow, and the row has to outlive it: a
-     * message saying a plan was observed is still a true record of what the Director said after
-     * the plan is gone.
+     * What the notification is about, held as a loose reference with no foreign key on purpose. The
+     * target is a plan today and a risk prediction tomorrow, and the row has to outlive it: a
+     * message saying a plan was observed is still a true record of what the Director said after the
+     * plan is gone.
      */
     @Column(name = "resource_type", length = 40)
     private String resourceType;

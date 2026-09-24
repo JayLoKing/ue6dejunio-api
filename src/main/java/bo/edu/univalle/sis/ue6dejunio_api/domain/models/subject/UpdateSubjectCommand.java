@@ -1,3 +1,4 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject;
 
-public record UpdateSubjectCommand(String name, Integer areaId, Boolean technical, Boolean active) {}
+public record UpdateSubjectCommand(
+        String name, Integer areaId, Boolean technical, Boolean active) {}

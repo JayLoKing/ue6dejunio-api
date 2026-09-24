@@ -59,10 +59,9 @@ public class LevelController {
     @GetMapping
     @Operation(summary = "Listar niveles. offset=pagina (1-indexed), limit=cantidad")
     public ResponseEntity<PagedResponse<LevelResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
-        @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort
-    ) {
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
+            @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort) {
         SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
         PageQuery p = PageQuery.of(offset - 1, limit, new SortField("name", dir));
         return ResponseEntity.ok(PagedResponse.of(levelService.list(p).map(LevelResponse::from)));
@@ -70,8 +69,8 @@ public class LevelController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar nivel")
-    public ResponseEntity<LevelResponse> update(@PathVariable Integer id,
-                                                @Valid @RequestBody UpdateLevelRequest request) {
+    public ResponseEntity<LevelResponse> update(
+            @PathVariable Integer id, @Valid @RequestBody UpdateLevelRequest request) {
         Level updated = levelService.update(id, new UpdateLevelCommand(request.name()));
         return ResponseEntity.ok(LevelResponse.from(updated));
     }

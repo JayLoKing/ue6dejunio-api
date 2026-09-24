@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
@@ -10,12 +10,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.UserMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import jakarta.annotation.Nullable;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
-import java.util.UUID;
 
 @Repository
 @Transactional(readOnly = true)
@@ -30,15 +29,15 @@ public class UserRepositoryAdapter implements IUserDomain {
     }
 
     @Override
-    public PageResult<UsersList> getUsers(PageQuery pageQuery, @Nullable String search,
-                                          UUID excludeUserId) {
+    public PageResult<UsersList> getUsers(
+            PageQuery pageQuery, @Nullable String search, UUID excludeUserId) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         if (search == null || search.isBlank()) {
             return SpringPaging.toPageResult(
-                repo.listExcluding(excludeUserId, pageable).map(mapper::toListItem));
+                    repo.listExcluding(excludeUserId, pageable).map(mapper::toListItem));
         }
         return SpringPaging.toPageResult(
-            repo.search(search, excludeUserId, pageable).map(mapper::toListItem));
+                repo.search(search, excludeUserId, pageable).map(mapper::toListItem));
     }
 
     @Override
@@ -71,8 +70,8 @@ public class UserRepositoryAdapter implements IUserDomain {
     @Override
     @Transactional
     public void deactivate(UUID id) {
-        UserEntity entity = repo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+        UserEntity entity =
+                repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
         entity.setActive(false);
         repo.save(entity);
     }

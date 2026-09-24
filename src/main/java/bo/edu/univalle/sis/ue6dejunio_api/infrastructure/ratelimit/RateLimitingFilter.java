@@ -43,7 +43,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private static final String RESET_PASSWORD_PATH = "/api/auth/reset-password";
     private static final String UNKNOWN_SUBJECT = "unknown";
     private static final String TOO_MANY_REQUESTS_BODY =
-        "{\"message\":\"Too many requests. Please try again later.\"}";
+            "{\"message\":\"Too many requests. Please try again later.\"}";
 
     private final RateLimitProperties properties;
     private final ClientIpResolver ipResolver;
@@ -54,8 +54,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RateLimitingFilter(
-        RateLimitProperties properties, ClientIpResolver ipResolver, RateLimitStore store
-    ) {
+            RateLimitProperties properties, ClientIpResolver ipResolver, RateLimitStore store) {
         this.properties = properties;
         this.ipResolver = ipResolver;
         this.store = store;
@@ -63,8 +62,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-        HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-        throws ServletException, IOException {
+            HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
         if (!properties.isEnabled()) {
             filterChain.doFilter(request, response);
             return;
@@ -123,20 +122,23 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             String ip = ipResolver.resolve(request);
             return (ip == null || ip.isBlank()) ? ClientIpResolver.UNKNOWN_IP : ip;
         } catch (RuntimeException ex) {
-            LOG.warn("Client IP resolution failed, falling back to '{}'", ClientIpResolver.UNKNOWN_IP, ex);
+            LOG.warn(
+                    "Client IP resolution failed, falling back to '{}'",
+                    ClientIpResolver.UNKNOWN_IP,
+                    ex);
             return ClientIpResolver.UNKNOWN_IP;
         }
     }
 
     private boolean isJsonPostTo(HttpServletRequest request, String path) {
         return "POST".equalsIgnoreCase(request.getMethod())
-            && path.equals(request.getRequestURI())
-            && isJsonContentType(request.getContentType());
+                && path.equals(request.getRequestURI())
+                && isJsonContentType(request.getContentType());
     }
 
     private boolean isJsonContentType(String contentType) {
         return contentType != null
-            && contentType.toLowerCase(Locale.ROOT).contains(MediaType.APPLICATION_JSON_VALUE);
+                && contentType.toLowerCase(Locale.ROOT).contains(MediaType.APPLICATION_JSON_VALUE);
     }
 
     private String extractEmail(byte[] body) {
@@ -144,8 +146,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             JsonNode node = objectMapper.readTree(body);
             String email = node.path("email").asText(null);
             return (email == null || email.isBlank())
-                ? UNKNOWN_SUBJECT
-                : email.trim().toLowerCase(Locale.ROOT);
+                    ? UNKNOWN_SUBJECT
+                    : email.trim().toLowerCase(Locale.ROOT);
         } catch (Exception ex) {
             return UNKNOWN_SUBJECT;
         }
@@ -177,17 +179,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private ConsumptionProbe tryConsume(String key, RateLimitProperties.Bucket config) {
         Bandwidth bandwidth =
-            Bandwidth.builder()
-                .capacity(config.getCapacity())
-                .refillGreedy(config.getRefillPerMinute(), Duration.ofMinutes(1))
-                .build();
+                Bandwidth.builder()
+                        .capacity(config.getCapacity())
+                        .refillGreedy(config.getRefillPerMinute(), Duration.ofMinutes(1))
+                        .build();
         Bucket bucket = store.resolveBucket(key, bandwidth);
         return bucket.tryConsumeAndReturnRemaining(1);
     }
 
     private void writeTooManyRequests(HttpServletResponse response, ConsumptionProbe probe)
-        throws IOException {
-        long retryAfterSeconds = Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds() + 1);
+            throws IOException {
+        long retryAfterSeconds =
+                Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds() + 1);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

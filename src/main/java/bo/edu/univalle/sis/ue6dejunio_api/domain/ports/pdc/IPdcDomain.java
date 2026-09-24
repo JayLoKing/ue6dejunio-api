@@ -4,7 +4,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpsertPdcSubjectCommand;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -15,7 +14,6 @@ public interface IPdcDomain {
     Pdc save(Pdc pdc);
 
     Optional<Pdc> findById(UUID id);
-
 
     /**
      * The plan's status alone, for the guards that only ask whether it can still be written. Empty
@@ -35,12 +33,12 @@ public interface IPdcDomain {
     Pdc addSubjects(UUID planId, List<UUID> classGroupIds);
 
     /**
-     * Replaces a subject block's objective, adaptations and weekly rows, and stamps who did it.
-     * The author travels with the write so the plan is not read and saved a second time just to
-     * record it.
+     * Replaces a subject block's objective, adaptations and weekly rows, and stamps who did it. The
+     * author travels with the write so the plan is not read and saved a second time just to record
+     * it.
      */
-    Pdc writeSubject(UUID planId, UUID planSubjectId, UpsertPdcSubjectCommand command,
-                     UUID currentUserId);
+    Pdc writeSubject(
+            UUID planId, UUID planSubjectId, UpsertPdcSubjectCommand command, UUID currentUserId);
 
     /** The courses that share a plan's grade and year — the parallels the rotation copies into. */
     List<UUID> siblingCourseIdsOf(UUID courseId);
@@ -86,12 +84,16 @@ public interface IPdcDomain {
 
     /**
      * @param courseId narrows to one course; {@code null} spans every course.
-     * @param teacherId narrows the listing to the plans a teacher takes part in; {@code null}
-     *                  spans every plan, which only the Director and the secretariat are entitled to.
+     * @param teacherId narrows the listing to the plans a teacher takes part in; {@code null} spans
+     *     every plan, which only the Director and the secretariat are entitled to.
      */
-    PageResult<Pdc> list(UUID courseId, Integer trimester, String status, String excludeStatus,
-                         UUID teacherId,
-                         PageQuery pageQuery);
+    PageResult<Pdc> list(
+            UUID courseId,
+            Integer trimester,
+            String status,
+            String excludeStatus,
+            UUID teacherId,
+            PageQuery pageQuery);
 
     void deleteById(UUID id);
 }

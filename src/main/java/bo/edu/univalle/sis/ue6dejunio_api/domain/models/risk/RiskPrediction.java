@@ -12,19 +12,17 @@ import java.util.UUID;
  * which is what {@code IRiskPredictionDomain.upsert} returns.
  *
  * @param featuresAnalyzed the exact vector the model was given, as JSON. Without it the prediction
- *                         cannot be explained a week later, when the inputs have all moved.
- * @param attended         whether somebody acted on this. The only field here a person writes.
+ *     cannot be explained a week later, when the inputs have all moved.
+ * @param attended whether somebody acted on this. The only field here a person writes.
  */
 public record RiskPrediction(
-    UUID id,
-    UUID studentId,
-    UUID classGroupId,
-    Integer trimester,
-    RiskLevel riskLevel,
-    BigDecimal pFail,
-    BigDecimal pOutstanding,
-    boolean attended,
-    String featuresAnalyzed,
-    LocalDateTime predictedAt
-) {
-}
+        UUID id,
+        UUID studentId,
+        UUID classGroupId,
+        Integer trimester,
+        RiskLevel riskLevel,
+        BigDecimal pFail,
+        BigDecimal pOutstanding,
+        boolean attended,
+        String featuresAnalyzed,
+        LocalDateTime predictedAt) {}

@@ -1,13 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.sse;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationSent;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class NotificationStreamRegistryTest {
 
@@ -111,7 +110,7 @@ class NotificationStreamRegistryTest {
         }
 
         assertThat(registry.openStreamsOf(reader))
-            .isEqualTo(NotificationStreamRegistry.MAX_STREAMS_PER_READER);
+                .isEqualTo(NotificationStreamRegistry.MAX_STREAMS_PER_READER);
     }
 
     /**

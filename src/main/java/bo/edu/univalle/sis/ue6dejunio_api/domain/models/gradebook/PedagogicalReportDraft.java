@@ -9,6 +9,7 @@ import java.util.List;
  * teacher emptied, because the screen holds both while it is being filled and always sends both.
  *
  * <p><b>{@code notes} is the one field where null and empty are not the same thing.</b>
+ *
  * <ul>
  *   <li>{@code null} — this save says nothing about section IV. Every stored paragraph is left
  *       exactly where it was.
@@ -25,7 +26,4 @@ import java.util.List;
  * arrive beside the draft, so a body can never contradict the document the caller addressed.
  */
 public record PedagogicalReportDraft(
-    String achievements,
-    String difficulties,
-    List<PedagogicalReportNote> notes
-) {}
+        String achievements, String difficulties, List<PedagogicalReportNote> notes) {}

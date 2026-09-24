@@ -8,11 +8,10 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk;
  * subject one row at a time — the same list turned into two hundred queries, once per reader.
  */
 public record StudentRisk(
-    RiskPrediction prediction,
-    String studentNames,
-    String studentLastNames,
-    String subjectName
-) {
+        RiskPrediction prediction,
+        String studentNames,
+        String studentLastNames,
+        String subjectName) {
 
     /** How the school writes a name: last names first, the way every listing already sorts. */
     public String studentFullName() {

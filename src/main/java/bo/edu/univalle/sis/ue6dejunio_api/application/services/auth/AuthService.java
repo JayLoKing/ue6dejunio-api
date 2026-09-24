@@ -1,7 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.auth;
 
-import java.util.UUID;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidCredentialsException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
@@ -9,18 +9,17 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordComma
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Service
 public class AuthService implements IAuthService {
@@ -34,10 +33,13 @@ public class AuthService implements IAuthService {
     private final IEmailService emailService;
     private final String resetUrl;
 
-    public AuthService(IUserDomain userDomain, PasswordEncoder passwordEncoder,
-                       IJwtService jwtService, ICourseDomain courseDomain,
-                       IEmailService emailService,
-                       @Value("${app.frontend.reset-url}") String resetUrl) {
+    public AuthService(
+            IUserDomain userDomain,
+            PasswordEncoder passwordEncoder,
+            IJwtService jwtService,
+            ICourseDomain courseDomain,
+            IEmailService emailService,
+            @Value("${app.frontend.reset-url}") String resetUrl) {
         this.userDomain = userDomain;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -49,8 +51,10 @@ public class AuthService implements IAuthService {
     @Override
     @Transactional(readOnly = true)
     public AuthenticatedUser login(LoginCommand command) {
-        User user = userDomain.findByEmail(command.email())
-            .orElseThrow(InvalidCredentialsException::new);
+        User user =
+                userDomain
+                        .findByEmail(command.email())
+                        .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(command.rawPassword(), user.getPassword())) {
             throw new InvalidCredentialsException();
@@ -78,8 +82,11 @@ public class AuthService implements IAuthService {
     @Override
     @Transactional
     public void changePassword(ChangePasswordCommand command) {
-        User user = userDomain.findById(command.userId())
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario", command.userId()));
+        User user =
+                userDomain
+                        .findById(command.userId())
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Usuario", command.userId()));
 
         if (!passwordEncoder.matches(command.currentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException();
@@ -109,8 +116,7 @@ public class AuthService implements IAuthService {
     @Transactional
     public void resetPassword(String token, String newPassword) {
         UUID userId = jwtService.validatePasswordResetToken(token);
-        User user = userDomain.findById(userId)
-            .orElseThrow(InvalidResetTokenException::new);
+        User user = userDomain.findById(userId).orElseThrow(InvalidResetTokenException::new);
 
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);

@@ -4,16 +4,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record AuthenticatedUser(
-    UUID userId,
-    String email,
-    String fullName,
-    String role,
-    String accessToken,
-    Instant issuedAt,
-    Instant expiresAt,
-    boolean mustChangePassword,
-    String gradeName,
-    String parallelName,
-    UUID courseId,
-    Boolean technical
-) {}
+        UUID userId,
+        String email,
+        String fullName,
+        String role,
+        String accessToken,
+        Instant issuedAt,
+        Instant expiresAt,
+        boolean mustChangePassword,
+        String gradeName,
+        String parallelName,
+        UUID courseId,
+        Boolean technical) {}

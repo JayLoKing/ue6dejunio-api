@@ -1,15 +1,14 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlanSubjectEntity;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
-import java.util.UUID;
-
 public interface JpaCurriculumPlanSubjectRepository
-    extends JpaRepository<CurriculumPlanSubjectEntity, UUID> {
+        extends JpaRepository<CurriculumPlanSubjectEntity, UUID> {
 
     /**
      * The weekly rows of every block of a plan, in one query.
@@ -19,7 +18,8 @@ public interface JpaCurriculumPlanSubjectRepository
      * would issue one query per subject instead. The returned list is discarded on purpose — what
      * matters is that the rows are now loaded in the same persistence context as the blocks.
      */
-    @Query("""
+    @Query(
+            """
         SELECT s FROM CurriculumPlanSubjectEntity s
         LEFT JOIN FETCH s.entries
         WHERE s.curriculumPlan.id = :planId

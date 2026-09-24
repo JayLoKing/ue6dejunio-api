@@ -1,19 +1,18 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.classgroup;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.CreateClassGroupCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClassGroupService implements IClassGroupService {
@@ -40,8 +39,8 @@ public class ClassGroupService implements IClassGroupService {
             }
             validateTeacherMatchesSubject(command.courseId(), a.subjectId(), a.teacherId());
             if (classGroupDomain.existsByCourseAndSubject(command.courseId(), a.subjectId())) {
-                throw new DuplicateResourceException("class_group (materia ya asignada al curso)",
-                    a.subjectId().toString());
+                throw new DuplicateResourceException(
+                        "class_group (materia ya asignada al curso)", a.subjectId().toString());
             }
             created.add(classGroupDomain.create(command.courseId(), a.subjectId(), a.teacherId()));
         }
@@ -63,8 +62,9 @@ public class ClassGroupService implements IClassGroupService {
     @Override
     @Transactional(readOnly = true)
     public ClassGroup getById(UUID id) {
-        return classGroupDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", id));
+        return classGroupDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", id));
     }
 
     @Override
@@ -77,8 +77,11 @@ public class ClassGroupService implements IClassGroupService {
     @Override
     @Transactional
     public ClassGroup reassignTeacher(UUID courseId, UUID classGroupId, UUID teacherId) {
-        ClassGroup cg = classGroupDomain.findById(classGroupId)
-            .orElseThrow(() -> new ResourceNotFoundException("ClassGroup", classGroupId));
+        ClassGroup cg =
+                classGroupDomain
+                        .findById(classGroupId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("ClassGroup", classGroupId));
         if (!cg.courseId().equals(courseId)) {
             throw new ResourceNotFoundException("ClassGroup", classGroupId);
         }
@@ -93,10 +96,10 @@ public class ClassGroupService implements IClassGroupService {
      * Who may stand in front of a subject.
      *
      * <p>A technical subject belongs to a technical teacher, or to the teacher who runs this
-     * course. The school does not have enough technical teachers to cover every course, and the
-     * gap is filled by the homeroom teacher rather than leaving the subject with nobody in front
-     * of it — a rule that refuses that does not protect anything, it just describes a course that
-     * cannot be created.
+     * course. The school does not have enough technical teachers to cover every course, and the gap
+     * is filled by the homeroom teacher rather than leaving the subject with nobody in front of it
+     * — a rule that refuses that does not protect anything, it just describes a course that cannot
+     * be created.
      *
      * <p>The licence is over their own course only: an aula teacher from another course is still
      * refused, and it is the course being assigned that decides, which is why this needs to know
@@ -108,15 +111,17 @@ public class ClassGroupService implements IClassGroupService {
     private void validateTeacherMatchesSubject(UUID courseId, UUID subjectId, UUID teacherId) {
         if (classGroupDomain.subjectIsTechnical(subjectId)) {
             if (!classGroupDomain.userIsTechnicalTeacher(teacherId)
-                && !classGroupDomain.userIsHomeroomTeacherOf(teacherId, courseId)) {
-                throw new ConflictException("Materia tecnica: requiere un docente tecnico o el "
-                    + "docente de aula del curso: " + subjectId);
+                    && !classGroupDomain.userIsHomeroomTeacherOf(teacherId, courseId)) {
+                throw new ConflictException(
+                        "Materia tecnica: requiere un docente tecnico o el "
+                                + "docente de aula del curso: "
+                                + subjectId);
             }
             return;
         }
         if (!classGroupDomain.userIsNonTechnicalTeacher(teacherId)) {
             throw new ConflictException(
-                "Materia no tecnica requiere docente de aula (no tecnico): " + subjectId);
+                    "Materia no tecnica requiere docente de aula (no tecnico): " + subjectId);
         }
     }
 }

@@ -4,16 +4,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Exactly one of {@code eventId} / {@code criterionId} must be set; the service rejects the
- * command otherwise.
+ * Exactly one of {@code eventId} / {@code criterionId} must be set; the service rejects the command
+ * otherwise.
  */
 public record SetScoreCommand(
-    UUID courseEnrollmentId,
-    UUID eventId,
-    UUID criterionId,
-    BigDecimal score,
-    UUID createdBy
-) {
+        UUID courseEnrollmentId, UUID eventId, UUID criterionId, BigDecimal score, UUID createdBy) {
     public boolean targetsEvent() {
         return eventId != null;
     }

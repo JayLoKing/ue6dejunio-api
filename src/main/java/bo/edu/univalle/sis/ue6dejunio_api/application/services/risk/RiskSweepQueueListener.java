@@ -4,13 +4,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.DailyAttendanceReco
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SessionAttendanceRecorded;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskSweepQueueDomain;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.List;
 
 /**
  * Turns "a teacher changed something the model reads" into a row in the sweep queue.
@@ -20,8 +19,8 @@ import java.util.List;
  * and a gradebook that had to remember to schedule a prediction would forget on the next path
  * somebody added.
  *
- * <p><b>{@code AFTER_COMMIT} is not a detail.</b> Two reasons, and either alone would be enough.
- * A write that rolls back must not queue a prediction over data that never landed — the sweep would
+ * <p><b>{@code AFTER_COMMIT} is not a detail.</b> Two reasons, and either alone would be enough. A
+ * write that rolls back must not queue a prediction over data that never landed — the sweep would
  * run on the previous marks and file an answer nobody's action produced. And the mark must not be
  * able to break the save it observes: inside the transaction, a failed insert here poisons it, and
  * a teacher would be told their grade was rejected because a queue row could not be written.
@@ -40,22 +39,25 @@ public class RiskSweepQueueListener {
     /** A mark was entered, corrected or removed, or the planned criteria of a subject changed. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRiskInputsChanged(RiskInputsChanged event) {
-        mark(() -> queue.markClassGroups(List.of(event.classGroupId()), event.trimester()),
-            "subject " + event.classGroupId() + " trimester " + event.trimester());
+        mark(
+                () -> queue.markClassGroups(List.of(event.classGroupId()), event.trimester()),
+                "subject " + event.classGroupId() + " trimester " + event.trimester());
     }
 
     /** A roll call taken inside one subject. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSessionAttendanceRecorded(SessionAttendanceRecorded event) {
-        mark(() -> queue.markClassGroupsOn(List.of(event.classGroupId()), event.date()),
-            "subject " + event.classGroupId() + " on " + event.date());
+        mark(
+                () -> queue.markClassGroupsOn(List.of(event.classGroupId()), event.date()),
+                "subject " + event.classGroupId() + " on " + event.date());
     }
 
     /** The classroom-wide roll call, which moves the attendance of every subject of that course. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDailyAttendanceRecorded(DailyAttendanceRecorded event) {
-        mark(() -> queue.markCoursesOfEnrollmentsOn(event.courseEnrollmentIds(), event.date()),
-            event.courseEnrollmentIds().size() + " enrolment(s) on " + event.date());
+        mark(
+                () -> queue.markCoursesOfEnrollmentsOn(event.courseEnrollmentIds(), event.date()),
+                event.courseEnrollmentIds().size() + " enrolment(s) on " + event.date());
     }
 
     /**
@@ -70,8 +72,11 @@ public class RiskSweepQueueListener {
         try {
             marking.run();
         } catch (RuntimeException ex) {
-            log.error("The risk sweep queue could not be marked for {}; the change is saved but the "
-                + "model will not see it until that subject is touched again", what, ex);
+            log.error(
+                    "The risk sweep queue could not be marked for {}; the change is saved but the "
+                            + "model will not see it until that subject is touched again",
+                    what,
+                    ex);
         }
     }
 }

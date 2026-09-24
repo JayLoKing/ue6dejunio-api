@@ -12,8 +12,8 @@ import java.util.UUID;
  * <p>Deliberately four bounded reads rather than one method that hands back finished vectors. The
  * assembling — grouping marks by dimension, keeping their order, dividing progress by what was
  * planned — is a rule about the model, and a rule buried in a JPQL query is a rule nobody can test
- * without a database. Here the database answers questions about rows, and
- * {@code RiskFeatureAssembler} answers the question about the model.
+ * without a database. Here the database answers questions about rows, and {@code
+ * RiskFeatureAssembler} answers the question about the model.
  *
  * <p>Every method takes a collection of class groups and returns everything for all of them, so a
  * sweep of the school is four queries and not four per subject.
@@ -24,7 +24,7 @@ public interface IRiskFeatureDomain {
      * The active class groups of an academic year — one prediction target each.
      *
      * @param academicYear the gestión as the school says it, {@code 2026}, not the surrogate key of
-     *                     the row that holds it
+     *     the row that holds it
      */
     List<UUID> activeClassGroupIds(int academicYear);
 
@@ -73,19 +73,15 @@ public interface IRiskFeatureDomain {
      * second copy of the same fact, free to disagree with the list it came in.
      *
      * @param dimension one of {@code Being}, {@code Knowing}, {@code Doing}, {@code Deciding} — the
-     *                  same four names the model uses, which is why nothing translates here
-     * @param score     the criterion's own score: the one entered against it, or the average of its
-     *                  activity items
+     *     same four names the model uses, which is why nothing translates here
+     * @param score the criterion's own score: the one entered against it, or the average of its
+     *     activity items
      */
     record CriterionScoreRow(
-        UUID studentId,
-        UUID classGroupId,
-        String dimension,
-        BigDecimal score
-    ) {
-    }
+            UUID studentId, UUID classGroupId, String dimension, BigDecimal score) {}
 
-    /** @param attendancePct 0 to 100 */
-    record AttendanceRateRow(UUID studentId, UUID classGroupId, BigDecimal attendancePct) {
-    }
+    /**
+     * @param attendancePct 0 to 100
+     */
+    record AttendanceRateRow(UUID studentId, UUID classGroupId, BigDecimal attendancePct) {}
 }

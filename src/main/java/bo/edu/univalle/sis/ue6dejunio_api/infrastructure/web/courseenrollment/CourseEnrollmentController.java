@@ -18,6 +18,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,13 +32,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.UUID;
-
 @RestController
 @Validated
 @RequestMapping("/api/course-enrollments")
-@Tag(name = "CourseEnrollments", description = "Inscripcion de estudiantes a un curso (una vez por gestion)")
+@Tag(
+        name = "CourseEnrollments",
+        description = "Inscripcion de estudiantes a un curso (una vez por gestion)")
 @SecurityRequirement(name = "bearerAuth")
 public class CourseEnrollmentController {
 
@@ -48,28 +49,41 @@ public class CourseEnrollmentController {
 
     private static CreateStudentCommand toCommand(CreateStudentRequest s) {
         return new CreateStudentCommand(
-            s.rudeCode(), s.identityCard(), s.names(), s.lastNames(), s.birthDate(), s.gender());
+                s.rudeCode(),
+                s.identityCard(),
+                s.names(),
+                s.lastNames(),
+                s.birthDate(),
+                s.gender());
     }
 
     @PostMapping
     @PreAuthorize("@authz.canWriteCourseEnrollment(authentication, #request.courseId())")
     @Operation(summary = "Inscribir un estudiante al curso (registro manual)")
-    public ResponseEntity<EnrollResponse> enrollSingle(@Valid @RequestBody EnrollStudentRequest request,
-                                                       JwtAuthenticationToken token) {
-        EnrollResult result = enrollmentService.enroll(new EnrollToCourseCommand(
-            request.courseId(), List.of(toCommand(request.student())), currentUser(token)));
+    public ResponseEntity<EnrollResponse> enrollSingle(
+            @Valid @RequestBody EnrollStudentRequest request, JwtAuthenticationToken token) {
+        EnrollResult result =
+                enrollmentService.enroll(
+                        new EnrollToCourseCommand(
+                                request.courseId(),
+                                List.of(toCommand(request.student())),
+                                currentUser(token)));
         return ResponseEntity.ok(EnrollResponse.from(result));
     }
 
     @PostMapping("/sync")
     @PreAuthorize("@authz.canWriteCourseEnrollment(authentication, #request.courseId())")
-    @Operation(summary = "Sincronizar nomina (PDF): crea estudiantes e inscribe al curso. Transaccion ACID")
-    public ResponseEntity<EnrollResponse> sync(@Valid @RequestBody EnrollCourseRequest request,
-                                               JwtAuthenticationToken token) {
-        List<CreateStudentCommand> students = request.students().stream()
-            .map(CourseEnrollmentController::toCommand).toList();
-        EnrollResult result = enrollmentService.enroll(
-            new EnrollToCourseCommand(request.courseId(), students, currentUser(token)));
+    @Operation(
+            summary =
+                    "Sincronizar nomina (PDF): crea estudiantes e inscribe al curso. Transaccion ACID")
+    public ResponseEntity<EnrollResponse> sync(
+            @Valid @RequestBody EnrollCourseRequest request, JwtAuthenticationToken token) {
+        List<CreateStudentCommand> students =
+                request.students().stream().map(CourseEnrollmentController::toCommand).toList();
+        EnrollResult result =
+                enrollmentService.enroll(
+                        new EnrollToCourseCommand(
+                                request.courseId(), students, currentUser(token)));
         return ResponseEntity.ok(EnrollResponse.from(result));
     }
 
@@ -95,12 +109,19 @@ public class CourseEnrollmentController {
     @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
     @Operation(summary = "Listar estudiantes inscritos a un curso")
     public ResponseEntity<PagedResponse<CourseStudentResponse>> students(
-        @RequestParam("id_course") UUID courseId,
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
-    ) {
-        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
-        return ResponseEntity.ok(PagedResponse.of(
-            enrollmentService.studentsOfCourse(courseId, p).map(CourseStudentResponse::from)));
+            @RequestParam("id_course") UUID courseId,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                PagedResponse.of(
+                        enrollmentService
+                                .studentsOfCourse(courseId, p)
+                                .map(CourseStudentResponse::from)));
     }
 }

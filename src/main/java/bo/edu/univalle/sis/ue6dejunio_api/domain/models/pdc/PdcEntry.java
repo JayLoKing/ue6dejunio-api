@@ -10,17 +10,16 @@ import java.util.UUID;
  * 4". {@code periods} is absent when the teacher left the cell blank.
  */
 public record PdcEntry(
-    UUID id,
-    String weekLabel,
-    String contents,
-    String practice,
-    String theory,
-    String valuation,
-    String production,
-    String resources,
-    Integer periods,
-    String criteriaBeing,
-    String criteriaKnowing,
-    String criteriaDoing,
-    Integer displayOrder
-) {}
+        UUID id,
+        String weekLabel,
+        String contents,
+        String practice,
+        String theory,
+        String valuation,
+        String production,
+        String resources,
+        Integer periods,
+        String criteriaBeing,
+        String criteriaKnowing,
+        String criteriaDoing,
+        Integer displayOrder) {}

@@ -8,13 +8,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.TrimesterPerio
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.TrimesterPeriodMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaTrimesterPeriodRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -24,9 +23,10 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
     private final JpaAcademicYearRepository academicYearRepo;
     private final TrimesterPeriodMapper mapper;
 
-    public TrimesterPeriodRepositoryAdapter(JpaTrimesterPeriodRepository trimesterPeriodRepo,
-                                            JpaAcademicYearRepository academicYearRepo,
-                                            TrimesterPeriodMapper mapper) {
+    public TrimesterPeriodRepositoryAdapter(
+            JpaTrimesterPeriodRepository trimesterPeriodRepo,
+            JpaAcademicYearRepository academicYearRepo,
+            TrimesterPeriodMapper mapper) {
         this.trimesterPeriodRepo = trimesterPeriodRepo;
         this.academicYearRepo = academicYearRepo;
         this.mapper = mapper;
@@ -34,9 +34,15 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
 
     @Override
     @Transactional
-    public TrimesterPeriod save(Integer academicYearId, int trimester, LocalDate startDate, LocalDate endDate) {
-        AcademicYearEntity year = academicYearRepo.findById(academicYearId)
-            .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", academicYearId));
+    public TrimesterPeriod save(
+            Integer academicYearId, int trimester, LocalDate startDate, LocalDate endDate) {
+        AcademicYearEntity year =
+                academicYearRepo
+                        .findById(academicYearId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "AcademicYear", academicYearId));
         TrimesterPeriodEntity e = new TrimesterPeriodEntity();
         e.setAcademicYear(year);
         e.setTrimester(trimester);
@@ -48,8 +54,10 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
     @Override
     @Transactional
     public TrimesterPeriod update(UUID id, LocalDate startDate, LocalDate endDate) {
-        TrimesterPeriodEntity e = trimesterPeriodRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("TrimesterPeriod", id));
+        TrimesterPeriodEntity e =
+                trimesterPeriodRepo
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("TrimesterPeriod", id));
         e.setStartDate(startDate);
         e.setEndDate(endDate);
         return mapper.toDomain(trimesterPeriodRepo.save(e));
@@ -69,7 +77,8 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
     @Override
     public List<TrimesterPeriod> findByAcademicYear(Integer academicYearId) {
         return trimesterPeriodRepo.findByAcademicYear_IdOrderByTrimester(academicYearId).stream()
-            .map(mapper::toDomain).toList();
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
@@ -81,5 +90,4 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
     public boolean existsByAcademicYearAndTrimester(Integer academicYearId, int trimester) {
         return trimesterPeriodRepo.existsByAcademicYear_IdAndTrimester(academicYearId, trimester);
     }
-
 }

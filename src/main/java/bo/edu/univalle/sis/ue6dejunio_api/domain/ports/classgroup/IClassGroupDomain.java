@@ -2,7 +2,6 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -10,9 +9,13 @@ import java.util.UUID;
 
 public interface IClassGroupDomain {
     boolean courseExists(UUID courseId);
+
     boolean subjectExists(UUID subjectId);
+
     boolean userIsTeacher(UUID userId);
+
     boolean userIsTechnicalTeacher(UUID userId);
+
     boolean userIsNonTechnicalTeacher(UUID userId);
 
     /**
@@ -23,11 +26,15 @@ public interface IClassGroupDomain {
      * theirs over their own course only.
      */
     boolean userIsHomeroomTeacherOf(UUID userId, UUID courseId);
+
     boolean subjectIsTechnical(UUID subjectId);
+
     boolean existsByCourseAndSubject(UUID courseId, UUID subjectId);
 
-    /** Whether the teacher runs at least one class group in the course. A technical teacher has no
-     * homeroom, so this is what ties them to the course's roster. */
+    /**
+     * Whether the teacher runs at least one class group in the course. A technical teacher has no
+     * homeroom, so this is what ties them to the course's roster.
+     */
     boolean teachesInCourse(UUID teacherId, UUID courseId);
 
     /**
@@ -37,6 +44,7 @@ public interface IClassGroupDomain {
     boolean teachesInAnyCourse(UUID teacherId, Collection<UUID> courseIds);
 
     ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId);
+
     Optional<ClassGroup> findById(UUID id);
 
     /**
@@ -49,6 +57,7 @@ public interface IClassGroupDomain {
      * @return only the ones that exist, in no particular order
      */
     List<ClassGroup> findByIdIn(Collection<UUID> ids);
+
     List<ClassGroup> byCourse(UUID courseId);
 
     /**
@@ -59,9 +68,14 @@ public interface IClassGroupDomain {
      * that looked this up per subject would run a query per row it prints.
      */
     List<ClassGroupField> knowledgeFieldsByCourse(UUID courseId);
+
     List<ClassGroup> byTeacher(UUID teacherId);
+
     UUID courseIdOfClassGroup(UUID classGroupId);
+
     UUID teacherIdOfClassGroup(UUID classGroupId);
+
     void setActive(UUID classGroupId, boolean active);
+
     ClassGroup setTeacher(UUID classGroupId, UUID teacherId);
 }

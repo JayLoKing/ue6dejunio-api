@@ -1,14 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.config;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
+import java.time.Clock;
+import java.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-
-import java.time.Clock;
-import java.time.LocalDate;
 
 /**
  * Ensures an academic_years row exists for the current year (per the injected La Paz Clock) on

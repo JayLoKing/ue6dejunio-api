@@ -13,9 +13,9 @@ import java.util.UUID;
  * throw away every vector but one.
  *
  * @param markedAt when the most recent change this row stands for arrived. The sweep clears only
- *                 the marks it actually swept, by comparing this against the instant it read them —
- *                 a save that lands while the model is answering moves this forward, survives the
- *                 clear, and is picked up by the following tick.
+ *     the marks it actually swept, by comparing this against the instant it read them — a save that
+ *     lands while the model is answering moves this forward, survives the clear, and is picked up
+ *     by the following tick.
  */
 public record SweepTarget(UUID classGroupId, int trimester, LocalDateTime markedAt) {
 

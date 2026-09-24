@@ -1,13 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.institution.Institution;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.institution.IInstitutionService;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The heading every official document prints: the district and the school come from configuration,
@@ -30,8 +29,9 @@ class InstitutionIT extends AbstractIntegrationTest {
     // the Director's line left blank the way the paper form leaves it.
     @Test
     void leavesTheDirectorBlankWhenNobodyHoldsTheRole() {
-        jdbc.update("UPDATE users SET is_active = false WHERE id_role = "
-            + "(SELECT id_role FROM roles WHERE name = 'Director')");
+        jdbc.update(
+                "UPDATE users SET is_active = false WHERE id_role = "
+                        + "(SELECT id_role FROM roles WHERE name = 'Director')");
 
         Institution heading = institutionService.current();
 
@@ -66,6 +66,8 @@ class InstitutionIT extends AbstractIntegrationTest {
 
     private String fullNameOf(UUID userId) {
         return jdbc.queryForObject(
-            "SELECT names || ' ' || last_names FROM users WHERE id_user = ?", String.class, userId);
+                "SELECT names || ' ' || last_names FROM users WHERE id_user = ?",
+                String.class,
+                userId);
     }
 }

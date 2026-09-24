@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Default {@link RateLimitStore}: a {@link ConcurrentHashMap}-backed in-memory bucket registry.
- * Suitable for a single instance deployment. The {@link TimeMeter} is injectable so tests can
- * drive a virtual clock instead of wall-clock time.
+ * Suitable for a single instance deployment. The {@link TimeMeter} is injectable so tests can drive
+ * a virtual clock instead of wall-clock time.
  */
 @Component
 public class InMemoryBucketStore implements RateLimitStore {
@@ -28,8 +28,12 @@ public class InMemoryBucketStore implements RateLimitStore {
     @Override
     public Bucket resolveBucket(String key, Bandwidth bandwidth) {
         return buckets.computeIfAbsent(
-            key,
-            k -> Bucket.builder().withCustomTimePrecision(timeMeter).addLimit(bandwidth).build());
+                key,
+                k ->
+                        Bucket.builder()
+                                .withCustomTimePrecision(timeMeter)
+                                .addLimit(bandwidth)
+                                .build());
     }
 
     /**

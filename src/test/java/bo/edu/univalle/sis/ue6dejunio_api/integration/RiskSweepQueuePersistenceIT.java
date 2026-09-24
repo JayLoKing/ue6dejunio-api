@@ -1,28 +1,27 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SweepTarget;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskSweepQueueDomain;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * The sweep queue against a real Postgres, because everything interesting about it is SQL.
  *
  * <p>A mocked port proves none of it. The coalescing is a primary key; the trimester of a roll call
- * is a join to {@code academic_trimesters}; the fan-out of a daily roll call is a join to
- * {@code class_groups}; and the clear is bounded by a timestamp the database wrote. Each of those
- * can only be wrong here.
+ * is a join to {@code academic_trimesters}; the fan-out of a daily roll call is a join to {@code
+ * class_groups}; and the clear is bounded by a timestamp the database wrote. Each of those can only
+ * be wrong here.
  *
- * <p>Trimester periods come seeded by {@code schema-it.sql} for 2026: T1 Feb–May, T2 Jun–Aug,
- * T3 Sep–Nov. The dates below are chosen against those and not against today.
+ * <p>Trimester periods come seeded by {@code schema-it.sql} for 2026: T1 Feb–May, T2 Jun–Aug, T3
+ * Sep–Nov. The dates below are chosen against those and not against today.
  */
 class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
 
@@ -32,8 +31,7 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
     /** December: after the last configured period ends, so it belongs to no trimester at all. */
     private static final LocalDate OUTSIDE_EVERY_TRIMESTER = LocalDate.of(2026, 12, 20);
 
-    @Autowired
-    private IRiskSweepQueueDomain queue;
+    @Autowired private IRiskSweepQueueDomain queue;
 
     private UUID courseId;
     private UUID mathGroup;
@@ -49,14 +47,20 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
 
     private LocalDateTime markedAtOf(UUID classGroupId, int trimester) {
         return jdbc.queryForObject(
-            "SELECT marked_at FROM risk_prediction_queue "
-                + "WHERE id_class_group = ? AND trimester = ?",
-            LocalDateTime.class, classGroupId, trimester);
+                "SELECT marked_at FROM risk_prediction_queue "
+                        + "WHERE id_class_group = ? AND trimester = ?",
+                LocalDateTime.class,
+                classGroupId,
+                trimester);
     }
 
     private void backdate(UUID classGroupId, int trimester, LocalDateTime when) {
-        jdbc.update("UPDATE risk_prediction_queue SET marked_at = ? "
-            + "WHERE id_class_group = ? AND trimester = ?", when, classGroupId, trimester);
+        jdbc.update(
+                "UPDATE risk_prediction_queue SET marked_at = ? "
+                        + "WHERE id_class_group = ? AND trimester = ?",
+                when,
+                classGroupId,
+                trimester);
     }
 
     @Test
@@ -64,8 +68,8 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
         queue.markClassGroups(List.of(mathGroup), 1);
 
         assertThat(queue.pending(10))
-            .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
-            .containsExactly(org.assertj.core.groups.Tuple.tuple(mathGroup, 1));
+                .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(mathGroup, 1));
     }
 
     /**
@@ -121,10 +125,13 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
         assertThat(queue.pending(10)).hasSize(1);
     }
 
-    /** A subject nobody teaches any more cannot be predicted, and must not break the write either. */
+    /**
+     * A subject nobody teaches any more cannot be predicted, and must not break the write either.
+     */
     @Test
     void markClassGroups_inactiveSubject_marksNothing() {
-        jdbc.update("UPDATE class_groups SET is_active = false WHERE id_class_group = ?", mathGroup);
+        jdbc.update(
+                "UPDATE class_groups SET is_active = false WHERE id_class_group = ?", mathGroup);
 
         queue.markClassGroups(List.of(mathGroup), 1);
 
@@ -137,8 +144,8 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
         queue.markClassGroupsOn(List.of(mathGroup), IN_TRIMESTER_2);
 
         assertThat(queue.pending(10))
-            .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
-            .containsExactly(org.assertj.core.groups.Tuple.tuple(mathGroup, 2));
+                .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(mathGroup, 2));
     }
 
     /**
@@ -163,48 +170,50 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
         queue.markCoursesOfEnrollmentsOn(List.of(enrollment), IN_TRIMESTER_2);
 
         assertThat(queue.pending(10))
-            .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
-            .containsExactlyInAnyOrder(
-                org.assertj.core.groups.Tuple.tuple(mathGroup, 2),
-                org.assertj.core.groups.Tuple.tuple(languageGroup, 2));
+                .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(mathGroup, 2),
+                        org.assertj.core.groups.Tuple.tuple(languageGroup, 2));
     }
 
     /**
      * The real shape of a roll call, and the one a single-student test cannot reach.
      *
      * <p>Every enrolment of the course emits the same {@code (class group, trimester)} tuple, and
-     * Postgres refuses duplicate arbiter tuples inside one {@code ON CONFLICT DO UPDATE}:
-     * {@code ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time}. With thirty
-     * students that is every whole-classroom roll call in the school, and the listener swallows the
-     * failure — attendance would commit and queue nothing, forever, in silence.
+     * Postgres refuses duplicate arbiter tuples inside one {@code ON CONFLICT DO UPDATE}: {@code
+     * ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time}. With thirty students
+     * that is every whole-classroom roll call in the school, and the listener swallows the failure
+     * — attendance would commit and queue nothing, forever, in silence.
      */
     @Test
     void markCoursesOfEnrollmentsOn_wholeClassroom_marksEachSubjectOnce() {
-        List<UUID> roster = List.of(
-            seedEnrollment(seedStudent("Ana", "Alvarez"), courseId),
-            seedEnrollment(seedStudent("Bruno", "Bermudez"), courseId),
-            seedEnrollment(seedStudent("Carla", "Chavez"), courseId));
+        List<UUID> roster =
+                List.of(
+                        seedEnrollment(seedStudent("Ana", "Alvarez"), courseId),
+                        seedEnrollment(seedStudent("Bruno", "Bermudez"), courseId),
+                        seedEnrollment(seedStudent("Carla", "Chavez"), courseId));
 
         queue.markCoursesOfEnrollmentsOn(roster, IN_TRIMESTER_2);
 
         assertThat(queue.pending(10))
-            .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
-            .containsExactlyInAnyOrder(
-                org.assertj.core.groups.Tuple.tuple(mathGroup, 2),
-                org.assertj.core.groups.Tuple.tuple(languageGroup, 2));
+                .extracting(SweepTarget::classGroupId, SweepTarget::trimester)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(mathGroup, 2),
+                        org.assertj.core.groups.Tuple.tuple(languageGroup, 2));
     }
 
     @Test
     void markCoursesOfEnrollmentsOn_skipsTheSubjectsNobodyTeaches() {
-        jdbc.update("UPDATE class_groups SET is_active = false WHERE id_class_group = ?",
-            languageGroup);
+        jdbc.update(
+                "UPDATE class_groups SET is_active = false WHERE id_class_group = ?",
+                languageGroup);
         UUID enrollment = seedEnrollment(seedStudent("Ana", "Alvarez"), courseId);
 
         queue.markCoursesOfEnrollmentsOn(List.of(enrollment), IN_TRIMESTER_2);
 
         assertThat(queue.pending(10))
-            .extracting(SweepTarget::classGroupId)
-            .containsExactly(mathGroup);
+                .extracting(SweepTarget::classGroupId)
+                .containsExactly(mathGroup);
     }
 
     @Test
@@ -214,10 +223,12 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
         backdate(languageGroup, 1, LocalDateTime.of(2026, 6, 1, 7, 0));
         backdate(mathGroup, 1, LocalDateTime.of(2026, 6, 1, 8, 0));
 
-        assertThat(queue.pending(10)).extracting(SweepTarget::classGroupId)
-            .containsExactly(languageGroup, mathGroup);
-        assertThat(queue.pending(1)).extracting(SweepTarget::classGroupId)
-            .containsExactly(languageGroup);
+        assertThat(queue.pending(10))
+                .extracting(SweepTarget::classGroupId)
+                .containsExactly(languageGroup, mathGroup);
+        assertThat(queue.pending(1))
+                .extracting(SweepTarget::classGroupId)
+                .containsExactly(languageGroup);
     }
 
     @Test
@@ -256,8 +267,6 @@ class RiskSweepQueuePersistenceIT extends AbstractIntegrationTest {
 
         queue.clearSwept(List.of(mathGroup), 1, LocalDateTime.now());
 
-        assertThat(queue.pending(10))
-            .extracting(SweepTarget::trimester)
-            .containsExactly(2);
+        assertThat(queue.pending(10)).extracting(SweepTarget::trimester).containsExactly(2);
     }
 }

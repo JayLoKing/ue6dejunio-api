@@ -1,13 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Spec: evaluation-integrity-guards RF16/RF18 — the exists queries backing the ConflictException
@@ -34,11 +33,14 @@ class AssessmentScoreExistsQueriesIT extends AbstractIntegrationTest {
         teacher = seedUser("Teacher", false);
         course = seedCourse(teacher, "A");
         classGroup = seedClassGroup(course, teacher, "Matematicas");
-        subjectId = jdbc.queryForObject(
-            "SELECT id_subject FROM class_groups WHERE id_class_group = ?", UUID.class, classGroup);
+        subjectId =
+                jdbc.queryForObject(
+                        "SELECT id_subject FROM class_groups WHERE id_class_group = ?",
+                        UUID.class,
+                        classGroup);
 
-        activityCriterion = seedActivityCriterion(
-            classGroup, 1, "Knowing", "Con notas", "Prueba escrita");
+        activityCriterion =
+                seedActivityCriterion(classGroup, 1, "Knowing", "Con notas", "Prueba escrita");
         criterionWithoutScore = seedCriterion(classGroup, 1, "Knowing", "Sin notas");
 
         enrollment = seedEnrollment(seedStudent(), course);
@@ -71,8 +73,11 @@ class AssessmentScoreExistsQueriesIT extends AbstractIntegrationTest {
     @Test
     void existsBySubject_true_whenTheOnlyScoreIsDirect() {
         UUID otherClassGroup = seedClassGroup(course, teacher, "Lenguaje");
-        UUID otherSubjectId = jdbc.queryForObject(
-            "SELECT id_subject FROM class_groups WHERE id_class_group = ?", UUID.class, otherClassGroup);
+        UUID otherSubjectId =
+                jdbc.queryForObject(
+                        "SELECT id_subject FROM class_groups WHERE id_class_group = ?",
+                        UUID.class,
+                        otherClassGroup);
         UUID direct = seedCriterion(otherClassGroup, 1, "Doing", "Participacion");
         seedCriterionScore(enrollment, direct, 30);
 
@@ -82,8 +87,11 @@ class AssessmentScoreExistsQueriesIT extends AbstractIntegrationTest {
     @Test
     void existsBySubject_false_whenSubjectHasNoScores() {
         UUID otherClassGroup = seedClassGroup(course, teacher, "Lenguaje");
-        UUID otherSubjectId = jdbc.queryForObject(
-            "SELECT id_subject FROM class_groups WHERE id_class_group = ?", UUID.class, otherClassGroup);
+        UUID otherSubjectId =
+                jdbc.queryForObject(
+                        "SELECT id_subject FROM class_groups WHERE id_class_group = ?",
+                        UUID.class,
+                        otherClassGroup);
 
         assertThat(assessmentScoreRepo.existsBySubject(otherSubjectId)).isFalse();
     }

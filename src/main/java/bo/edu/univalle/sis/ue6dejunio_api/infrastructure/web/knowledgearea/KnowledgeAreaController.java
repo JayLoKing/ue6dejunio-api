@@ -44,9 +44,9 @@ public class KnowledgeAreaController {
     @PostMapping
     @Operation(summary = "Crear area de saberes. displayOrder opcional: por defecto va al final")
     public ResponseEntity<KnowledgeAreaResponse> create(
-        @Valid @RequestBody CreateKnowledgeAreaRequest r) {
-        KnowledgeArea a = areaService.create(
-            new CreateKnowledgeAreaCommand(r.name(), r.displayOrder()));
+            @Valid @RequestBody CreateKnowledgeAreaRequest r) {
+        KnowledgeArea a =
+                areaService.create(new CreateKnowledgeAreaCommand(r.name(), r.displayOrder()));
         return ResponseEntity.ok(KnowledgeAreaResponse.from(a));
     }
 
@@ -59,22 +59,22 @@ public class KnowledgeAreaController {
     @GetMapping
     @Operation(summary = "Listar areas de saberes, en el orden en que se imprimen")
     public ResponseEntity<PagedResponse<KnowledgeAreaResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit
-    ) {
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit) {
         // Sorted by the order they print in: the catalogue exists to lay out the plan, and any
         // other order would make the list disagree with the document it describes.
         PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("displayOrder"));
-        return ResponseEntity.ok(PagedResponse.of(
-            areaService.list(p).map(KnowledgeAreaResponse::from)));
+        return ResponseEntity.ok(
+                PagedResponse.of(areaService.list(p).map(KnowledgeAreaResponse::from)));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar area de saberes. displayOrder opcional: por defecto no se mueve")
+    @Operation(
+            summary = "Actualizar area de saberes. displayOrder opcional: por defecto no se mueve")
     public ResponseEntity<KnowledgeAreaResponse> update(
-        @PathVariable Integer id, @Valid @RequestBody UpdateKnowledgeAreaRequest r) {
-        KnowledgeArea a = areaService.update(id,
-            new UpdateKnowledgeAreaCommand(r.name(), r.displayOrder()));
+            @PathVariable Integer id, @Valid @RequestBody UpdateKnowledgeAreaRequest r) {
+        KnowledgeArea a =
+                areaService.update(id, new UpdateKnowledgeAreaCommand(r.name(), r.displayOrder()));
         return ResponseEntity.ok(KnowledgeAreaResponse.from(a));
     }
 

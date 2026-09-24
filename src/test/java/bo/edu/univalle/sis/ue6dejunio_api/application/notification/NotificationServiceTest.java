@@ -1,5 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.notification;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.NotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -9,22 +16,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notificatio
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
@@ -34,14 +33,25 @@ class NotificationServiceTest {
     @InjectMocks private NotificationService notificationService;
 
     private Notification notif(UUID id, UUID receiver) {
-        return new Notification(id, UUID.randomUUID(), "Sender",
-            receiver, "Receiver", NotificationType.SUMMONS, null, "msg",
-            null, null, null, null, LocalDateTime.now());
+        return new Notification(
+                id,
+                UUID.randomUUID(),
+                "Sender",
+                receiver,
+                "Receiver",
+                NotificationType.SUMMONS,
+                null,
+                "msg",
+                null,
+                null,
+                null,
+                null,
+                LocalDateTime.now());
     }
 
     private static SendNotificationCommand summons(UUID sender, UUID receiver) {
-        return new SendNotificationCommand(sender, receiver, NotificationType.SUMMONS,
-            null, "hola", null, null);
+        return new SendNotificationCommand(
+                sender, receiver, NotificationType.SUMMONS, null, "hola", null, null);
     }
 
     /** A receiver the Director is allowed to write to, which every send below assumes. */
@@ -56,7 +66,7 @@ class NotificationServiceTest {
         UUID receiver = UUID.randomUUID();
         receiverIsATeacher(receiver);
         when(notificationDomain.send(any(SendNotificationCommand.class)))
-            .thenReturn(notif(UUID.randomUUID(), receiver));
+                .thenReturn(notif(UUID.randomUUID(), receiver));
         Notification r = notificationService.send(summons(sender, receiver));
         assertThat(r.message()).isEqualTo("msg");
     }
@@ -71,7 +81,7 @@ class NotificationServiceTest {
         UUID written = UUID.randomUUID();
         receiverIsATeacher(receiver);
         when(notificationDomain.send(any(SendNotificationCommand.class)))
-            .thenReturn(notif(written, receiver));
+                .thenReturn(notif(written, receiver));
 
         notificationService.send(summons(sender, receiver));
 
@@ -87,7 +97,7 @@ class NotificationServiceTest {
         when(notificationDomain.userExists(receiver)).thenReturn(false);
 
         assertThatThrownBy(() -> notificationService.send(summons(sender, receiver)))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
 
         verify(events, never()).publish(any());
     }
@@ -99,11 +109,19 @@ class NotificationServiceTest {
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.userExists(receiver)).thenReturn(true);
         when(notificationDomain.send(any(SendNotificationCommand.class)))
-            .thenReturn(notif(UUID.randomUUID(), receiver));
+                .thenReturn(notif(UUID.randomUUID(), receiver));
 
-        assertThat(notificationService.send(new SendNotificationCommand(
-            null, receiver, NotificationType.PDC_APPROVED, null, "hola", null, null)))
-            .isNotNull();
+        assertThat(
+                        notificationService.send(
+                                new SendNotificationCommand(
+                                        null,
+                                        receiver,
+                                        NotificationType.PDC_APPROVED,
+                                        null,
+                                        "hola",
+                                        null,
+                                        null)))
+                .isNotNull();
     }
 
     @Test
@@ -111,9 +129,18 @@ class NotificationServiceTest {
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.userExists(receiver)).thenReturn(true);
 
-        assertThatThrownBy(() -> notificationService.send(new SendNotificationCommand(
-            UUID.randomUUID(), receiver, NotificationType.PDC_APPROVED, null, "hola", null, null)))
-            .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(
+                        () ->
+                                notificationService.send(
+                                        new SendNotificationCommand(
+                                                UUID.randomUUID(),
+                                                receiver,
+                                                NotificationType.PDC_APPROVED,
+                                                null,
+                                                "hola",
+                                                null,
+                                                null)))
+                .isInstanceOf(ValidationException.class);
     }
 
     @Test
@@ -123,7 +150,7 @@ class NotificationServiceTest {
         when(notificationDomain.roleNameOf(receiver)).thenReturn(Optional.of("Director"));
 
         assertThatThrownBy(() -> notificationService.send(summons(UUID.randomUUID(), receiver)))
-            .isInstanceOf(ValidationException.class);
+                .isInstanceOf(ValidationException.class);
     }
 
     @Test
@@ -131,7 +158,7 @@ class NotificationServiceTest {
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.userExists(receiver)).thenReturn(false);
         assertThatThrownBy(() -> notificationService.send(summons(UUID.randomUUID(), receiver)))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     // The catalog types are their own heading. CUSTOM is the one the sender has to name, or the
@@ -141,9 +168,18 @@ class NotificationServiceTest {
         UUID receiver = UUID.randomUUID();
         when(notificationDomain.userExists(receiver)).thenReturn(true);
 
-        assertThatThrownBy(() -> notificationService.send(new SendNotificationCommand(
-            UUID.randomUUID(), receiver, NotificationType.CUSTOM, "   ", "hola", null, null)))
-            .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(
+                        () ->
+                                notificationService.send(
+                                        new SendNotificationCommand(
+                                                UUID.randomUUID(),
+                                                receiver,
+                                                NotificationType.CUSTOM,
+                                                "   ",
+                                                "hola",
+                                                null,
+                                                null)))
+                .isInstanceOf(ValidationException.class);
     }
 
     @Test
@@ -151,7 +187,7 @@ class NotificationServiceTest {
         UUID receiver = UUID.randomUUID();
         receiverIsATeacher(receiver);
         when(notificationDomain.send(any(SendNotificationCommand.class)))
-            .thenReturn(notif(UUID.randomUUID(), receiver));
+                .thenReturn(notif(UUID.randomUUID(), receiver));
 
         assertThat(notificationService.send(summons(UUID.randomUUID(), receiver))).isNotNull();
     }
@@ -171,7 +207,7 @@ class NotificationServiceTest {
         when(notificationDomain.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> notificationService.markRead(id))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -180,6 +216,6 @@ class NotificationServiceTest {
         when(notificationDomain.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> notificationService.delete(id))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

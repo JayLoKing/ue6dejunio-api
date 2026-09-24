@@ -1,12 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalReportDraft;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalReportDraft;
 import java.util.List;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 /**
  * The one mapping in this request where null and empty may not be flattened into each other.
@@ -22,7 +21,7 @@ class SavePedagogicalReportRequestTest {
     @Test
     void toDraft_fieldOmitted_leavesTheNotesNullSoTheSaveSaysNothingAboutSectionFour() {
         PedagogicalReportDraft draft =
-            new SavePedagogicalReportRequest("Logros", "Dificultades", null).toDraft();
+                new SavePedagogicalReportRequest("Logros", "Dificultades", null).toDraft();
 
         assertThat(draft.notes()).isNull();
         assertThat(draft.achievements()).isEqualTo("Logros");
@@ -32,7 +31,7 @@ class SavePedagogicalReportRequestTest {
     @Test
     void toDraft_fieldSentEmpty_keepsItEmptySoSectionFourIsCleared() {
         PedagogicalReportDraft draft =
-            new SavePedagogicalReportRequest(null, null, List.of()).toDraft();
+                new SavePedagogicalReportRequest(null, null, List.of()).toDraft();
 
         assertThat(draft.notes()).isNotNull().isEmpty();
     }
@@ -41,9 +40,14 @@ class SavePedagogicalReportRequestTest {
     void toDraft_carriesEachParagraphOntoTheEnrolmentItNames() {
         UUID enrollmentId = UUID.randomUUID();
 
-        PedagogicalReportDraft draft = new SavePedagogicalReportRequest(null, null,
-            List.of(new SavePedagogicalReportRequest.FailingStudentNote(
-                enrollmentId, "Refuerzo", "Cuaderno"))).toDraft();
+        PedagogicalReportDraft draft =
+                new SavePedagogicalReportRequest(
+                                null,
+                                null,
+                                List.of(
+                                        new SavePedagogicalReportRequest.FailingStudentNote(
+                                                enrollmentId, "Refuerzo", "Cuaderno")))
+                        .toDraft();
 
         assertThat(draft.notes()).hasSize(1);
         assertThat(draft.notes().get(0).courseEnrollmentId()).isEqualTo(enrollmentId);

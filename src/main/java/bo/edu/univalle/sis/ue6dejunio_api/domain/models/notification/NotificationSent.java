@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.event.DomainEvent;
-
 import java.util.UUID;
 
 /**
@@ -15,5 +14,4 @@ import java.util.UUID;
  * @param receiverId whose inbox grew
  * @param notificationId the row that was written, so a log can be traced back to it
  */
-public record NotificationSent(UUID receiverId, UUID notificationId) implements DomainEvent {
-}
+public record NotificationSent(UUID receiverId, UUID notificationId) implements DomainEvent {}

@@ -18,15 +18,14 @@ import java.util.UUID;
  * is what the table's unique constraint says too.
  */
 public record NewRiskPrediction(
-    UUID studentId,
-    UUID classGroupId,
-    int trimester,
-    RiskLevel riskLevel,
-    BigDecimal pFail,
-    BigDecimal pOutstanding,
-    RiskFeatures features,
-    LocalDateTime predictedAt
-) {
+        UUID studentId,
+        UUID classGroupId,
+        int trimester,
+        RiskLevel riskLevel,
+        BigDecimal pFail,
+        BigDecimal pOutstanding,
+        RiskFeatures features,
+        LocalDateTime predictedAt) {
 
     public NewRiskPrediction {
         Objects.requireNonNull(studentId, "studentId");

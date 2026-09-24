@@ -4,7 +4,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -16,8 +15,8 @@ public interface INotificationDomain {
     /**
      * Everyone who can act on a plan waiting for review.
      *
-     * <p>All of them, not the first one found: a school with two Directors has two people who
-     * might pick the review up, and telling one leaves the other blind to a plan that is waiting.
+     * <p>All of them, not the first one found: a school with two Directors has two people who might
+     * pick the review up, and telling one leaves the other blind to a plan that is waiting.
      */
     List<UUID> activeDirectorIds();
 
@@ -41,13 +40,22 @@ public interface INotificationDomain {
      * @return empty when there is no such user
      */
     Optional<String> roleNameOf(UUID userId);
+
     Notification send(SendNotificationCommand command);
+
     Optional<Notification> findById(UUID id);
+
     /** Stamps delivery on whatever it hands back: this is the moment the row reached its reader. */
     PageResult<Notification> listReceived(UUID receiverId, boolean unreadOnly, PageQuery pageQuery);
+
     long unreadCount(UUID receiverId);
-    /** @return the stamp the row now holds, so the caller reports what was written */
+
+    /**
+     * @return the stamp the row now holds, so the caller reports what was written
+     */
     LocalDateTime markAsRead(UUID id);
+
     int markAllRead(UUID receiverId);
+
     void deleteById(UUID id);
 }

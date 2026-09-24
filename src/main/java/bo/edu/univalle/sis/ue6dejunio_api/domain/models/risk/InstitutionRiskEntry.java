@@ -16,23 +16,22 @@ import java.util.UUID;
  * whoever reads this has to act on. The classroom travels too: a name with no classroom beside it
  * names nobody in a building with two students called the same.
  *
- * @param position     the place on the list, starting at one. Worst first.
+ * @param position the place on the list, starting at one. Worst first.
  * @param predictionId the prediction this row stands for. Attending one is per prediction and not
- *                     per screen, so a row without it cannot be acted on.
- * @param pFail        never null: a prediction the model never scored cannot be placed against ones
- *                     it did, so it holds no place at all.
+ *     per screen, so a row without it cannot be acted on.
+ * @param pFail never null: a prediction the model never scored cannot be placed against ones it
+ *     did, so it holds no place at all.
  */
 public record InstitutionRiskEntry(
-    int position,
-    UUID predictionId,
-    UUID studentId,
-    String fullName,
-    UUID courseId,
-    String gradeName,
-    String parallelName,
-    UUID classGroupId,
-    String subjectName,
-    RiskLevel riskLevel,
-    BigDecimal pFail,
-    boolean attended
-) {}
+        int position,
+        UUID predictionId,
+        UUID studentId,
+        String fullName,
+        UUID courseId,
+        String gradeName,
+        String parallelName,
+        UUID classGroupId,
+        String subjectName,
+        RiskLevel riskLevel,
+        BigDecimal pFail,
+        boolean attended) {}

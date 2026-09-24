@@ -8,5 +8,4 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.models.event;
  * happens next. A plan announces that it was handed in; whether that becomes a notification, a row
  * in an audit log, or nothing at all is not the plan's business.
  */
-public interface DomainEvent {
-}
+public interface DomainEvent {}

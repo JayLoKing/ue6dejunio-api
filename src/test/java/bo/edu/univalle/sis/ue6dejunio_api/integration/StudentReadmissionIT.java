@@ -1,17 +1,16 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Putting back a student the school had taken off the roll.
@@ -40,10 +39,16 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
         course = seedCourse(teacher, "A");
         student = UUID.randomUUID();
         jdbc.update(
-            "INSERT INTO students (id_student, rude_code, identity_card, names, last_names, "
-                + "birth_date, gender, status) VALUES (?,?,?,?,?,?,?,?)",
-            student, RUDE, CARNET, "Ana", "Quispe",
-            java.sql.Date.valueOf("2015-01-01"), "F", "Effective");
+                "INSERT INTO students (id_student, rude_code, identity_card, names, last_names, "
+                        + "birth_date, gender, status) VALUES (?,?,?,?,?,?,?,?)",
+                student,
+                RUDE,
+                CARNET,
+                "Ana",
+                "Quispe",
+                java.sql.Date.valueOf("2015-01-01"),
+                "F",
+                "Effective");
         seedEnrollment(student, course);
     }
 
@@ -52,29 +57,34 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
             {"id_course": "%s", "students": [{
               "rudeCode": "%s", "identityCard": "%s", "names": "Ana", "lastNames": "Quispe",
               "birthDate": "2015-01-01", "gender": "F"}]}
-            """.formatted(courseId, RUDE, CARNET);
+            """
+                .formatted(courseId, RUDE, CARNET);
     }
 
     private void withdraw() throws Exception {
-        mvc.perform(post("/api/students/{id}/withdraw", student)
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .contentType("application/json")
-                .content("{\"reason\":\"Transferencia\"}"))
-            .andExpect(status().isNoContent());
+        mvc.perform(
+                        post("/api/students/{id}/withdraw", student)
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .contentType("application/json")
+                                .content("{\"reason\":\"Transferencia\"}"))
+                .andExpect(status().isNoContent());
     }
 
     private String reimportInto(UUID courseId) throws Exception {
-        return mvc.perform(post("/api/course-enrollments/sync")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .contentType("application/json")
-                .content(rosterWith(courseId)))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+        return mvc.perform(
+                        post("/api/course-enrollments/sync")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .contentType("application/json")
+                                .content(rosterWith(courseId)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
     }
 
     private String statusOfStudent() {
         return jdbc.queryForObject(
-            "SELECT status FROM students WHERE id_student = ?", String.class, student);
+                "SELECT status FROM students WHERE id_student = ?", String.class, student);
     }
 
     /**
@@ -90,9 +100,11 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
 
         assertThat(statusOfStudent()).isEqualTo("Effective");
         assertThat(body).contains("\"studentsReadmitted\":1");
-        Integer active = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM course_enrollments WHERE id_student = ? AND status = 'Effective'",
-            Integer.class, student);
+        Integer active =
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM course_enrollments WHERE id_student = ? AND status = 'Effective'",
+                        Integer.class,
+                        student);
         assertThat(active).isEqualTo(1);
     }
 
@@ -103,9 +115,12 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
 
         reimportInto(course);
 
-        Integer rows = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM course_enrollments WHERE id_student = ? AND id_course = ?",
-            Integer.class, student, course);
+        Integer rows =
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM course_enrollments WHERE id_student = ? AND id_course = ?",
+                        Integer.class,
+                        student,
+                        course);
         assertThat(rows).isEqualTo(1);
     }
 
@@ -117,22 +132,32 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
     void readmittedStudent_isVisibleInTheDirectoryAgain() throws Exception {
         withdraw();
 
-        mvc.perform(get("/api/students/search").param("q", "Quispe")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content.length()").value(0));
+        mvc.perform(
+                        get("/api/students/search")
+                                .param("q", "Quispe")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director, "Director")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
 
         reimportInto(course);
 
-        mvc.perform(get("/api/students/search").param("q", "Quispe")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content.length()").value(1))
-            .andExpect(jsonPath("$.content[0].status").value("Effective"))
-            .andExpect(jsonPath("$.content[0].parallel").value("A"));
+        mvc.perform(
+                        get("/api/students/search")
+                                .param("q", "Quispe")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director, "Director")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].status").value("Effective"))
+                .andExpect(jsonPath("$.content[0].parallel").value("A"));
     }
 
-    /** Another course is an ordinary enrolment, but the student still has to come back on the roll. */
+    /**
+     * Another course is an ordinary enrolment, but the student still has to come back on the roll.
+     */
     @Test
     void reimportedIntoAnotherCourse_isAlsoPutBackOnTheRoll() throws Exception {
         withdraw();
@@ -144,19 +169,25 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
         assertThat(body).contains("\"studentsReadmitted\":1");
     }
 
-    /** The explanation described an absence that is over; kept, it would describe a student who attends. */
+    /**
+     * The explanation described an absence that is over; kept, it would describe a student who
+     * attends.
+     */
     @Test
     void readmission_clearsTheWithdrawalExplanation() throws Exception {
         withdraw();
 
         reimportInto(course);
 
-        mvc.perform(get("/api/students/{id}", student)
-                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("Effective"))
-            .andExpect(jsonPath("$.statusReason").doesNotExist())
-            .andExpect(jsonPath("$.statusNote").doesNotExist());
+        mvc.perform(
+                        get("/api/students/{id}", student)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director, "Director")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("Effective"))
+                .andExpect(jsonPath("$.statusReason").doesNotExist())
+                .andExpect(jsonPath("$.statusNote").doesNotExist());
     }
 
     /** Who put them back is recorded, the same as who took them off. */
@@ -166,12 +197,18 @@ class StudentReadmissionIT extends AbstractIntegrationTest {
 
         reimportInto(course);
 
-        UUID changedBy = jdbc.queryForObject(
-            "SELECT status_changed_by FROM students WHERE id_student = ?", UUID.class, student);
+        UUID changedBy =
+                jdbc.queryForObject(
+                        "SELECT status_changed_by FROM students WHERE id_student = ?",
+                        UUID.class,
+                        student);
         assertThat(changedBy).isEqualTo(director);
     }
 
-    /** A student who never left is not "readmitted" — the import must not report a change it did not make. */
+    /**
+     * A student who never left is not "readmitted" — the import must not report a change it did not
+     * make.
+     */
     @Test
     void studentStillOnTheRoll_isNotReportedAsReadmitted() throws Exception {
         String body = reimportInto(course);

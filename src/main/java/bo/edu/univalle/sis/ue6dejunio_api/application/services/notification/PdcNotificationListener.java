@@ -5,14 +5,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotific
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatusChanged;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Turns what happened to a plan into who needs to hear about it.
@@ -33,8 +32,8 @@ public class PdcNotificationListener {
     private final NotificationDispatcher dispatcher;
     private final INotificationDomain notificationDomain;
 
-    public PdcNotificationListener(NotificationDispatcher dispatcher,
-                                   INotificationDomain notificationDomain) {
+    public PdcNotificationListener(
+            NotificationDispatcher dispatcher, INotificationDomain notificationDomain) {
         this.dispatcher = dispatcher;
         this.notificationDomain = notificationDomain;
     }
@@ -55,11 +54,15 @@ public class PdcNotificationListener {
         if (PdcStatus.PUBLISHED.equals(event.status())) {
             tellEveryDirector(event);
         } else if (PdcStatus.APPROVED.equals(event.status())) {
-            tellAuthor(event, NotificationType.PDC_APPROVED,
-                "Tu %s fue aprobado.".formatted(planLabel(event)));
+            tellAuthor(
+                    event,
+                    NotificationType.PDC_APPROVED,
+                    "Tu %s fue aprobado.".formatted(planLabel(event)));
         } else if (PdcStatus.WITH_OBSERVATIONS.equals(event.status())) {
-            tellAuthor(event, NotificationType.PDC_OBSERVED,
-                "Tu %s fue observado: %s".formatted(planLabel(event), event.observations()));
+            tellAuthor(
+                    event,
+                    NotificationType.PDC_OBSERVED,
+                    "Tu %s fue observado: %s".formatted(planLabel(event), event.observations()));
         }
         // Draft and Under Review are steps nobody is waiting on, and a status this listener does
         // not know is one nobody asked it to announce.
@@ -68,20 +71,26 @@ public class PdcNotificationListener {
     private void tellEveryDirector(PdcStatusChanged event) {
         List<UUID> directors = notificationDomain.activeDirectorIds();
         if (directors.isEmpty()) {
-            log.warn("The plan {} was handed in and the school has no active Director to review it",
-                event.planId());
+            log.warn(
+                    "The plan {} was handed in and the school has no active Director to review it",
+                    event.planId());
             return;
         }
         for (UUID director : directors) {
-            send(director, event, NotificationType.PDC_PUBLISHED,
-                "Un %s fue entregado para revisión.".formatted(planLabel(event)));
+            send(
+                    director,
+                    event,
+                    NotificationType.PDC_PUBLISHED,
+                    "Un %s fue entregado para revisión.".formatted(planLabel(event)));
         }
     }
 
     private void tellAuthor(PdcStatusChanged event, NotificationType type, String message) {
         if (event.authorId() == null) {
-            log.warn("The plan {} changed to {} and has no author to tell",
-                event.planId(), event.status());
+            log.warn(
+                    "The plan {} changed to {} and has no author to tell",
+                    event.planId(),
+                    event.status());
             return;
         }
         send(event.authorId(), event, type, message);
@@ -94,16 +103,21 @@ public class PdcNotificationListener {
      * already committed and correct; a message that could not be written cannot undo it, and
      * turning that into an error the caller can do nothing about helps nobody. It is worth a log.
      */
-    private void send(UUID receiver, PdcStatusChanged event, NotificationType type,
-                      String message) {
+    private void send(
+            UUID receiver, PdcStatusChanged event, NotificationType type, String message) {
         try {
             // No sender: the system wrote this, and putting a name on it would credit a person for
             // a line nobody typed.
-            dispatcher.deliver(new SendNotificationCommand(
-                null, receiver, type, null, message, PLAN_RESOURCE, event.planId()));
+            dispatcher.deliver(
+                    new SendNotificationCommand(
+                            null, receiver, type, null, message, PLAN_RESOURCE, event.planId()));
         } catch (RuntimeException ex) {
-            log.error("The plan {} changed to {} and {} could not be told",
-                event.planId(), event.status(), receiver, ex);
+            log.error(
+                    "The plan {} changed to {} and {} could not be told",
+                    event.planId(),
+                    event.status(),
+                    receiver,
+                    ex);
         }
     }
 

@@ -1,9 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -12,21 +11,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.regex.Pattern;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Spec: Output Equivalence (Centralizer) — GET /api/gradebook/centralizer.
  *
- * Characterization test: captures the byte-identical JSON produced by {@code
+ * <p>Characterization test: captures the byte-identical JSON produced by {@code
  * GradebookService.centralizer} for a seeded course/trimester/page, comparing it against a
  * committed golden resource. This MUST be run and its golden committed against the CURRENT
- * (unmodified) service BEFORE any batch-load refactor lands, per the strict-TDD ordering
- * constraint in this change.
+ * (unmodified) service BEFORE any batch-load refactor lands, per the strict-TDD ordering constraint
+ * in this change.
  *
  * <p><b>Capture procedure</b> (requires Docker; run once, before refactor commit):
+ *
  * <pre>
  *   git stash push -- \
  *     src/main/java/.../application/services/gradebook/GradebookService.java \
@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   git stash pop
  *   ./gradlew test -Dtest=GradebookCentralizerGoldenTest,GradebookAttendanceGoldenTest -x spotlessCheck
  * </pre>
+ *
  * The first run bootstraps the golden file if missing and asserts against it once present, so the
  * second run proves identical output.
  *
@@ -50,15 +51,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * last name, so generated names would reorder the rows between runs. Everything else is asserted
  * verbatim: field names and order, subject names, totals, averages, null-vs-value and paging.
  *
- * <p>The golden files must be committed; left untracked they regenerate on a clean checkout and
- * the test degrades into asserting the output against itself.
+ * <p>The golden files must be committed; left untracked they regenerate on a clean checkout and the
+ * test degrades into asserting the output against itself.
  */
 class GradebookCentralizerGoldenTest extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mvc;
 
     private static final Path GOLDEN_PATH =
-        Path.of("src/test/resources/gradebook/golden/centralizer-page1.json");
+            Path.of("src/test/resources/gradebook/golden/centralizer-page1.json");
 
     private UUID director;
     private UUID courseId;
@@ -79,34 +80,65 @@ class GradebookCentralizerGoldenTest extends AbstractIntegrationTest {
         UUID studentWithScores = seedStudent("Ana", "Perez");
         UUID enrollmentWithScores = seedEnrollment(studentWithScores, courseId);
         // academic_scores caps each dimension: being<=10, knowing<=45, doing<=40, deciding<=5.
-        seedAcademicScore(enrollmentWithScores, classGroupMath, 1,
-            new BigDecimal("10"), new BigDecimal("20"), new BigDecimal("25"), new BigDecimal("5"));
-        seedAcademicScore(enrollmentWithScores, classGroupLang, 1,
-            new BigDecimal("8"), new BigDecimal("15"), new BigDecimal("15"), new BigDecimal("4"));
+        seedAcademicScore(
+                enrollmentWithScores,
+                classGroupMath,
+                1,
+                new BigDecimal("10"),
+                new BigDecimal("20"),
+                new BigDecimal("25"),
+                new BigDecimal("5"));
+        seedAcademicScore(
+                enrollmentWithScores,
+                classGroupLang,
+                1,
+                new BigDecimal("8"),
+                new BigDecimal("15"),
+                new BigDecimal("15"),
+                new BigDecimal("4"));
 
         // Student enrolled but with zero recorded scores (empty-scores scenario).
         UUID studentNoScores = seedStudent("Luis", "Zapata");
         seedEnrollment(studentNoScores, courseId);
     }
 
-    private void seedAcademicScore(UUID enrollmentId, UUID classGroupId, int trimester,
-                                   BigDecimal being, BigDecimal knowing, BigDecimal doing, BigDecimal deciding) {
+    private void seedAcademicScore(
+            UUID enrollmentId,
+            UUID classGroupId,
+            int trimester,
+            BigDecimal being,
+            BigDecimal knowing,
+            BigDecimal doing,
+            BigDecimal deciding) {
         jdbc.update(
-            "INSERT INTO academic_scores (id_academic_score, id_course_enrollment, id_class_group, trimester, "
-                + "score_being, score_knowing, score_doing, score_deciding) VALUES (?,?,?,?,?,?,?,?)",
-            UUID.randomUUID(), enrollmentId, classGroupId, trimester, being, knowing, doing, deciding);
+                "INSERT INTO academic_scores (id_academic_score, id_course_enrollment, id_class_group, trimester, "
+                        + "score_being, score_knowing, score_doing, score_deciding) VALUES (?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(),
+                enrollmentId,
+                classGroupId,
+                trimester,
+                being,
+                knowing,
+                doing,
+                deciding);
     }
 
     @Test
     void centralizerPage1_matchesCommittedGolden() throws Exception {
-        String actual = mvc.perform(get("/api/gradebook/centralizer")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseId.toString())
-                .param("trimester", "1")
-                .param("offset", "1")
-                .param("limit", "30"))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String actual =
+                mvc.perform(
+                                get("/api/gradebook/centralizer")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(director, "Director"))
+                                        .param("id_course", courseId.toString())
+                                        .param("trimester", "1")
+                                        .param("offset", "1")
+                                        .param("limit", "30"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(StandardCharsets.UTF_8);
 
         assertGoldenMatch(GOLDEN_PATH, actual);
     }
@@ -136,6 +168,7 @@ class GradebookCentralizerGoldenTest extends AbstractIntegrationTest {
         return UUID_PATTERN.matcher(json).replaceAll("<uuid>");
     }
 
-    private static final Pattern UUID_PATTERN = Pattern.compile(
-        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+    private static final Pattern UUID_PATTERN =
+            Pattern.compile(
+                    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 }

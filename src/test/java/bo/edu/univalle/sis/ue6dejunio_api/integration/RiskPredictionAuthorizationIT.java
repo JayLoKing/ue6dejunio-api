@@ -1,31 +1,30 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MockMvc;
+
 /**
  * Who actually reaches the risk panel, through the real filter chain.
  *
- * <p>Worth its own class because two independent layers have to agree: the role rules in
- * {@code SecurityConfig} decide who reaches the handler at all, and {@code @PreAuthorize} decides
- * whose rows they see. A route the chain does not name inherits whatever the nearest wildcard says
- * — {@code /api/courses/**} is Director-only — and the guard behind it never runs to disagree. That
+ * <p>Worth its own class because two independent layers have to agree: the role rules in {@code
+ * SecurityConfig} decide who reaches the handler at all, and {@code @PreAuthorize} decides whose
+ * rows they see. A route the chain does not name inherits whatever the nearest wildcard says —
+ * {@code /api/courses/**} is Director-only — and the guard behind it never runs to disagree. That
  * failure is invisible to every test that mocks the service away.
  */
 class RiskPredictionAuthorizationIT extends AbstractIntegrationTest {
@@ -53,14 +52,33 @@ class RiskPredictionAuthorizationIT extends AbstractIntegrationTest {
         ana = seedStudent("Ana", "Alvarez");
         seedEnrollment(ana, courseId);
 
-        RiskFeatures vector = new RiskFeatures(ana, mathGroup, 1,
-            List.of(new BigDecimal("8")), List.of(new BigDecimal("30")),
-            List.of(new BigDecimal("25")), List.of(new BigDecimal("4")),
-            new BigDecimal("87.50"), 8);
-        predictionId = riskPredictions.upsertAll(List.of(new NewRiskPrediction(
-            ana, mathGroup, 1, RiskLevel.RIESGO_CRITICO,
-            new BigDecimal("0.8100"), new BigDecimal("0.0044"), vector,
-            LocalDateTime.of(2026, 4, 10, 8, 0)))).get(0).stored().id();
+        RiskFeatures vector =
+                new RiskFeatures(
+                        ana,
+                        mathGroup,
+                        1,
+                        List.of(new BigDecimal("8")),
+                        List.of(new BigDecimal("30")),
+                        List.of(new BigDecimal("25")),
+                        List.of(new BigDecimal("4")),
+                        new BigDecimal("87.50"),
+                        8);
+        predictionId =
+                riskPredictions
+                        .upsertAll(
+                                List.of(
+                                        new NewRiskPrediction(
+                                                ana,
+                                                mathGroup,
+                                                1,
+                                                RiskLevel.RIESGO_CRITICO,
+                                                new BigDecimal("0.8100"),
+                                                new BigDecimal("0.0044"),
+                                                vector,
+                                                LocalDateTime.of(2026, 4, 10, 8, 0))))
+                        .get(0)
+                        .stored()
+                        .id();
     }
 
     private String bearer(UUID userId, String role) {
@@ -75,12 +93,13 @@ class RiskPredictionAuthorizationIT extends AbstractIntegrationTest {
      */
     @Test
     void courseRisk_theTeacherOfTheCourse_reachesIt() throws Exception {
-        mvc.perform(get("/api/courses/{id}/risk", courseId)
-                .header("Authorization", bearer(owningTeacher, "Teacher"))
-                .param("trimester", "1"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].studentName").value("Alvarez Ana"))
-            .andExpect(jsonPath("$[0].riskLevel").value("RiesgoCritico"));
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(owningTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].studentName").value("Alvarez Ana"))
+                .andExpect(jsonPath("$[0].riskLevel").value("RiesgoCritico"));
     }
 
     /**
@@ -94,85 +113,94 @@ class RiskPredictionAuthorizationIT extends AbstractIntegrationTest {
         UUID technicalTeacher = seedUser("Teacher", true);
         seedClassGroup(courseId, technicalTeacher, "Lenguaje");
 
-        mvc.perform(get("/api/courses/{id}/risk", courseId)
-                .header("Authorization", bearer(technicalTeacher, "Teacher"))
-                .param("trimester", "1"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(technicalTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
     void courseRisk_theSecretariatReadsIt() throws Exception {
-        mvc.perform(get("/api/courses/{id}/risk", courseId)
-                .header("Authorization", bearer(secretary, "Secretary"))
-                .param("trimester", "1"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(secretary, "Secretary"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
     void courseRisk_theDirectorReadsIt() throws Exception {
-        mvc.perform(get("/api/courses/{id}/risk", courseId)
-                .header("Authorization", bearer(director, "Director"))
-                .param("trimester", "1"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(director, "Director"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
     void courseRisk_aTeacherWithNothingInTheCourse_isRefused() throws Exception {
-        mvc.perform(get("/api/courses/{id}/risk", courseId)
-                .header("Authorization", bearer(otherTeacher, "Teacher"))
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(otherTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
     // ---------------------------------------------------------------- the subject panel
 
     @Test
     void classGroupRisk_theTeacherOfTheSubject_reachesIt() throws Exception {
-        mvc.perform(get("/api/class-groups/{id}/risk", mathGroup)
-                .header("Authorization", bearer(owningTeacher, "Teacher"))
-                .param("trimester", "1"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].subjectName").value("Matematicas"));
+        mvc.perform(
+                        get("/api/class-groups/{id}/risk", mathGroup)
+                                .header("Authorization", bearer(owningTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subjectName").value("Matematicas"));
     }
 
     @Test
     void classGroupRisk_anotherTeachersSubject_isRefused() throws Exception {
-        mvc.perform(get("/api/class-groups/{id}/risk", mathGroup)
-                .header("Authorization", bearer(otherTeacher, "Teacher"))
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/class-groups/{id}/risk", mathGroup)
+                                .header("Authorization", bearer(otherTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
     /** Running the model is a write, and the secretariat writes nothing. */
     @Test
     void classGroupPredict_theSecretariat_isRefused() throws Exception {
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .post("/api/class-groups/{id}/risk/predict", mathGroup)
-                .header("Authorization", bearer(secretary, "Secretary"))
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                        "/api/class-groups/{id}/risk/predict", mathGroup)
+                                .header("Authorization", bearer(secretary, "Secretary"))
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
     /** A sweep of the whole school is the Director's alone. */
     @Test
     void predictYear_aTeacher_isRefused() throws Exception {
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .post("/api/risk/predict-year")
-                .header("Authorization", bearer(owningTeacher, "Teacher"))
-                .param("academicYear", "2026")
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                        "/api/risk/predict-year")
+                                .header("Authorization", bearer(owningTeacher, "Teacher"))
+                                .param("academicYear", "2026")
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
     // ---------------------------------------------------------------- marking one as handled
 
     @Test
     void attend_theTeacherWhoseSubjectItIs_marksIt() throws Exception {
-        mvc.perform(put("/api/risk-predictions/{id}/attend", predictionId)
-                .header("Authorization", bearer(owningTeacher, "Teacher"))
-                .param("attended", "true"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.attended").value(true));
+        mvc.perform(
+                        put("/api/risk-predictions/{id}/attend", predictionId)
+                                .header("Authorization", bearer(owningTeacher, "Teacher"))
+                                .param("attended", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attended").value(true));
     }
 
     /**
@@ -182,26 +210,29 @@ class RiskPredictionAuthorizationIT extends AbstractIntegrationTest {
      */
     @Test
     void attend_aTeacherFromAnotherCourse_isRefusedAndReadsNothing() throws Exception {
-        mvc.perform(put("/api/risk-predictions/{id}/attend", predictionId)
-                .header("Authorization", bearer(otherTeacher, "Teacher"))
-                .param("attended", "true"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        put("/api/risk-predictions/{id}/attend", predictionId)
+                                .header("Authorization", bearer(otherTeacher, "Teacher"))
+                                .param("attended", "true"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void attend_theSecretariat_isRefused() throws Exception {
-        mvc.perform(put("/api/risk-predictions/{id}/attend", predictionId)
-                .header("Authorization", bearer(secretary, "Secretary"))
-                .param("attended", "true"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        put("/api/risk-predictions/{id}/attend", predictionId)
+                                .header("Authorization", bearer(secretary, "Secretary"))
+                                .param("attended", "true"))
+                .andExpect(status().isForbidden());
     }
 
     /** An id that resolves to nothing denies from inside the guard rather than surfacing a 404. */
     @Test
     void attend_anIdThatIsNobodys_isRefused() throws Exception {
-        mvc.perform(put("/api/risk-predictions/{id}/attend", UUID.randomUUID())
-                .header("Authorization", bearer(otherTeacher, "Teacher"))
-                .param("attended", "true"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        put("/api/risk-predictions/{id}/attend", UUID.randomUUID())
+                                .header("Authorization", bearer(otherTeacher, "Teacher"))
+                                .param("attended", "true"))
+                .andExpect(status().isForbidden());
     }
 }

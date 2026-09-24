@@ -5,5 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaGradeRepository extends JpaRepository<GradeEntity, Integer> {
     boolean existsByLevel_Id(Integer levelId);
+
     boolean existsByNameAndLevel_Id(String name, Integer levelId);
 }

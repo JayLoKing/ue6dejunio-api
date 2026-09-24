@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 /**
  * {@link ClientIpResolver} for deployments behind a reverse proxy. Honors {@code X-Forwarded-For}
  * ONLY when the immediate {@code remoteAddr} is one of the configured trusted proxies, taking the
- * first (left-most, closest-to-client) hop of the header. Falls back to {@code remoteAddr} in
- * every other case, and never throws.
+ * first (left-most, closest-to-client) hop of the header. Falls back to {@code remoteAddr} in every
+ * other case, and never throws.
  */
 @Component
 @ConditionalOnProperty(name = "app.security.rate-limit.ip-resolver", havingValue = "trusted-proxy")

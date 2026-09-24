@@ -12,8 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class Ue6dejunioApiApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(Ue6dejunioApiApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(Ue6dejunioApiApplication.class, args);
+    }
 }

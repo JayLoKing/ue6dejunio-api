@@ -1,14 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Repository;
-
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
 
 /**
  * The four reads that feed the model, as SQL.
@@ -35,7 +34,8 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
 
     @Override
     public List<UUID> activeClassGroupIds(int academicYear) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT cg.id_class_group
                 FROM class_groups cg
                 JOIN courses c ON c.id_course = cg.id_course
@@ -44,27 +44,27 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
                   AND c.is_active = true
                   AND y.year = :year
             """)
-            .param("year", academicYear)
-            .query(UUID.class)
-            .list();
+                .param("year", academicYear)
+                .query(UUID.class)
+                .list();
     }
 
     /**
      * One row per criterion, which is what the model calls a mark in a dimension.
      *
      * <p>{@code COALESCE(s.id_criterion, e.id_criterion)} and the average over it are not a
-     * flourish — they are the gradebook's own rule, the same one
-     * {@code JpaAssessmentScoreRepository.dimensionAverageRows} applies. A criterion is scored
-     * either directly or through the activity items hanging off it, and reading only the direct
-     * scores would drop every criterion a teacher chose to grade by activity. Not fewer marks for
-     * those students: none, for that whole dimension, so the vector never completes and the student
-     * is never predicted at all.
+     * flourish — they are the gradebook's own rule, the same one {@code
+     * JpaAssessmentScoreRepository.dimensionAverageRows} applies. A criterion is scored either
+     * directly or through the activity items hanging off it, and reading only the direct scores
+     * would drop every criterion a teacher chose to grade by activity. Not fewer marks for those
+     * students: none, for that whole dimension, so the vector never completes and the student is
+     * never predicted at all.
      *
-     * <p>Ordered by the criterion's most recent mark, then by its id, then by the student. The trend
-     * feature is the last mark minus the first, so the order carries meaning — and
-     * {@code created_at} is nullable, has no sub-millisecond guarantee, and a teacher saving a whole
-     * sheet writes several rows on one clock reading. Without a tie broken the same way every time,
-     * the same data yields a different trend from one sweep to the next.
+     * <p>Ordered by the criterion's most recent mark, then by its id, then by the student. The
+     * trend feature is the last mark minus the first, so the order carries meaning — and {@code
+     * created_at} is nullable, has no sub-millisecond guarantee, and a teacher saving a whole sheet
+     * writes several rows on one clock reading. Without a tie broken the same way every time, the
+     * same data yields a different trend from one sweep to the next.
      *
      * <p>The student is in there to make the ordering total. Two students share a criterion and a
      * timestamp, so the first two keys alone leave their rows free to swap — which never reorders
@@ -77,7 +77,8 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
             return List.of();
         }
 
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT ce.id_student            AS id_student,
                        c.id_class_group         AS id_class_group,
                        c.dimension              AS dimension,
@@ -96,16 +97,17 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
                 GROUP BY ce.id_student, c.id_class_group, c.dimension, c.id_criterion
                 ORDER BY MAX(s.created_at) ASC NULLS FIRST, c.id_criterion, ce.id_student
             """)
-            .param("groups", classGroupIds)
-            .param("trimester", trimester)
-            .param("effective", EFFECTIVE)
-            .query((rs, rowNum) -> new CriterionScoreRow(
-                rs.getObject("id_student", UUID.class),
-                rs.getObject("id_class_group", UUID.class),
-                rs.getString("dimension"),
-                rs.getBigDecimal("score")
-            ))
-            .list();
+                .param("groups", classGroupIds)
+                .param("trimester", trimester)
+                .param("effective", EFFECTIVE)
+                .query(
+                        (rs, rowNum) ->
+                                new CriterionScoreRow(
+                                        rs.getObject("id_student", UUID.class),
+                                        rs.getObject("id_class_group", UUID.class),
+                                        rs.getString("dimension"),
+                                        rs.getBigDecimal("score")))
+                .list();
     }
 
     @Override
@@ -114,19 +116,23 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
             return Map.of();
         }
 
-        List<Map.Entry<UUID, Integer>> rows = jdbc.sql("""
+        List<Map.Entry<UUID, Integer>> rows =
+                jdbc.sql(
+                                """
                 SELECT id_class_group, COUNT(*) AS planned
                 FROM evaluation_criteria
                 WHERE id_class_group IN (:groups)
                   AND trimester = :trimester
                 GROUP BY id_class_group
             """)
-            .param("groups", classGroupIds)
-            .param("trimester", trimester)
-            .query((rs, rowNum) -> Map.entry(
-                rs.getObject("id_class_group", UUID.class),
-                rs.getInt("planned")))
-            .list();
+                        .param("groups", classGroupIds)
+                        .param("trimester", trimester)
+                        .query(
+                                (rs, rowNum) ->
+                                        Map.entry(
+                                                rs.getObject("id_class_group", UUID.class),
+                                                rs.getInt("planned")))
+                        .list();
 
         Map<UUID, Integer> counts = new HashMap<>(rows.size());
         rows.forEach(row -> counts.put(row.getKey(), row.getValue()));
@@ -151,12 +157,12 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
      *
      * <p><b>This is not the percentage the attendance panel shows, and it must not be "corrected"
      * into agreement with it.</b> {@code AttendanceCounts} answers the school's question — how much
-     * class did this student actually sit — counting only {@code Present} over
-     * {@code Present + Absent + Late}, with {@code Excused} excluded entirely. This one answers a
-     * different question: what the model was trained on. Its training set was built from the
-     * monthly spreadsheets by {@code ue6dejunio-ia}'s {@code asistencia_loader}, whose rule is
-     * {@code (presentes + retrasos + licencias) / dias_habiles} — a mark of any kind counts as a
-     * day, and only an outright absence counts against.
+     * class did this student actually sit — counting only {@code Present} over {@code Present +
+     * Absent + Late}, with {@code Excused} excluded entirely. This one answers a different
+     * question: what the model was trained on. Its training set was built from the monthly
+     * spreadsheets by {@code ue6dejunio-ia}'s {@code asistencia_loader}, whose rule is {@code
+     * (presentes + retrasos + licencias) / dias_habiles} — a mark of any kind counts as a day, and
+     * only an outright absence counts against.
      *
      * <p>So {@code Late} and {@code Excused} both count as attended here. Feeding the model the
      * panel's figure instead would hand it a feature on a scale it never saw in training, which is
@@ -170,7 +176,8 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
             return List.of();
         }
 
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 WITH marks AS (
                     SELECT cg.id_class_group          AS id_class_group,
                            ce.id_student              AS id_student,
@@ -203,14 +210,15 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
                 WHERE preference = 1
                 GROUP BY id_student, id_class_group
             """)
-            .param("groups", classGroupIds)
-            .param("trimester", trimester)
-            .param("effective", EFFECTIVE)
-            .query((rs, rowNum) -> new AttendanceRateRow(
-                rs.getObject("id_student", UUID.class),
-                rs.getObject("id_class_group", UUID.class),
-                rs.getBigDecimal("pct")
-            ))
-            .list();
+                .param("groups", classGroupIds)
+                .param("trimester", trimester)
+                .param("effective", EFFECTIVE)
+                .query(
+                        (rs, rowNum) ->
+                                new AttendanceRateRow(
+                                        rs.getObject("id_student", UUID.class),
+                                        rs.getObject("id_class_group", UUID.class),
+                                        rs.getBigDecimal("pct")))
+                .list();
     }
 }

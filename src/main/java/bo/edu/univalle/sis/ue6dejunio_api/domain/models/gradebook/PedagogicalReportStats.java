@@ -17,7 +17,4 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook;
  * closed before the report is handed in.
  */
 public record PedagogicalReportStats(
-    GenderTally effective,
-    GenderTally passed,
-    GenderTally failed
-) {}
+        GenderTally effective, GenderTally passed, GenderTally failed) {}

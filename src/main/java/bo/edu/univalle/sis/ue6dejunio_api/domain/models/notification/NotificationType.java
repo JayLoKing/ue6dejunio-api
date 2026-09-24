@@ -4,8 +4,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification;
  * Why the school is writing to someone.
  *
  * <p>The type is the notification's subject: an inbox groups and filters by it, and each one reads
- * as a heading without anybody typing it. {@link #CUSTOM} is the exception and the reason
- * {@code subject} exists — what the catalog has no name for, the Director names himself.
+ * as a heading without anybody typing it. {@link #CUSTOM} is the exception and the reason {@code
+ * subject} exists — what the catalog has no name for, the Director names himself.
  *
  * <p>Kept as a varchar in the database rather than a Postgres enum. This list grows every time the
  * school finds another reason to write, and {@code ALTER TYPE ... ADD VALUE} cannot run inside a

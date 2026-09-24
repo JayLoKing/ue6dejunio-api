@@ -1,14 +1,22 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.adaptation;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateAdaptationRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateAdaptationRequest;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -18,15 +26,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdaptationControllerTest {
@@ -38,19 +37,30 @@ class AdaptationControllerTest {
     @Captor private ArgumentCaptor<UpdateAdaptationCommand> updateCaptor;
 
     private static JwtAuthenticationToken tokenOf(UUID userId) {
-        Jwt jwt = Jwt.withTokenValue("t")
-            .header("alg", "RS256")
-            .subject(userId.toString())
-            .issuedAt(Instant.now())
-            .expiresAt(Instant.now().plusSeconds(60))
-            .build();
+        Jwt jwt =
+                Jwt.withTokenValue("t")
+                        .header("alg", "RS256")
+                        .subject(userId.toString())
+                        .issuedAt(Instant.now())
+                        .expiresAt(Instant.now().plusSeconds(60))
+                        .build();
         return new JwtAuthenticationToken(jwt, List.of(), userId.toString());
     }
 
     private static Adaptation adaptation(String conditionType) {
-        return new Adaptation(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Ana Paz",
-            conditionType, "Contenido", "Metodología", "Criterio",
-            UUID.randomUUID(), UUID.randomUUID(), null, null);
+        return new Adaptation(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Ana Paz",
+                conditionType,
+                "Contenido",
+                "Metodología",
+                "Criterio",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                null);
     }
 
     // Paging without an ORDER BY is paging over an undefined order: SQL is free to return the rows
@@ -60,19 +70,20 @@ class AdaptationControllerTest {
     void list_asksForAStableOrder() {
         UUID planId = UUID.randomUUID();
         when(adaptationService.listByPlan(eq(planId), pageQueryCaptor.capture()))
-            .thenReturn(PageResult.<Adaptation>empty(PageQuery.of(0, 20)));
+                .thenReturn(PageResult.<Adaptation>empty(PageQuery.of(0, 20)));
 
         controller.list(planId, 1, 20);
 
         assertThat(pageQueryCaptor.getValue().sort())
-            .containsExactly(SortField.asc("student.lastNames"), SortField.asc("student.names"));
+                .containsExactly(
+                        SortField.asc("student.lastNames"), SortField.asc("student.names"));
     }
 
     @Test
     void list_translatesTheOneBasedOffsetToAZeroBasedPage() {
         UUID planId = UUID.randomUUID();
         when(adaptationService.listByPlan(eq(planId), pageQueryCaptor.capture()))
-            .thenReturn(PageResult.<Adaptation>empty(PageQuery.of(2, 15)));
+                .thenReturn(PageResult.<Adaptation>empty(PageQuery.of(2, 15)));
 
         controller.list(planId, 3, 15);
 
@@ -87,11 +98,18 @@ class AdaptationControllerTest {
     void create_carriesTheConditionTheFormAsksFor() {
         UUID author = UUID.randomUUID();
         when(adaptationService.create(createCaptor.capture()))
-            .thenReturn(adaptation("Discapacidad"));
+                .thenReturn(adaptation("Discapacidad"));
 
-        var response = controller.create(new CreateAdaptationRequest(
-            UUID.randomUUID(), UUID.randomUUID(), "Discapacidad",
-            "Contenido", "Metodología", "Criterio"), tokenOf(author));
+        var response =
+                controller.create(
+                        new CreateAdaptationRequest(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                "Discapacidad",
+                                "Contenido",
+                                "Metodología",
+                                "Criterio"),
+                        tokenOf(author));
 
         assertThat(createCaptor.getValue().conditionType()).isEqualTo("Discapacidad");
         assertThat(response.getBody()).isNotNull();
@@ -102,10 +120,13 @@ class AdaptationControllerTest {
     void update_carriesTheCorrectedCondition() {
         UUID author = UUID.randomUUID();
         when(adaptationService.update(any(UUID.class), updateCaptor.capture()))
-            .thenReturn(adaptation("TEA"));
+                .thenReturn(adaptation("TEA"));
 
-        var response = controller.update(UUID.randomUUID(), new UpdateAdaptationRequest(
-            "TEA", "Contenido", "Metodología", "Criterio"), tokenOf(author));
+        var response =
+                controller.update(
+                        UUID.randomUUID(),
+                        new UpdateAdaptationRequest("TEA", "Contenido", "Metodología", "Criterio"),
+                        tokenOf(author));
 
         assertThat(updateCaptor.getValue().conditionType()).isEqualTo("TEA");
         assertThat(response.getBody()).isNotNull();

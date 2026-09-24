@@ -1,21 +1,21 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AssessmentScoreEntity;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentScoreEntity, UUID> {
 
-    Optional<AssessmentScoreEntity> findByCourseEnrollment_IdAndEvent_Id(UUID courseEnrollmentId, UUID eventId);
+    Optional<AssessmentScoreEntity> findByCourseEnrollment_IdAndEvent_Id(
+            UUID courseEnrollmentId, UUID eventId);
 
-    Optional<AssessmentScoreEntity> findByCourseEnrollment_IdAndCriterion_Id(UUID courseEnrollmentId,
-                                                                            UUID criterionId);
+    Optional<AssessmentScoreEntity> findByCourseEnrollment_IdAndCriterion_Id(
+            UUID courseEnrollmentId, UUID criterionId);
 
     List<AssessmentScoreEntity> findByEvent_Id(UUID eventId);
 
@@ -37,7 +37,8 @@ public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentSc
      * <p>The joins are explicit LEFT JOINs on purpose. Implicit path navigation compiles to inner
      * joins, which would drop every directly scored row before the OR is ever evaluated.
      */
-    @Query("""
+    @Query(
+            """
         SELECT COUNT(s) > 0 FROM AssessmentScoreEntity s
         LEFT JOIN s.event ev
         LEFT JOIN ev.criterion evc
@@ -48,7 +49,8 @@ public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentSc
         """)
     boolean existsBySubject(@Param("subjectId") UUID subjectId);
 
-    @Query("""
+    @Query(
+            """
         SELECT COUNT(s) > 0 FROM AssessmentScoreEntity s
         LEFT JOIN s.event ev
         WHERE ev.criterion.id = :criterionId OR s.criterion.id = :criterionId
@@ -63,7 +65,9 @@ public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentSc
      *
      * <p>Native because JPQL has no subquery in {@code FROM}.
      */
-    @Query(value = """
+    @Query(
+            value =
+                    """
         SELECT t.dimension AS dimension, AVG(t.criterion_avg) AS avg_score
         FROM (
             SELECT c.dimension AS dimension, AVG(s.score) AS criterion_avg
@@ -76,8 +80,10 @@ public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentSc
             GROUP BY c.id_criterion, c.dimension
         ) t
         GROUP BY t.dimension
-        """, nativeQuery = true)
-    List<Object[]> dimensionAverageRows(@Param("courseEnrollmentId") UUID courseEnrollmentId,
-                                        @Param("classGroupId") UUID classGroupId,
-                                        @Param("trimester") Integer trimester);
+        """,
+            nativeQuery = true)
+    List<Object[]> dimensionAverageRows(
+            @Param("courseEnrollmentId") UUID courseEnrollmentId,
+            @Param("classGroupId") UUID classGroupId,
+            @Param("trimester") Integer trimester);
 }

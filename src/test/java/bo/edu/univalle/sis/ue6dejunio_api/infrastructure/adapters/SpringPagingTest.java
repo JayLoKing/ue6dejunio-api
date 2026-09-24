@@ -1,18 +1,17 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class SpringPagingTest {
 
@@ -28,19 +27,22 @@ class SpringPagingTest {
     @Test
     void toPageable_keepsEveryFieldInTheOrderGiven() {
         // El orden de los campos ES el ORDER BY: perderlo cambia las filas que devuelve la pagina.
-        Pageable p = SpringPaging.toPageable(PageQuery.of(0, 30,
-            SortField.asc("student.lastNames"),
-            SortField.desc("updatedAt")));
+        Pageable p =
+                SpringPaging.toPageable(
+                        PageQuery.of(
+                                0,
+                                30,
+                                SortField.asc("student.lastNames"),
+                                SortField.desc("updatedAt")));
 
-        assertThat(p.getSort()).containsExactly(
-            Sort.Order.asc("student.lastNames"),
-            Sort.Order.desc("updatedAt"));
+        assertThat(p.getSort())
+                .containsExactly(Sort.Order.asc("student.lastNames"), Sort.Order.desc("updatedAt"));
     }
 
     @Test
     void toPageResult_keepsTheCoordinatesSpringReports() {
-        Page<String> page = new PageImpl<>(
-            List.of("a", "b"), PageRequest.of(1, 2, Sort.by("name")), 7);
+        Page<String> page =
+                new PageImpl<>(List.of("a", "b"), PageRequest.of(1, 2, Sort.by("name")), 7);
 
         PageResult<String> result = SpringPaging.toPageResult(page);
 

@@ -10,10 +10,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYea
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.catalog.ICatalogDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.catalog.ICatalogService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -23,8 +22,10 @@ public class CatalogService implements ICatalogService {
     private final ITrimesterPeriodDomain trimesterPeriodDomain;
     private final IAcademicYearDomain academicYearDomain;
 
-    public CatalogService(ICatalogDomain catalogDomain, ITrimesterPeriodDomain trimesterPeriodDomain,
-                          IAcademicYearDomain academicYearDomain) {
+    public CatalogService(
+            ICatalogDomain catalogDomain,
+            ITrimesterPeriodDomain trimesterPeriodDomain,
+            IAcademicYearDomain academicYearDomain) {
         this.catalogDomain = catalogDomain;
         this.trimesterPeriodDomain = trimesterPeriodDomain;
         this.academicYearDomain = academicYearDomain;
@@ -57,10 +58,13 @@ public class CatalogService implements ICatalogService {
 
     @Override
     public List<TrimesterPeriodItem> trimesters(Integer academicYearId) {
-        Integer yearId = academicYearId != null ? academicYearId : academicYearDomain.currentYearId();
+        Integer yearId =
+                academicYearId != null ? academicYearId : academicYearDomain.currentYearId();
         return trimesterPeriodDomain.findByAcademicYear(yearId).stream()
-            .map(p -> new TrimesterPeriodItem(p.id(), p.trimester(), p.startDate(), p.endDate()))
-            .toList();
+                .map(
+                        p ->
+                                new TrimesterPeriodItem(
+                                        p.id(), p.trimester(), p.startDate(), p.endDate()))
+                .toList();
     }
-
 }

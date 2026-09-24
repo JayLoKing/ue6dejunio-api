@@ -8,10 +8,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.RiskPredictionEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaRiskPredictionRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,6 +18,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Repository
 public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
@@ -35,7 +34,8 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
      */
     private final JsonMapper json;
 
-    public RiskPredictionRepositoryAdapter(JpaRiskPredictionRepository repository, JsonMapper json) {
+    public RiskPredictionRepositoryAdapter(
+            JpaRiskPredictionRepository repository, JsonMapper json) {
         this.repository = repository;
         this.json = json;
     }
@@ -67,7 +67,8 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
                 entity.setStudentId(prediction.studentId());
                 entity.setClassGroupId(prediction.classGroupId());
                 entity.setTrimester(prediction.trimester());
-                // A fresh prediction is nobody's business yet. Only the row being replaced can carry
+                // A fresh prediction is nobody's business yet. Only the row being replaced can
+                // carry
                 // an "attended" the Director set, and that is preserved below rather than reset.
                 entity.setAttended(false);
                 previousLevels.add(null);
@@ -104,17 +105,20 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
         Map<Integer, Set<UUID>> studentsByTrimester = new HashMap<>();
         Map<Integer, Set<UUID>> groupsByTrimester = new HashMap<>();
         for (NewRiskPrediction p : predictions) {
-            studentsByTrimester.computeIfAbsent(p.trimester(), t -> new LinkedHashSet<>())
-                .add(p.studentId());
-            groupsByTrimester.computeIfAbsent(p.trimester(), t -> new LinkedHashSet<>())
-                .add(p.classGroupId());
+            studentsByTrimester
+                    .computeIfAbsent(p.trimester(), t -> new LinkedHashSet<>())
+                    .add(p.studentId());
+            groupsByTrimester
+                    .computeIfAbsent(p.trimester(), t -> new LinkedHashSet<>())
+                    .add(p.classGroupId());
         }
 
         Map<Key, RiskPredictionEntity> existing = new HashMap<>();
         for (Map.Entry<Integer, Set<UUID>> entry : studentsByTrimester.entrySet()) {
             Integer trimester = entry.getKey();
-            List<RiskPredictionEntity> rows = repository.findByTrimesterAndClassGroupIdInAndStudentIdIn(
-                trimester, groupsByTrimester.get(trimester), entry.getValue());
+            List<RiskPredictionEntity> rows =
+                    repository.findByTrimesterAndClassGroupIdInAndStudentIdIn(
+                            trimester, groupsByTrimester.get(trimester), entry.getValue());
             for (RiskPredictionEntity row : rows) {
                 existing.put(Key.of(row), row);
             }
@@ -145,8 +149,8 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
      */
     @Override
     @Transactional
-    public Set<UUID> claimForNotification(Collection<UUID> predictionIds, LocalDateTime now,
-                                          LocalDateTime notBefore) {
+    public Set<UUID> claimForNotification(
+            Collection<UUID> predictionIds, LocalDateTime now, LocalDateTime notBefore) {
         if (predictionIds == null || predictionIds.isEmpty()) {
             return Set.of();
         }
@@ -181,8 +185,11 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
     @Override
     @Transactional
     public RiskPrediction markAttended(UUID id, boolean attended) {
-        RiskPredictionEntity entity = repository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Predicción de riesgo", id));
+        RiskPredictionEntity entity =
+                repository
+                        .findById(id)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Predicción de riesgo", id));
         entity.setAttended(attended);
         return toDomain(repository.save(entity));
     }
@@ -190,33 +197,34 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
     private static List<StudentRisk> toViews(List<Object[]> rows) {
         List<StudentRisk> views = new ArrayList<>(rows.size());
         for (Object[] row : rows) {
-            views.add(new StudentRisk(
-                toDomain((RiskPredictionEntity) row[0]),
-                (String) row[1],
-                (String) row[2],
-                (String) row[3]));
+            views.add(
+                    new StudentRisk(
+                            toDomain((RiskPredictionEntity) row[0]),
+                            (String) row[1],
+                            (String) row[2],
+                            (String) row[3]));
         }
         return views;
     }
 
     private static RiskPrediction toDomain(RiskPredictionEntity entity) {
         return new RiskPrediction(
-            entity.getId(),
-            entity.getStudentId(),
-            entity.getClassGroupId(),
-            entity.getTrimester(),
-            levelOf(entity),
-            entity.getPFail(),
-            entity.getPOutstanding(),
-            entity.isAttended(),
-            entity.getFeaturesAnalyzed(),
-            entity.getPredictedAt());
+                entity.getId(),
+                entity.getStudentId(),
+                entity.getClassGroupId(),
+                entity.getTrimester(),
+                levelOf(entity),
+                entity.getPFail(),
+                entity.getPOutstanding(),
+                entity.isAttended(),
+                entity.getFeaturesAnalyzed(),
+                entity.getPredictedAt());
     }
 
     /**
-     * A stored level the enum does not know is a bug here, not bad input: the column carries a CHECK
-     * listing the same four words. Failing loudly beats handing back a null that the transition
-     * check would read as "never predicted before" and announce all over again.
+     * A stored level the enum does not know is a bug here, not bad input: the column carries a
+     * CHECK listing the same four words. Failing loudly beats handing back a null that the
+     * transition check would read as "never predicted before" and announce all over again.
      *
      * <p>Left as an {@link IllegalStateException}, and therefore a 500, deliberately. It is the
      * honest answer: the row disagrees with its own constraint, so this system is broken and no
@@ -226,17 +234,21 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
      */
     private static RiskLevel levelOf(RiskPredictionEntity entity) {
         return RiskLevel.fromModel(entity.getRiskLevel())
-            .orElseThrow(() -> new IllegalStateException(
-                "The prediction " + entity.getId() + " holds an unknown risk level: "
-                    + entity.getRiskLevel()));
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        "The prediction "
+                                                + entity.getId()
+                                                + " holds an unknown risk level: "
+                                                + entity.getRiskLevel()));
     }
 
     /** What {@code uq_risk_pred} makes unique, so the lookup matches the constraint exactly. */
     private record Key(UUID studentId, UUID classGroupId, Integer trimester) {
 
         static Key of(NewRiskPrediction prediction) {
-            return new Key(prediction.studentId(), prediction.classGroupId(),
-                prediction.trimester());
+            return new Key(
+                    prediction.studentId(), prediction.classGroupId(), prediction.trimester());
         }
 
         static Key of(RiskPredictionEntity entity) {

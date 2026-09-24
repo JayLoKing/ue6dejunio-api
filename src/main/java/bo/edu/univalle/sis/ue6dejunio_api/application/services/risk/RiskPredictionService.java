@@ -21,11 +21,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain.UpsertResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,6 +36,10 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Runs the model over the school and keeps what it said.
@@ -64,13 +63,12 @@ public class RiskPredictionService implements IRiskPredictionService {
     private final ICourseService courseService;
 
     public RiskPredictionService(
-        IRiskFeatureDomain featureDomain,
-        IRiskModelClient modelClient,
-        IRiskPredictionDomain predictionDomain,
-        INotificationService notifications,
-        IClassGroupDomain classGroupDomain,
-        ICourseService courseService
-    ) {
+            IRiskFeatureDomain featureDomain,
+            IRiskModelClient modelClient,
+            IRiskPredictionDomain predictionDomain,
+            INotificationService notifications,
+            IClassGroupDomain classGroupDomain,
+            ICourseService courseService) {
         this.featureDomain = featureDomain;
         this.modelClient = modelClient;
         this.predictionDomain = predictionDomain;
@@ -108,9 +106,11 @@ public class RiskPredictionService implements IRiskPredictionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<InstitutionRiskEntry> institutionRisk(Integer academicYearId, int trimester, int places) {
+    public List<InstitutionRiskEntry> institutionRisk(
+            Integer academicYearId, int trimester, int places) {
         if (academicYearId == null) {
-            throw new ValidationException("A school-wide risk list needs the gestión it belongs to");
+            throw new ValidationException(
+                    "A school-wide risk list needs the gestión it belongs to");
         }
         /*
          * The worst of each course first, then the worst of those. Taking `places` from a course
@@ -132,7 +132,8 @@ public class RiskPredictionService implements IRiskPredictionService {
     }
 
     /** One row per student, keeping the worst of whatever rows they hold. */
-    private static List<InstitutionRiskEntry> collapsedByStudent(List<InstitutionRiskEntry> entries) {
+    private static List<InstitutionRiskEntry> collapsedByStudent(
+            List<InstitutionRiskEntry> entries) {
         Map<UUID, InstitutionRiskEntry> byStudent = new LinkedHashMap<>();
         for (InstitutionRiskEntry entry : entries) {
             byStudent.merge(entry.studentId(), entry, WORST_SUBJECT);
@@ -160,22 +161,33 @@ public class RiskPredictionService implements IRiskPredictionService {
      * <p>The tie is broken on the subject's own name rather than left to whichever the query
      * returned first. Two subjects can sit on the same probability, and kept by arrival order the
      * row would name Lenguaje on one reading and Matematicas on the next off the same unchanged
-     * predictions — the same reason the list itself breaks its ties on something the reader can see.
+     * predictions — the same reason the list itself breaks its ties on something the reader can
+     * see.
      */
-    private static final BinaryOperator<InstitutionRiskEntry> WORST_SUBJECT = (kept, candidate) -> {
-        int byProbability = candidate.pFail().compareTo(kept.pFail());
-        if (byProbability != 0) {
-            return byProbability > 0 ? candidate : kept;
-        }
-        return candidate.subjectName().compareTo(kept.subjectName()) < 0 ? candidate : kept;
-    };
+    private static final BinaryOperator<InstitutionRiskEntry> WORST_SUBJECT =
+            (kept, candidate) -> {
+                int byProbability = candidate.pFail().compareTo(kept.pFail());
+                if (byProbability != 0) {
+                    return byProbability > 0 ? candidate : kept;
+                }
+                return candidate.subjectName().compareTo(kept.subjectName()) < 0 ? candidate : kept;
+            };
 
     private static InstitutionRiskEntry entryOf(Course course, StudentRisk risk) {
         RiskPrediction prediction = risk.prediction();
-        return new InstitutionRiskEntry(0, prediction.id(), prediction.studentId(),
-            risk.studentFullName(), course.id(), course.gradeName(), course.parallelName(),
-            prediction.classGroupId(), risk.subjectName(), prediction.riskLevel(),
-            prediction.pFail(), prediction.attended());
+        return new InstitutionRiskEntry(
+                0,
+                prediction.id(),
+                prediction.studentId(),
+                risk.studentFullName(),
+                course.id(),
+                course.gradeName(),
+                course.parallelName(),
+                prediction.classGroupId(),
+                risk.subjectName(),
+                prediction.riskLevel(),
+                prediction.pFail(),
+                prediction.attended());
     }
 
     /**
@@ -185,20 +197,35 @@ public class RiskPredictionService implements IRiskPredictionService {
      * probability come out in the same order on two readings and what decides it is something the
      * reader can see.
      */
-    private static List<InstitutionRiskEntry> ranked(List<InstitutionRiskEntry> entries, int places) {
-        List<InstitutionRiskEntry> sorted = entries.stream()
-            .sorted(Comparator.comparing(InstitutionRiskEntry::pFail).reversed()
-                .thenComparing(InstitutionRiskEntry::fullName))
-            .limit(places)
-            .toList();
+    private static List<InstitutionRiskEntry> ranked(
+            List<InstitutionRiskEntry> entries, int places) {
+        List<InstitutionRiskEntry> sorted =
+                entries.stream()
+                        .sorted(
+                                Comparator.comparing(InstitutionRiskEntry::pFail)
+                                        .reversed()
+                                        .thenComparing(InstitutionRiskEntry::fullName))
+                        .limit(places)
+                        .toList();
         return IntStream.range(0, sorted.size())
-            .mapToObj(i -> {
-                InstitutionRiskEntry e = sorted.get(i);
-                return new InstitutionRiskEntry(i + 1, e.predictionId(), e.studentId(), e.fullName(),
-                    e.courseId(), e.gradeName(), e.parallelName(), e.classGroupId(), e.subjectName(),
-                    e.riskLevel(), e.pFail(), e.attended());
-            })
-            .toList();
+                .mapToObj(
+                        i -> {
+                            InstitutionRiskEntry e = sorted.get(i);
+                            return new InstitutionRiskEntry(
+                                    i + 1,
+                                    e.predictionId(),
+                                    e.studentId(),
+                                    e.fullName(),
+                                    e.courseId(),
+                                    e.gradeName(),
+                                    e.parallelName(),
+                                    e.classGroupId(),
+                                    e.subjectName(),
+                                    e.riskLevel(),
+                                    e.pFail(),
+                                    e.attended());
+                        })
+                .toList();
     }
 
     @Override
@@ -218,12 +245,12 @@ public class RiskPredictionService implements IRiskPredictionService {
             return RunSummary.empty();
         }
 
-        List<RiskFeatures> candidates = RiskFeatureAssembler.assemble(
-            trimester,
-            featureDomain.criterionScores(classGroupIds, trimester),
-            featureDomain.plannedCriteriaCount(classGroupIds, trimester),
-            featureDomain.attendanceRates(classGroupIds, trimester)
-        );
+        List<RiskFeatures> candidates =
+                RiskFeatureAssembler.assemble(
+                        trimester,
+                        featureDomain.criterionScores(classGroupIds, trimester),
+                        featureDomain.plannedCriteriaCount(classGroupIds, trimester),
+                        featureDomain.attendanceRates(classGroupIds, trimester));
 
         List<RiskFeatures> complete = candidates.stream().filter(RiskFeatures::isComplete).toList();
         int considered = candidates.size();
@@ -236,10 +263,11 @@ public class RiskPredictionService implements IRiskPredictionService {
         List<RiskScore> scores = modelClient.predictBatch(complete);
         List<UpsertResult> written = predictionDomain.upsertAll(toPredictions(complete, scores));
 
-        List<RiskAssessed> transitions = written.stream()
-            .filter(UpsertResult::levelChanged)
-            .map(RiskPredictionService::assessmentOf)
-            .toList();
+        List<RiskAssessed> transitions =
+                written.stream()
+                        .filter(UpsertResult::levelChanged)
+                        .map(RiskPredictionService::assessmentOf)
+                        .toList();
 
         announce(transitions, trimester);
 
@@ -255,14 +283,18 @@ public class RiskPredictionService implements IRiskPredictionService {
      * checks it anyway, because the cost of being wrong here is a prediction filed under the wrong
      * child.
      */
-    private List<NewRiskPrediction> toPredictions(List<RiskFeatures> vectors, List<RiskScore> scores) {
+    private List<NewRiskPrediction> toPredictions(
+            List<RiskFeatures> vectors, List<RiskScore> scores) {
         if (scores.size() != vectors.size()) {
             // The model answered something this side cannot read, which is what this exception is
             // for and why it reaches the caller as a 503. An IllegalStateException here would tell
             // the Director his school's system broke and send him looking in the wrong place.
             throw new RiskModelUnavailableException(
-                "The model answered " + scores.size() + " scores for " + vectors.size()
-                    + " vectors, so no score can be tied to the student it belongs to.");
+                    "The model answered "
+                            + scores.size()
+                            + " scores for "
+                            + vectors.size()
+                            + " vectors, so no score can be tied to the student it belongs to.");
         }
 
         // One clock reading for the whole run: every row of a sweep is the same statement about the
@@ -273,15 +305,16 @@ public class RiskPredictionService implements IRiskPredictionService {
         for (int i = 0; i < vectors.size(); i++) {
             RiskFeatures vector = vectors.get(i);
             RiskScore score = scores.get(i);
-            predictions.add(new NewRiskPrediction(
-                vector.studentId(),
-                vector.classGroupId(),
-                vector.trimester(),
-                score.level(),
-                score.pFail(),
-                score.pOutstanding(),
-                vector,
-                predictedAt));
+            predictions.add(
+                    new NewRiskPrediction(
+                            vector.studentId(),
+                            vector.classGroupId(),
+                            vector.trimester(),
+                            score.level(),
+                            score.pFail(),
+                            score.pOutstanding(),
+                            vector,
+                            predictedAt));
         }
         return predictions;
     }
@@ -289,12 +322,12 @@ public class RiskPredictionService implements IRiskPredictionService {
     private static RiskAssessed assessmentOf(UpsertResult result) {
         RiskPrediction stored = result.stored();
         return new RiskAssessed(
-            stored.id(),
-            stored.studentId(),
-            stored.classGroupId(),
-            stored.trimester(),
-            result.previousLevel(),
-            stored.riskLevel());
+                stored.id(),
+                stored.studentId(),
+                stored.classGroupId(),
+                stored.trimester(),
+                result.previousLevel(),
+                stored.riskLevel());
     }
 
     /**
@@ -312,9 +345,10 @@ public class RiskPredictionService implements IRiskPredictionService {
      * loop is how a run turns into hundreds of round trips.
      */
     private void announce(List<RiskAssessed> transitions, int trimester) {
-        List<RiskAssessed> demanding = transitions.stream()
-            .filter(transition -> transition.currentLevel().demandsAttention())
-            .toList();
+        List<RiskAssessed> demanding =
+                transitions.stream()
+                        .filter(transition -> transition.currentLevel().demandsAttention())
+                        .toList();
         if (demanding.isEmpty()) {
             return;
         }
@@ -334,66 +368,81 @@ public class RiskPredictionService implements IRiskPredictionService {
          * before either recorded would both announce, which is the duplicate this is preventing.
          */
         LocalDateTime now = LocalDateTime.now();
-        Set<UUID> announceable = predictionDomain.claimForNotification(
-            demanding.stream().map(RiskAssessed::predictionId).toList(),
-            now,
-            now.toLocalDate().atStartOfDay());
+        Set<UUID> announceable =
+                predictionDomain.claimForNotification(
+                        demanding.stream().map(RiskAssessed::predictionId).toList(),
+                        now,
+                        now.toLocalDate().atStartOfDay());
 
-        List<RiskAssessed> critical = demanding.stream()
-            .filter(transition -> announceable.contains(transition.predictionId()))
-            .toList();
+        List<RiskAssessed> critical =
+                demanding.stream()
+                        .filter(transition -> announceable.contains(transition.predictionId()))
+                        .toList();
         if (critical.isEmpty()) {
             return;
         }
 
-        Map<UUID, ClassGroup> subjects = classGroupDomain
-            .findByIdIn(critical.stream().map(RiskAssessed::classGroupId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(ClassGroup::id, Function.identity()));
+        Map<UUID, ClassGroup> subjects =
+                classGroupDomain
+                        .findByIdIn(
+                                critical.stream()
+                                        .map(RiskAssessed::classGroupId)
+                                        .collect(Collectors.toSet()))
+                        .stream()
+                        .collect(Collectors.toMap(ClassGroup::id, Function.identity()));
 
-        Map<UUID, String> names = predictionDomain
-            .byIds(critical.stream().map(RiskAssessed::predictionId).toList())
-            .stream()
-            .collect(Collectors.toMap(
-                risk -> risk.prediction().studentId(),
-                StudentRisk::studentFullName,
-                (first, second) -> first));
+        Map<UUID, String> names =
+                predictionDomain
+                        .byIds(critical.stream().map(RiskAssessed::predictionId).toList())
+                        .stream()
+                        .collect(
+                                Collectors.toMap(
+                                        risk -> risk.prediction().studentId(),
+                                        StudentRisk::studentFullName,
+                                        (first, second) -> first));
 
         Map<UUID, Set<UUID>> studentsBySubject = new LinkedHashMap<>();
         for (RiskAssessed transition : critical) {
             studentsBySubject
-                .computeIfAbsent(transition.classGroupId(), id -> new LinkedHashSet<>())
-                .add(transition.studentId());
+                    .computeIfAbsent(transition.classGroupId(), id -> new LinkedHashSet<>())
+                    .add(transition.studentId());
         }
 
-        studentsBySubject.forEach((classGroupId, studentIds) -> {
-            ClassGroup subject = subjects.get(classGroupId);
-            if (subject != null) {
-                notifyTeacher(subject, studentIds, names, trimester);
-            }
-        });
+        studentsBySubject.forEach(
+                (classGroupId, studentIds) -> {
+                    ClassGroup subject = subjects.get(classGroupId);
+                    if (subject != null) {
+                        notifyTeacher(subject, studentIds, names, trimester);
+                    }
+                });
     }
 
-    private void notifyTeacher(ClassGroup classGroup, Set<UUID> studentIds,
-                               Map<UUID, String> names, int trimester) {
+    private void notifyTeacher(
+            ClassGroup classGroup, Set<UUID> studentIds, Map<UUID, String> names, int trimester) {
         if (classGroup.teacherId() == null) {
             // A subject nobody teaches yet. The prediction is still written and the Director still
             // sees it; there is simply no inbox to put this in.
-            log.info("No teacher assigned to class group {}, so {} risk transitions go unannounced",
-                classGroup.id(), studentIds.size());
+            log.info(
+                    "No teacher assigned to class group {}, so {} risk transitions go unannounced",
+                    classGroup.id(),
+                    studentIds.size());
             return;
         }
 
-        notifications.send(new SendNotificationCommand(
-            null,
-            classGroup.teacherId(),
-            NotificationType.CUSTOM,
-            "Riesgo académico en " + classGroup.subjectName(),
-            namesOf(studentIds, names)
-                + " en riesgo de reprobar " + classGroup.subjectName()
-                + " (trimestre " + trimester + "). Revise el panel de riesgo.",
-            "class_group",
-            classGroup.id()));
+        notifications.send(
+                new SendNotificationCommand(
+                        null,
+                        classGroup.teacherId(),
+                        NotificationType.CUSTOM,
+                        "Riesgo académico en " + classGroup.subjectName(),
+                        namesOf(studentIds, names)
+                                + " en riesgo de reprobar "
+                                + classGroup.subjectName()
+                                + " (trimestre "
+                                + trimester
+                                + "). Revise el panel de riesgo.",
+                        "class_group",
+                        classGroup.id()));
     }
 
     /**

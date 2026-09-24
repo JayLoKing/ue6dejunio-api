@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -26,13 +28,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.UUID;
-
 @RestController
 @Validated
 @RequestMapping("/api/criteria")
-@Tag(name = "Criteria", description = "Criterios de evaluacion. Directos, o agrupadores de una actividad")
+@Tag(
+        name = "Criteria",
+        description = "Criterios de evaluacion. Directos, o agrupadores de una actividad")
 @SecurityRequirement(name = "bearerAuth")
 public class CriterionController {
 
@@ -44,11 +45,20 @@ public class CriterionController {
 
     @PostMapping
     @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
-    @Operation(summary = "Crear criterio. Con 'activity' crea tambien sus criterios en la misma transaccion")
+    @Operation(
+            summary =
+                    "Crear criterio. Con 'activity' crea tambien sus criterios en la misma transaccion")
     public ResponseEntity<CriterionResponse> create(@Valid @RequestBody CreateCriterionRequest r) {
-        EvaluationCriterion c = criterionService.create(new CreateCriterionCommand(
-            r.classGroupId(), r.trimester(), r.dimension(), r.name(),
-            r.activityTitle(), r.activityItems(), r.curriculumPlanId()));
+        EvaluationCriterion c =
+                criterionService.create(
+                        new CreateCriterionCommand(
+                                r.classGroupId(),
+                                r.trimester(),
+                                r.dimension(),
+                                r.name(),
+                                r.activityTitle(),
+                                r.activityItems(),
+                                r.curriculumPlanId()));
         return ResponseEntity.ok(CriterionResponse.from(c));
     }
 
@@ -63,19 +73,20 @@ public class CriterionController {
     @PreAuthorize("@authz.canReadClassGroup(authentication, #classGroupId)")
     @Operation(summary = "Listar criterios de una materia+trimestre. dimension opcional")
     public ResponseEntity<List<CriterionResponse>> list(
-        @RequestParam("id_class_group") UUID classGroupId,
-        @RequestParam @Min(1) @Max(3) Integer trimester,
-        @RequestParam(required = false) String dimension
-    ) {
-        return ResponseEntity.ok(criterionService.list(classGroupId, trimester, dimension)
-            .stream().map(CriterionResponse::from).toList());
+            @RequestParam("id_class_group") UUID classGroupId,
+            @RequestParam @Min(1) @Max(3) Integer trimester,
+            @RequestParam(required = false) String dimension) {
+        return ResponseEntity.ok(
+                criterionService.list(classGroupId, trimester, dimension).stream()
+                        .map(CriterionResponse::from)
+                        .toList());
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("@authz.canWriteScoreCriterion(authentication, #id)")
     @Operation(summary = "Actualizar criterio (nombre)")
-    public ResponseEntity<CriterionResponse> update(@PathVariable UUID id,
-                                                    @Valid @RequestBody UpdateCriterionRequest r) {
+    public ResponseEntity<CriterionResponse> update(
+            @PathVariable UUID id, @Valid @RequestBody UpdateCriterionRequest r) {
         EvaluationCriterion c = criterionService.update(id, new UpdateCriterionCommand(r.name()));
         return ResponseEntity.ok(CriterionResponse.from(c));
     }

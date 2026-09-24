@@ -1,15 +1,14 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.Map;
-import java.util.UUID;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Spec: only the Director sends a notification.
@@ -27,18 +26,21 @@ class NotificationAuthorizationIT extends AbstractIntegrationTest {
     @Autowired private MockMvc mvc;
 
     private String bodyTo(UUID receiver) throws Exception {
-        return json.writeValueAsString(Map.of(
-            "receiver_id", receiver.toString(),
-            "type", "SUMMONS",
-            "message", "Aproximese a direccion."));
+        return json.writeValueAsString(
+                Map.of(
+                        "receiver_id", receiver.toString(),
+                        "type", "SUMMONS",
+                        "message", "Aproximese a direccion."));
     }
 
-    private void send(UUID sender, String role, UUID receiver, int expectedStatus) throws Exception {
-        mvc.perform(post("/api/notifications")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(bodyTo(receiver))
-                .header("Authorization", "Bearer " + tokenFor(sender, role)))
-            .andExpect(status().is(expectedStatus));
+    private void send(UUID sender, String role, UUID receiver, int expectedStatus)
+            throws Exception {
+        mvc.perform(
+                        post("/api/notifications")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(bodyTo(receiver))
+                                .header("Authorization", "Bearer " + tokenFor(sender, role)))
+                .andExpect(status().is(expectedStatus));
     }
 
     @Test
@@ -73,15 +75,23 @@ class NotificationAuthorizationIT extends AbstractIntegrationTest {
         UUID director = seedUser("Director", false);
         UUID teacher = seedUser("Teacher", false);
 
-        for (String systemOnly : new String[]{"PDC_PUBLISHED", "PDC_APPROVED", "PDC_OBSERVED"}) {
-            mvc.perform(post("/api/notifications")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(json.writeValueAsString(Map.of(
-                        "receiver_id", teacher.toString(),
-                        "type", systemOnly,
-                        "message", "Tu plan fue aprobado.")))
-                    .header("Authorization", "Bearer " + tokenFor(director, "Director")))
-                .andExpect(status().isBadRequest());
+        for (String systemOnly : new String[] {"PDC_PUBLISHED", "PDC_APPROVED", "PDC_OBSERVED"}) {
+            mvc.perform(
+                            post("/api/notifications")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            json.writeValueAsString(
+                                                    Map.of(
+                                                            "receiver_id",
+                                                            teacher.toString(),
+                                                            "type",
+                                                            systemOnly,
+                                                            "message",
+                                                            "Tu plan fue aprobado.")))
+                                    .header(
+                                            "Authorization",
+                                            "Bearer " + tokenFor(director, "Director")))
+                    .andExpect(status().isBadRequest());
         }
     }
 

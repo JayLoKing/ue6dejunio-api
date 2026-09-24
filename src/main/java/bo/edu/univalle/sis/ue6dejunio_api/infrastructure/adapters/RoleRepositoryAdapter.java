@@ -4,11 +4,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.RoleMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaRoleRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.Optional;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)

@@ -1,30 +1,28 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.assessment;
 
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment.AssessmentEventService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.CreateEventCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.UpdateEventCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment.AssessmentEventService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.CreateEventCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.UpdateEventCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class AssessmentEventServiceTest {
@@ -38,13 +36,18 @@ class AssessmentEventServiceTest {
 
     private EvaluationCriterion directCriterion() {
         return new EvaluationCriterion(
-            criterionId, classGroup, 1, "Doing", "Participacion", null, null);
+                criterionId, classGroup, 1, "Doing", "Participacion", null, null);
     }
 
     private EvaluationCriterion activityCriterion() {
         return new EvaluationCriterion(
-            criterionId, classGroup, 1, "Doing", "Evaluacion de cuadernos",
-            "Revision de Cuadernos", null);
+                criterionId,
+                classGroup,
+                1,
+                "Doing",
+                "Evaluacion de cuadernos",
+                "Revision de Cuadernos",
+                null);
     }
 
     private AssessmentEvent item(UUID id, String title) {
@@ -65,8 +68,8 @@ class AssessmentEventServiceTest {
         when(criterionDomain.findById(criterionId)).thenReturn(Optional.of(directCriterion()));
 
         assertThatThrownBy(() -> service.create(new CreateEventCommand(criterionId, "Tema 1")))
-            .isInstanceOf(ConflictException.class)
-            .hasMessageContaining("no pertenece a una actividad");
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("no pertenece a una actividad");
         verify(eventDomain, never()).create(any(), any());
     }
 
@@ -75,7 +78,7 @@ class AssessmentEventServiceTest {
         when(criterionDomain.findById(criterionId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(new CreateEventCommand(criterionId, "Tema 1")))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -102,8 +105,8 @@ class AssessmentEventServiceTest {
         when(eventDomain.hasScores(id)).thenReturn(true);
 
         assertThatThrownBy(() -> service.delete(id))
-            .isInstanceOf(ConflictException.class)
-            .hasMessageContaining("calificaciones registradas");
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("calificaciones registradas");
         verify(eventDomain, never()).deleteById(any());
     }
 
@@ -113,7 +116,7 @@ class AssessmentEventServiceTest {
         when(eventDomain.findById(id)).thenReturn(Optional.of(item(id, "Tema 1")));
 
         assertThatThrownBy(() -> service.update(id, new UpdateEventCommand("   ")))
-            .isInstanceOf(ValidationException.class);
+                .isInstanceOf(ValidationException.class);
         verify(eventDomain, never()).update(any(), any());
     }
 
@@ -122,8 +125,7 @@ class AssessmentEventServiceTest {
         UUID id = UUID.randomUUID();
         when(eventDomain.findById(id)).thenReturn(Optional.of(item(id, "Tema 1")));
 
-        service.update(id, new UpdateEventCommand(null))
-;
+        service.update(id, new UpdateEventCommand(null));
         verify(eventDomain).update(id, null);
     }
 
@@ -141,14 +143,14 @@ class AssessmentEventServiceTest {
         when(eventDomain.countItems(criterionId)).thenReturn(1L);
 
         assertThatThrownBy(() -> service.delete(id))
-            .isInstanceOf(ConflictException.class)
-            .hasMessageContaining("Revision de Cuadernos");
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Revision de Cuadernos");
         verify(eventDomain, never()).deleteById(any());
     }
 
     /**
-     * A legacy criterion carries items with no activity name. Deleting its last item is allowed:
-     * it falls back to being scored directly, which is a reachable state, not a dead one.
+     * A legacy criterion carries items with no activity name. Deleting its last item is allowed: it
+     * falls back to being scored directly, which is a reachable state, not a dead one.
      */
     @Test
     void delete_theLastItemOfALegacyCriterion_succeeds() {
@@ -167,8 +169,7 @@ class AssessmentEventServiceTest {
         UUID id = UUID.randomUUID();
         when(eventDomain.findById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(id))
-            .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.delete(id)).isInstanceOf(ResourceNotFoundException.class);
         verify(eventDomain, never()).deleteById(any());
     }
 }

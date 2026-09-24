@@ -12,11 +12,9 @@ import java.util.UUID;
  * @param previousLevel null the first time this student and subject are ever predicted
  */
 public record RiskAssessed(
-    UUID predictionId,
-    UUID studentId,
-    UUID classGroupId,
-    int trimester,
-    RiskLevel previousLevel,
-    RiskLevel currentLevel
-) {
-}
+        UUID predictionId,
+        UUID studentId,
+        UUID classGroupId,
+        int trimester,
+        RiskLevel previousLevel,
+        RiskLevel currentLevel) {}

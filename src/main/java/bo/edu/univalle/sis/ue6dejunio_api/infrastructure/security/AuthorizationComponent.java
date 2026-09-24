@@ -1,21 +1,27 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -24,20 +30,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-
 /**
- * Ownership-based authorization. Director reads and writes everything; Teacher only their own
- * class groups (subject) or their homeroom course, depending on the resource; Secretary reads
- * across the school and writes nothing.
+ * Ownership-based authorization. Director reads and writes everything; Teacher only their own class
+ * groups (subject) or their homeroom course, depending on the resource; Secretary reads across the
+ * school and writes nothing.
  *
- * <p>Used from {@code @PreAuthorize}, e.g.
- * {@code @authz.canWriteClassGroup(authentication, #id)}.
+ * <p>Used from {@code @PreAuthorize}, e.g. {@code @authz.canWriteClassGroup(authentication, #id)}.
  */
 @Component("authz")
 public class AuthorizationComponent {
@@ -45,6 +43,7 @@ public class AuthorizationComponent {
     private static final Logger log = LoggerFactory.getLogger(AuthorizationComponent.class);
 
     private static final String ROLE_DIRECTOR = "ROLE_Director";
+
     /**
      * School-wide read actor: reaches the academic record without owning a course, and matches no
      * write rule anywhere. Which reads exactly is decided by the GET rules in SecurityConfig — the
@@ -52,6 +51,7 @@ public class AuthorizationComponent {
      * unreachable.
      */
     private static final String ROLE_SECRETARY = "ROLE_Secretary";
+
     private static final UUID NO_MATCH_COURSE_ID = new UUID(0L, 0L);
 
     private final IClassGroupDomain classGroupDomain;
@@ -66,17 +66,16 @@ public class AuthorizationComponent {
     private final IRiskPredictionDomain riskPredictionDomain;
 
     public AuthorizationComponent(
-        IClassGroupDomain classGroupDomain,
-        IAssessmentEventDomain assessmentEventDomain,
-        IAssessmentScoreDomain assessmentScoreDomain,
-        ICriterionDomain criterionDomain,
-        ICourseEnrollmentDomain courseEnrollmentDomain,
-        ICourseDomain courseDomain,
-        IPdcDomain pdcDomain,
-        INotificationDomain notificationDomain,
-        IAdaptationDomain adaptationDomain,
-        IRiskPredictionDomain riskPredictionDomain
-    ) {
+            IClassGroupDomain classGroupDomain,
+            IAssessmentEventDomain assessmentEventDomain,
+            IAssessmentScoreDomain assessmentScoreDomain,
+            ICriterionDomain criterionDomain,
+            ICourseEnrollmentDomain courseEnrollmentDomain,
+            ICourseDomain courseDomain,
+            IPdcDomain pdcDomain,
+            INotificationDomain notificationDomain,
+            IAdaptationDomain adaptationDomain,
+            IRiskPredictionDomain riskPredictionDomain) {
         this.classGroupDomain = classGroupDomain;
         this.assessmentEventDomain = assessmentEventDomain;
         this.assessmentScoreDomain = assessmentScoreDomain;
@@ -104,9 +103,10 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        return riskPredictionDomain.findById(predictionId)
-            .map(prediction -> canWriteClassGroup(authentication, prediction.classGroupId()))
-            .orElse(false);
+        return riskPredictionDomain
+                .findById(predictionId)
+                .map(prediction -> canWriteClassGroup(authentication, prediction.classGroupId()))
+                .orElse(false);
     }
 
     public boolean canWriteClassGroup(Authentication authentication, UUID classGroupId) {
@@ -162,16 +162,18 @@ public class AuthorizationComponent {
 
     /**
      * Entry guard for the scoring endpoint, where the body carries one target or the other. A body
-     * naming both, or neither, is denied here rather than reaching the service: {@code @PreAuthorize}
-     * runs first, so an ambiguous target must not be allowed to pick a branch.
+     * naming both, or neither, is denied here rather than reaching the service:
+     * {@code @PreAuthorize} runs first, so an ambiguous target must not be allowed to pick a
+     * branch.
      */
-    public boolean canWriteScoreTarget(Authentication authentication, UUID eventId, UUID criterionId) {
+    public boolean canWriteScoreTarget(
+            Authentication authentication, UUID eventId, UUID criterionId) {
         if ((eventId == null) == (criterionId == null)) {
             return false;
         }
         return eventId != null
-            ? canWriteScoreEvent(authentication, eventId)
-            : canWriteScoreCriterion(authentication, criterionId);
+                ? canWriteScoreEvent(authentication, eventId)
+                : canWriteScoreCriterion(authentication, criterionId);
     }
 
     public boolean canWriteScore(Authentication authentication, UUID scoreId) {
@@ -185,7 +187,8 @@ public class AuthorizationComponent {
         if (score.isEmpty()) {
             return false;
         }
-        return canWriteScoreTarget(authentication, score.get().eventId(), score.get().criterionId());
+        return canWriteScoreTarget(
+                authentication, score.get().eventId(), score.get().criterionId());
     }
 
     public boolean canReadScoreEvent(Authentication authentication, UUID eventId) {
@@ -198,9 +201,10 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        return assessmentEventDomain.findById(eventId)
-            .map(event -> canReadClassGroup(authentication, event.classGroupId()))
-            .orElse(false);
+        return assessmentEventDomain
+                .findById(eventId)
+                .map(event -> canReadClassGroup(authentication, event.classGroupId()))
+                .orElse(false);
     }
 
     public boolean canReadScoreCriterion(Authentication authentication, UUID criterionId) {
@@ -213,15 +217,16 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        return criterionDomain.findById(criterionId)
-            .map(criterion -> canReadClassGroup(authentication, criterion.classGroupId()))
-            .orElse(false);
+        return criterionDomain
+                .findById(criterionId)
+                .map(criterion -> canReadClassGroup(authentication, criterion.classGroupId()))
+                .orElse(false);
     }
 
     /**
-     * Who may read a class group's criteria and marks. Deliberately wider than
-     * {@link #canWriteClassGroup}: two different teachers reach the same subject, and only one of
-     * them may write it.
+     * Who may read a class group's criteria and marks. Deliberately wider than {@link
+     * #canWriteClassGroup}: two different teachers reach the same subject, and only one of them may
+     * write it.
      *
      * <ul>
      *   <li>The teacher the Director put in charge of the class group — they record its marks, so
@@ -254,9 +259,13 @@ public class AuthorizationComponent {
         if (userId == null) {
             return false;
         }
-        return classGroupDomain.findById(classGroupId)
-            .map(cg -> userId.equals(cg.teacherId()) || isHomeroomTeacherOf(userId, cg.courseId()))
-            .orElse(false);
+        return classGroupDomain
+                .findById(classGroupId)
+                .map(
+                        cg ->
+                                userId.equals(cg.teacherId())
+                                        || isHomeroomTeacherOf(userId, cg.courseId()))
+                .orElse(false);
     }
 
     /**
@@ -268,9 +277,10 @@ public class AuthorizationComponent {
         if (teacherId == null || courseId == null) {
             return false;
         }
-        return courseDomain.findById(courseId)
-            .map(course -> teacherId.equals(course.homeroomTeacherId()))
-            .orElse(false);
+        return courseDomain
+                .findById(courseId)
+                .map(course -> teacherId.equals(course.homeroomTeacherId()))
+                .orElse(false);
     }
 
     public boolean canReadEnrollmentScope(Authentication authentication, UUID courseEnrollmentId) {
@@ -282,9 +292,9 @@ public class AuthorizationComponent {
 
     /**
      * The secretariat is a school-wide READ actor: it consults any course's records without owning
-     * one. It is deliberately checked here, at the read entry points, and never inside
-     * {@link #ownsEnrollmentCourse} — that helper also backs the write predicates, so widening it
-     * would silently hand out write access.
+     * one. It is deliberately checked here, at the read entry points, and never inside {@link
+     * #ownsEnrollmentCourse} — that helper also backs the write predicates, so widening it would
+     * silently hand out write access.
      */
     private boolean isReadOnlyStaff(Authentication authentication) {
         return authentication != null && hasRole(authentication, ROLE_SECRETARY);
@@ -294,8 +304,11 @@ public class AuthorizationComponent {
         return ownsEnrollmentCourse(authentication, courseEnrollmentId);
     }
 
-    public boolean canWriteDailyBatch(Authentication authentication, Collection<UUID> courseEnrollmentIds) {
-        if (authentication == null || courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
+    public boolean canWriteDailyBatch(
+            Authentication authentication, Collection<UUID> courseEnrollmentIds) {
+        if (authentication == null
+                || courseEnrollmentIds == null
+                || courseEnrollmentIds.isEmpty()) {
             return false;
         }
         if (hasRole(authentication, ROLE_DIRECTOR)) {
@@ -312,33 +325,32 @@ public class AuthorizationComponent {
         // teacher holding two active homerooms would pass the per-student endpoint and be refused
         // by the batch for the very same rows.
         Map<UUID, UUID> courseByEnrollment =
-            courseEnrollmentDomain.courseIdsByEnrollment(courseEnrollmentIds);
+                courseEnrollmentDomain.courseIdsByEnrollment(courseEnrollmentIds);
         if (!courseByEnrollment.keySet().containsAll(courseEnrollmentIds)) {
             return false;
         }
-        return courseDomain.isHomeroomTeacherOfAll(teacherId, new HashSet<>(courseByEnrollment.values()));
+        return courseDomain.isHomeroomTeacherOfAll(
+                teacherId, new HashSet<>(courseByEnrollment.values()));
     }
 
     /**
-     * Scope of the student directory. Director and Secretary see whatever course was asked for
-     * (or all of them when none is); a Teacher is always pinned to their own homeroom course and
-     * never reaches another one.
+     * Scope of the student directory. Director and Secretary see whatever course was asked for (or
+     * all of them when none is); a Teacher is always pinned to their own homeroom course and never
+     * reaches another one.
      *
      * <p>Never denies with 403: a Teacher without a homeroom gets an id that matches nothing, so
      * the listing comes back empty instead of erroring.
      */
     public UUID effectiveDirectoryCourseId(Authentication authentication, UUID requestedCourseId) {
         if (authentication != null
-            && (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication))) {
+                && (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication))) {
             return requestedCourseId;
         }
         UUID teacherId = authentication != null ? userId(authentication) : null;
         if (teacherId == null) {
             return NO_MATCH_COURSE_ID;
         }
-        return courseDomain.homeroomCourseOf(teacherId)
-            .map(Course::id)
-            .orElse(NO_MATCH_COURSE_ID);
+        return courseDomain.homeroomCourseOf(teacherId).map(Course::id).orElse(NO_MATCH_COURSE_ID);
     }
 
     public boolean canReadCourse(Authentication authentication, UUID courseId) {
@@ -377,16 +389,16 @@ public class AuthorizationComponent {
             return false;
         }
         return teacherId.equals(course.get().homeroomTeacherId())
-            || classGroupDomain.teachesInCourse(teacherId, courseId);
+                || classGroupDomain.teachesInCourse(teacherId, courseId);
     }
 
     /**
-     * Who may read a single student. A teacher reaches only students enrolled in a course they
-     * are tied to, either as homeroom teacher or through a class group they run.
+     * Who may read a single student. A teacher reaches only students enrolled in a course they are
+     * tied to, either as homeroom teacher or through a class group they run.
      *
-     * <p>The tie is asked once for every course at a time. Walking the courses and calling
-     * {@link #canReadCourseRoster} per course made the guard cost grow with the student's
-     * enrollments, and this runs before every read of the record.
+     * <p>The tie is asked once for every course at a time. Walking the courses and calling {@link
+     * #canReadCourseRoster} per course made the guard cost grow with the student's enrollments, and
+     * this runs before every read of the record.
      */
     public boolean canReadStudent(Authentication authentication, UUID studentId) {
         if (authentication == null || studentId == null) {
@@ -404,13 +416,13 @@ public class AuthorizationComponent {
             return false;
         }
         return courseDomain.isHomeroomTeacherOfAny(teacherId, courseIds)
-            || classGroupDomain.teachesInAnyCourse(teacherId, courseIds);
+                || classGroupDomain.teachesInAnyCourse(teacherId, courseIds);
     }
 
     /**
      * Who may enroll students into a course. Narrower than {@link #canReadCourseRoster}: running a
-     * subject in the course is enough to read its roster, but composing that roster is the
-     * homeroom teacher's act, or the Director's.
+     * subject in the course is enough to read its roster, but composing that roster is the homeroom
+     * teacher's act, or the Director's.
      */
     public boolean canWriteCourseEnrollment(Authentication authentication, UUID courseId) {
         return canReadCourse(authentication, courseId) && !isReadOnlyStaff(authentication);
@@ -463,14 +475,15 @@ public class AuthorizationComponent {
             return false;
         }
         // The Director opens no plans. A month is planned by whoever delivers it, and the office
-        // reviews what comes back — a plan opened from the office would carry no teaching behind it.
+        // reviews what comes back — a plan opened from the office would carry no teaching behind
+        // it.
         UUID teacherId = userId(authentication);
         if (teacherId == null) {
             return false;
         }
         List<UUID> courseIds = List.of(courseId);
         return courseDomain.isHomeroomTeacherOfAny(teacherId, courseIds)
-            || classGroupDomain.teachesInAnyCourse(teacherId, courseIds);
+                || classGroupDomain.teachesInAnyCourse(teacherId, courseIds);
     }
 
     /**
@@ -499,14 +512,14 @@ public class AuthorizationComponent {
 
     /**
      * Ownership of a curricular plan. A PDC belongs to a course and covers several subjects, so a
-     * teacher has a stake in it either by running the course or by teaching one of its subjects —
-     * a specialist has to reach the plan to write their own block. Read-only staff writes nowhere.
+     * teacher has a stake in it either by running the course or by teaching one of its subjects — a
+     * specialist has to reach the plan to write their own block. Read-only staff writes nowhere.
      *
      * <p>The Director is not here. A plan is written by the teachers who deliver it; the Director
      * reads what they publish and answers with an approval or an observation. Letting the office
      * write inside the document would put its content under a name that never taught the class.
-     * What the Director may still do to the plan as a whole is settled by
-     * {@link #canAdministerPdc}.
+     * What the Director may still do to the plan as a whole is settled by {@link
+     * #canAdministerPdc}.
      *
      * <p>Reaching the plan is not the same as writing any part of it: which block a teacher may
      * rewrite is settled by {@link #canWritePdcSubject}.
@@ -517,7 +530,8 @@ public class AuthorizationComponent {
         }
         UUID callerId = userId(authentication);
         // Asks for the writers' ids rather than the plan: this runs before every write, and reading
-        // the document to compare a handful of UUIDs pulled every block and every weekly row with it.
+        // the document to compare a handful of UUIDs pulled every block and every weekly row with
+        // it.
         return callerId != null && pdcDomain.writerIdsOf(pdcId).contains(callerId);
     }
 
@@ -565,9 +579,12 @@ public class AuthorizationComponent {
      * plan, a specialist owns only the block for the subject they teach. Without this a teacher
      * with one block could rewrite every other subject of the course.
      */
-    public boolean canWritePdcSubject(Authentication authentication, UUID pdcId, UUID planSubjectId) {
-        if (authentication == null || pdcId == null || planSubjectId == null
-            || isReadOnlyStaff(authentication)) {
+    public boolean canWritePdcSubject(
+            Authentication authentication, UUID pdcId, UUID planSubjectId) {
+        if (authentication == null
+                || pdcId == null
+                || planSubjectId == null
+                || isReadOnlyStaff(authentication)) {
             return false;
         }
         // No Director branch, for the reason given on canWritePdc: the block is the teacher's work.
@@ -575,7 +592,7 @@ public class AuthorizationComponent {
         // Matched inside this plan: a block id from another plan contributes nobody to the set,
         // so it resolves to a denial rather than to someone else's block.
         return callerId != null
-            && pdcDomain.subjectWriterIdsOf(pdcId, planSubjectId).contains(callerId);
+                && pdcDomain.subjectWriterIdsOf(pdcId, planSubjectId).contains(callerId);
     }
 
     /**
@@ -651,9 +668,10 @@ public class AuthorizationComponent {
         if (callerId == null) {
             return false;
         }
-        return notificationDomain.findById(notificationId)
-            .map(n -> callerId.equals(n.receiverId()))
-            .orElse(false);
+        return notificationDomain
+                .findById(notificationId)
+                .map(n -> callerId.equals(n.receiverId()))
+                .orElse(false);
     }
 
     private boolean ownsEnrollmentCourse(Authentication authentication, UUID courseEnrollmentId) {
@@ -684,7 +702,8 @@ public class AuthorizationComponent {
 
     private boolean hasRole(Authentication auth, String role) {
         // An absent authentication holds no role. Every caller guards first, but reaching here with
-        // null used to throw inside @PreAuthorize, which Spring surfaces as a 500 — an unauthenticated
+        // null used to throw inside @PreAuthorize, which Spring surfaces as a 500 — an
+        // unauthenticated
         // request has to be denied, not turned into a server error.
         if (auth == null) {
             return false;
@@ -699,8 +718,8 @@ public class AuthorizationComponent {
 
     /**
      * Caller id, or {@code null} when the token carries no usable subject. These predicates run
-     * inside {@code @PreAuthorize}, so an exception here would surface as 500 instead of 403 —
-     * a malformed subject must deny, not fail.
+     * inside {@code @PreAuthorize}, so an exception here would surface as 500 instead of 403 — a
+     * malformed subject must deny, not fail.
      */
     private UUID userId(Authentication auth) {
         if (auth instanceof JwtAuthenticationToken token) {

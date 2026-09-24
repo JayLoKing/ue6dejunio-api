@@ -1,28 +1,5 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.courseenrollment;
 
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.CourseEnrollmentService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,9 +11,31 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.CourseEnrollmentService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 /**
- * The roster arrives as a whole PDF at once, so what matters here is that a class of forty costs
- * a fixed number of queries, and that the counts it reports stay true.
+ * The roster arrives as a whole PDF at once, so what matters here is that a class of forty costs a
+ * fixed number of queries, and that the counts it reports stay true.
  */
 @ExtendWith(MockitoExtension.class)
 class CourseEnrollmentServiceEnrollTest {
@@ -55,13 +54,17 @@ class CourseEnrollmentServiceEnrollTest {
     }
 
     private CreateStudentCommand row(String rude, String idCard) {
-        return new CreateStudentCommand(rude, idCard, "Ana", "Perez",
-            LocalDate.of(2015, 3, 1), "F");
+        return new CreateStudentCommand(
+                rude, idCard, "Ana", "Perez", LocalDate.of(2015, 3, 1), "F");
     }
 
     private Student student(UUID id, String rude, String idCard) {
-        return Student.builder().id(id).rudeCode(rude).identityCard(idCard)
-            .status(STATUS_EFFECTIVE).build();
+        return Student.builder()
+                .id(id)
+                .rudeCode(rude)
+                .identityCard(idCard)
+                .status(STATUS_EFFECTIVE)
+                .build();
     }
 
     /** Whoever is importing the roster. It is who the readmission is recorded against. */
@@ -75,8 +78,12 @@ class CourseEnrollmentServiceEnrollTest {
     private static final String STATUS_WITHDRAWN = "Withdrawn";
 
     private Student withdrawn(UUID id, String rude, String idCard) {
-        return Student.builder().id(id).rudeCode(rude).identityCard(idCard)
-            .status(STATUS_WITHDRAWN).build();
+        return Student.builder()
+                .id(id)
+                .rudeCode(rude)
+                .identityCard(idCard)
+                .status(STATUS_WITHDRAWN)
+                .build();
     }
 
     /**
@@ -89,15 +96,15 @@ class CourseEnrollmentServiceEnrollTest {
     void withdrawnStudent_backOnARoster_isPutBackOnTheRoll() {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+                .thenReturn(List.of(withdrawn(id, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of());
+                .thenReturn(Map.of());
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
         ArgumentCaptor<StudentStatusChange> change =
-            ArgumentCaptor.forClass(StudentStatusChange.class);
+                ArgumentCaptor.forClass(StudentStatusChange.class);
         verify(studentDomain).updateStatusIn(eq(Set.of(id)), change.capture());
         assertThat(change.getValue().status()).isEqualTo(STATUS_EFFECTIVE);
         assertThat(change.getValue().changedBy()).isEqualTo(actor);
@@ -112,29 +119,31 @@ class CourseEnrollmentServiceEnrollTest {
     void readmission_doesNotKeepTheOldExplanation() {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+                .thenReturn(List.of(withdrawn(id, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of());
+                .thenReturn(Map.of());
 
         service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
         ArgumentCaptor<StudentStatusChange> change =
-            ArgumentCaptor.forClass(StudentStatusChange.class);
+                ArgumentCaptor.forClass(StudentStatusChange.class);
         verify(studentDomain).updateStatusIn(eq(Set.of(id)), change.capture());
         assertThat(change.getValue().reason()).isNull();
         assertThat(change.getValue().note()).isNull();
     }
 
-    /** Nobody to put back means nobody's status is rewritten — the set the write is given is empty. */
+    /**
+     * Nobody to put back means nobody's status is rewritten — the set the write is given is empty.
+     */
     @Test
     void studentAlreadyOnTheRoll_hasTheirStatusLeftAlone() {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(student(id, "R1", "C1")));
+                .thenReturn(List.of(student(id, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of());
+                .thenReturn(Map.of());
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
@@ -147,13 +156,13 @@ class CourseEnrollmentServiceEnrollTest {
     void withdrawnStudentTwiceInOneFile_isReadmittedOnce() {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+                .thenReturn(List.of(withdrawn(id, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of());
+                .thenReturn(Map.of());
 
-        EnrollResult result = service.enroll(
-            cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
 
         verify(studentDomain, times(1)).updateStatusIn(eq(Set.of(id)), any());
         assertThat(result.studentsReadmitted()).isEqualTo(1);
@@ -169,12 +178,12 @@ class CourseEnrollmentServiceEnrollTest {
     void closedEnrolment_doesNotCountAsASeatTaken() {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+                .thenReturn(List.of(withdrawn(id, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         // The student holds a closed enrolment in this very course. It is a record of them leaving,
         // not a seat still taken, and the unique index means it is also the only way back in.
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of(id, STATUS_WITHDRAWN));
+                .thenReturn(Map.of(id, STATUS_WITHDRAWN));
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
@@ -192,16 +201,15 @@ class CourseEnrollmentServiceEnrollTest {
     void severalClosedEnrolments_areReopenedInOneCall() {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
-        when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(
-            List.of(withdrawn(first, "R1", "C1"), withdrawn(second, "R2", "C2")));
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(List.of(withdrawn(first, "R1", "C1"), withdrawn(second, "R2", "C2")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of(first, STATUS_WITHDRAWN, second, STATUS_WITHDRAWN));
+                .thenReturn(Map.of(first, STATUS_WITHDRAWN, second, STATUS_WITHDRAWN));
 
         service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R2", "C2"))));
 
-        verify(enrollmentDomain, times(1))
-            .reactivateEnrollments(courseId, Set.of(first, second));
+        verify(enrollmentDomain, times(1)).reactivateEnrollments(courseId, Set.of(first, second));
     }
 
     @Test
@@ -210,7 +218,7 @@ class CourseEnrollmentServiceEnrollTest {
         when(enrollmentDomain.courseExists(missing)).thenReturn(false);
 
         assertThatThrownBy(() -> service.enroll(cmd(missing, List.of(row("R1", "C1")))))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
 
         verify(studentDomain, never()).save(any());
     }
@@ -219,7 +227,8 @@ class CourseEnrollmentServiceEnrollTest {
     void newStudent_isCreatedAndEnrolled() {
         when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of());
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
-        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection())).thenReturn(Map.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
         UUID newId = UUID.randomUUID();
         when(studentDomain.save(any())).thenReturn(student(newId, "R1", "C1"));
 
@@ -236,9 +245,10 @@ class CourseEnrollmentServiceEnrollTest {
     void studentAlreadyOnRecordByRude_isReusedNotRecreated() {
         UUID existingId = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(student(existingId, "R1", "C1")));
+                .thenReturn(List.of(student(existingId, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
-        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection())).thenReturn(Map.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
@@ -253,8 +263,9 @@ class CourseEnrollmentServiceEnrollTest {
         UUID existingId = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of());
         when(studentDomain.findByIdentityCardIn(anyCollection()))
-            .thenReturn(List.of(student(existingId, "OTRO", "C1")));
-        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection())).thenReturn(Map.of());
+                .thenReturn(List.of(student(existingId, "OTRO", "C1")));
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
@@ -266,10 +277,10 @@ class CourseEnrollmentServiceEnrollTest {
     void studentAlreadyEnrolledInThisCourse_isSkipped() {
         UUID existingId = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
-            .thenReturn(List.of(student(existingId, "R1", "C1")));
+                .thenReturn(List.of(student(existingId, "R1", "C1")));
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
-            .thenReturn(Map.of(existingId, STATUS_EFFECTIVE));
+                .thenReturn(Map.of(existingId, STATUS_EFFECTIVE));
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 
@@ -282,12 +293,13 @@ class CourseEnrollmentServiceEnrollTest {
     void theSameStudentTwiceInOnePayload_isCreatedOnceAndEnrolledOnce() {
         when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of());
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
-        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection())).thenReturn(Map.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
         UUID newId = UUID.randomUUID();
         when(studentDomain.save(any())).thenReturn(student(newId, "R1", "C1"));
 
-        EnrollResult result = service.enroll(
-            cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
 
         // A PDF that repeats a row must not produce two students, nor two enrolments.
         assertThat(result.studentsCreated()).isEqualTo(1);
@@ -300,11 +312,12 @@ class CourseEnrollmentServiceEnrollTest {
 
     @Test
     void aWholeRoster_costsAFixedNumberOfLookups() {
-        List<CreateStudentCommand> roster = List.of(
-            row("R1", "C1"), row("R2", "C2"), row("R3", "C3"), row("R4", "C4"));
+        List<CreateStudentCommand> roster =
+                List.of(row("R1", "C1"), row("R2", "C2"), row("R3", "C3"), row("R4", "C4"));
         when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of());
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
-        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection())).thenReturn(Map.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
         when(studentDomain.save(any())).thenAnswer(i -> student(UUID.randomUUID(), "R", "C"));
 
         service.enroll(cmd(courseId, roster));

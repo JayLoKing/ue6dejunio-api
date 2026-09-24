@@ -9,11 +9,12 @@ public final class AssessmentDimension {
     public static final String DOING = "Doing";
     public static final String DECIDING = "Deciding";
 
-    private static final Map<String, BigDecimal> MAX = Map.of(
-        BEING, new BigDecimal("10"),
-        KNOWING, new BigDecimal("45"),
-        DOING, new BigDecimal("40"),
-        DECIDING, new BigDecimal("5"));
+    private static final Map<String, BigDecimal> MAX =
+            Map.of(
+                    BEING, new BigDecimal("10"),
+                    KNOWING, new BigDecimal("45"),
+                    DOING, new BigDecimal("40"),
+                    DECIDING, new BigDecimal("5"));
 
     public static boolean isValid(String dimension) {
         return MAX.containsKey(dimension);

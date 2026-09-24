@@ -5,10 +5,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record CreateProgressCommand(
-    UUID planId,
-    LocalDate progressDate,
-    String advancedContent,
-    BigDecimal percentage,
-    String observations,
-    UUID createdBy
-) {}
+        UUID planId,
+        LocalDate progressDate,
+        String advancedContent,
+        BigDecimal percentage,
+        String observations,
+        UUID createdBy) {}

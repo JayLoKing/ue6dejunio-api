@@ -1,9 +1,17 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,15 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * The one account that exists before anyone can log in.
@@ -41,13 +40,19 @@ class BootstrapDirectorRunnerTest {
     private static final String PASSWORD = "una-clave-larga";
 
     private BootstrapDirectorRunner runner(String email, String password) {
-        return new BootstrapDirectorRunner(userDomain, roleDomain, passwordEncoder,
-            email, password, "1234567", "Elena", "Rojas");
+        return new BootstrapDirectorRunner(
+                userDomain,
+                roleDomain,
+                passwordEncoder,
+                email,
+                password,
+                "1234567",
+                "Elena",
+                "Rojas");
     }
 
     private void directorRoleExists() {
-        when(roleDomain.findByName("Director"))
-            .thenReturn(Optional.of(new Role(1, "Director")));
+        when(roleDomain.findByName("Director")).thenReturn(Optional.of(new Role(1, "Director")));
     }
 
     @Test
@@ -132,7 +137,7 @@ class BootstrapDirectorRunnerTest {
     @Test
     void directorAlreadyThere_createsNobody() {
         when(userDomain.findByEmail(EMAIL))
-            .thenReturn(Optional.of(User.builder().email(EMAIL).build()));
+                .thenReturn(Optional.of(User.builder().email(EMAIL).build()));
 
         runner(EMAIL, PASSWORD).run();
 
@@ -146,6 +151,6 @@ class BootstrapDirectorRunnerTest {
         when(roleDomain.findByName("Director")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> runner(EMAIL, PASSWORD).run())
-            .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class);
     }
 }

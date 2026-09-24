@@ -11,9 +11,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Turns a written notification into a nudge down whatever streams its receiver has open.
  *
  * <p>{@code AFTER_COMMIT} for the same reason the PDC listener uses it: a send that is rolled back
- * must not tell a browser to go and read a row that does not exist. The browser would refetch,
- * find the old count, and the badge would simply not move — harmless, but it is a round trip spent
- * on a lie.
+ * must not tell a browser to go and read a row that does not exist. The browser would refetch, find
+ * the old count, and the badge would simply not move — harmless, but it is a round trip spent on a
+ * lie.
  */
 @Component
 public class NotificationStreamListener {
@@ -35,8 +35,11 @@ public class NotificationStreamListener {
         try {
             registry.push(event);
         } catch (RuntimeException ex) {
-            log.error("The notification {} was written and could not be streamed to {}",
-                event.notificationId(), event.receiverId(), ex);
+            log.error(
+                    "The notification {} was written and could not be streamed to {}",
+                    event.notificationId(),
+                    event.receiverId(),
+                    ex);
         }
     }
 }

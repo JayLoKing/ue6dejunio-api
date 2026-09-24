@@ -5,13 +5,16 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceExc
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidCredentialsException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,16 +22,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.sql.SQLException;
-import java.util.List;
-import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,9 +38,8 @@ public class GlobalExceptionHandler {
     private final boolean includeBindingErrors;
 
     public GlobalExceptionHandler(
-        @Value("${server.error.include-message:always}") String includeMessage,
-        @Value("${server.error.include-binding-errors:always}") String includeBindingErrors
-    ) {
+            @Value("${server.error.include-message:always}") String includeMessage,
+            @Value("${server.error.include-binding-errors:always}") String includeBindingErrors) {
         this.includeMessage = !"never".equalsIgnoreCase(includeMessage);
         this.includeBindingErrors = !"never".equalsIgnoreCase(includeBindingErrors);
     }
@@ -52,7 +50,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(UserInactiveException.class)
-    public ResponseEntity<ErrorResponse> handleInactive(UserInactiveException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleInactive(
+            UserInactiveException ex, HttpServletRequest req) {
         return build(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), req);
     }
 
@@ -62,17 +61,20 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            ResourceNotFoundException ex, HttpServletRequest req) {
         return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), req);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicate(DuplicateResourceException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleDuplicate(
+            DuplicateResourceException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req);
     }
 
     @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleConflict(
+            ConflictException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req);
     }
 
@@ -80,20 +82,23 @@ public class GlobalExceptionHandler {
      * The model answered, and refused the batch.
      *
      * <p>Declared before the unavailable handler it extends, because Spring picks the most specific
-     * one and these two must not collapse. 502 and not 503: the model is up and reachable, so
-     * "try again later" is advice that will never come true. What is wrong is the batch this API
+     * one and these two must not collapse. 502 and not 503: the model is up and reachable, so "try
+     * again later" is advice that will never come true. What is wrong is the batch this API
      * assembled, and that is a defect here.
      *
      * <p>The model's own reason goes to the log and not to the caller — it names vectors by index,
      * which means nothing to a teacher and everything to whoever reads the log next.
      */
     @ExceptionHandler(RiskModelRejectedException.class)
-    public ResponseEntity<ErrorResponse> handleModelRejected(RiskModelRejectedException ex,
-                                                             HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleModelRejected(
+            RiskModelRejectedException ex, HttpServletRequest req) {
         log.error("The prediction model refused the batch", ex);
-        return build(HttpStatus.BAD_GATEWAY, "Bad Gateway",
-            "El modelo rechazó los datos enviados. No es una caída del servicio: hay un "
-                + "desacuerdo entre lo que el sistema mandó y lo que el modelo acepta.", req);
+        return build(
+                HttpStatus.BAD_GATEWAY,
+                "Bad Gateway",
+                "El modelo rechazó los datos enviados. No es una caída del servicio: hay un "
+                        + "desacuerdo entre lo que el sistema mandó y lo que el modelo acepta.",
+                req);
     }
 
     /**
@@ -104,11 +109,14 @@ public class GlobalExceptionHandler {
      * sends him looking in the wrong place.
      */
     @ExceptionHandler(RiskModelUnavailableException.class)
-    public ResponseEntity<ErrorResponse> handleModelUnavailable(RiskModelUnavailableException ex,
-                                                                HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleModelUnavailable(
+            RiskModelUnavailableException ex, HttpServletRequest req) {
         log.error("The prediction model could not be used", ex);
-        return build(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable",
-            "El modelo de predicción no está disponible en este momento.", req);
+        return build(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Service Unavailable",
+                "El modelo de predicción no está disponible en este momento.",
+                req);
     }
 
     /** Postgres for "a unique constraint said no". The one integrity failure the caller caused. */
@@ -122,20 +130,20 @@ public class GlobalExceptionHandler {
      *
      * <p>Where a rule is held by a constraint rather than by a look-before-you-write, the caller
      * who loses the race learns about it from Postgres instead of from the service. Left to the
-     * catch-all that arrives as a 500: the caller told the server broke, when what happened is
-     * that someone else got there first.
+     * catch-all that arrives as a 500: the caller told the server broke, when what happened is that
+     * someone else got there first.
      *
      * <p>But {@link DataIntegrityViolationException} is the parent of every integrity failure
      * Spring translates. A NOT NULL, a foreign key or a check violation is this code writing a row
      * it had no business writing; answering those 409 would send the caller to resolve a conflict
-     * that is not theirs, and they would retry forever against a bug that had stopped being
-     * logged. So the two are told apart, and only the duplicate is the caller's.
+     * that is not theirs, and they would retry forever against a bug that had stopped being logged.
+     * So the two are told apart, and only the duplicate is the caller's.
      *
      * <p>The signal is the SQL state, not the exception type, and that is not a preference. Spring
      * translates the same Postgres failure into different types depending on who caught it:
-     * JdbcTemplate produces {@code DuplicateKeyException}, Hibernate wraps its own and produces
-     * the plain parent. Every write in this application goes through JPA, so a handler keyed on
-     * the subclass would answer 500 to every real duplicate. Both paths are pinned by tests.
+     * JdbcTemplate produces {@code DuplicateKeyException}, Hibernate wraps its own and produces the
+     * plain parent. Every write in this application goes through JPA, so a handler keyed on the
+     * subclass would answer 500 to every real duplicate. Both paths are pinned by tests.
      *
      * <p>The duplicate is logged at WARN rather than ERROR — losing a race is not an outage — and
      * without the exception, unlike every other line this class writes. Postgres spells a unique
@@ -144,17 +152,25 @@ public class GlobalExceptionHandler {
      * the path say a duplicate happened and where, which is what the line is for.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
-                                                             HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(
+            DataIntegrityViolationException ex, HttpServletRequest req) {
         if (!isDuplicate(ex)) {
             logTheFailure(ex, req);
-            return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-                "Error interno del servidor", req);
+            return build(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Internal Server Error",
+                    "Error interno del servidor",
+                    req);
         }
-        log.warn("Duplicate rejected by the database on {} {}",
-            req.getMethod(), req.getRequestURI());
-        return build(HttpStatus.CONFLICT, "Conflict",
-            "El registro entra en conflicto con uno existente", req);
+        log.warn(
+                "Duplicate rejected by the database on {} {}",
+                req.getMethod(),
+                req.getRequestURI());
+        return build(
+                HttpStatus.CONFLICT,
+                "Conflict",
+                "El registro entra en conflicto con uno existente",
+                req);
     }
 
     /**
@@ -183,12 +199,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ValidationException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(ValidationException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleValidationException(
+            ValidationException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req);
     }
 
     @ExceptionHandler(InvalidResetTokenException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidResetToken(InvalidResetTokenException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleInvalidResetToken(
+            InvalidResetTokenException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req);
     }
 
@@ -203,19 +221,27 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpServletRequest req) {
-        return build(HttpStatus.BAD_REQUEST, "Bad Request",
-            "El cuerpo de la peticion no se puede leer", req);
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "Bad Request",
+                "El cuerpo de la peticion no se puede leer",
+                req);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleValidation(
+            MethodArgumentNotValidException ex, HttpServletRequest req) {
         return badRequest(
-            ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> detail(
-                    fe.getField(),
-                    fe.getDefaultMessage() == null ? "inválido" : fe.getDefaultMessage()))
-                .toList(),
-            req);
+                ex.getBindingResult().getFieldErrors().stream()
+                        .map(
+                                fe ->
+                                        detail(
+                                                fe.getField(),
+                                                fe.getDefaultMessage() == null
+                                                        ? "inválido"
+                                                        : fe.getDefaultMessage()))
+                        .toList(),
+                req);
     }
 
     /**
@@ -227,26 +253,30 @@ public class GlobalExceptionHandler {
      * it fell through to the catch-all — and asking for more rows than the ceiling allows was
      * reported as a server failure across all fifteen controllers that page this way.
      *
-     * <p>Hibernate throws this same type at flush when an entity fails bean validation, which
-     * would be a server fault wearing a caller's clothes: the path would name an entity field and
-     * this would answer 400 for a mapping bug. It cannot happen here — no entity in this project
-     * carries a {@code jakarta.validation} annotation, checked rather than assumed. Should one
-     * ever gain them, this handler has to tell the two apart before that stays true.
+     * <p>Hibernate throws this same type at flush when an entity fails bean validation, which would
+     * be a server fault wearing a caller's clothes: the path would name an entity field and this
+     * would answer 400 for a mapping bug. It cannot happen here — no entity in this project carries
+     * a {@code jakarta.validation} annotation, checked rather than assumed. Should one ever gain
+     * them, this handler has to tell the two apart before that stays true.
      */
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
-                                                                   HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(
+            ConstraintViolationException ex, HttpServletRequest req) {
         return badRequest(
-            ex.getConstraintViolations().stream()
-                .map(v -> detail(parameterOf(v.getPropertyPath().toString()), v.getMessage()))
-                .toList(),
-            req);
+                ex.getConstraintViolations().stream()
+                        .map(
+                                v ->
+                                        detail(
+                                                parameterOf(v.getPropertyPath().toString()),
+                                                v.getMessage()))
+                        .toList(),
+                req);
     }
 
     /**
-     * The parameter the caller sent. A method violation names its path as {@code list.limit} —
-     * the method it was validated on, then the parameter — and only the last segment is something
-     * the caller can act on.
+     * The parameter the caller sent. A method violation names its path as {@code list.limit} — the
+     * method it was validated on, then the parameter — and only the last segment is something the
+     * caller can act on.
      */
     private static String parameterOf(String propertyPath) {
         int lastSeparator = propertyPath.lastIndexOf('.');
@@ -257,13 +287,15 @@ public class GlobalExceptionHandler {
         return Map.of("field", field, "message", message);
     }
 
-    private ResponseEntity<ErrorResponse> badRequest(List<Map<String, String>> details,
-                                                     HttpServletRequest req) {
-        ErrorResponse body = ErrorResponse.withDetails(
-            HttpStatus.BAD_REQUEST.value(), "Bad Request",
-            includeMessage ? "Datos de entrada inválidos" : null, req.getRequestURI(),
-            includeBindingErrors ? details : List.of()
-        );
+    private ResponseEntity<ErrorResponse> badRequest(
+            List<Map<String, String>> details, HttpServletRequest req) {
+        ErrorResponse body =
+                ErrorResponse.withDetails(
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Bad Request",
+                        includeMessage ? "Datos de entrada inválidos" : null,
+                        req.getRequestURI(),
+                        includeBindingErrors ? details : List.of());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
@@ -286,8 +318,11 @@ public class GlobalExceptionHandler {
             }
         }
         logTheFailure(ex, req);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-            "Error interno del servidor", req);
+        return build(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal Server Error",
+                "Error interno del servidor",
+                req);
     }
 
     /**
@@ -306,9 +341,14 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);
     }
 
-    private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message, HttpServletRequest req) {
-        return ResponseEntity.status(status).body(
-            ErrorResponse.of(status.value(), error, includeMessage ? message : null, req.getRequestURI())
-        );
+    private ResponseEntity<ErrorResponse> build(
+            HttpStatus status, String error, String message, HttpServletRequest req) {
+        return ResponseEntity.status(status)
+                .body(
+                        ErrorResponse.of(
+                                status.value(),
+                                error,
+                                includeMessage ? message : null,
+                                req.getRequestURI()));
     }
 }

@@ -1,27 +1,5 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
-
-import java.math.BigDecimal;
-import java.net.http.HttpClient;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -31,6 +9,27 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
+import java.math.BigDecimal;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
 
 /**
  * The wire contract, against a stub of the model service.
@@ -56,21 +55,27 @@ class RiskModelHttpClientAdapterTest {
 
     private static RiskFeatures vector() {
         return new RiskFeatures(
-            UUID.randomUUID(), UUID.randomUUID(), 1,
-            List.of(new BigDecimal("8")),
-            List.of(new BigDecimal("30"), new BigDecimal("35")),
-            List.of(new BigDecimal("25")),
-            List.of(new BigDecimal("4")),
-            new BigDecimal("87.50"), 8);
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                1,
+                List.of(new BigDecimal("8")),
+                List.of(new BigDecimal("30"), new BigDecimal("35")),
+                List.of(new BigDecimal("25")),
+                List.of(new BigDecimal("4")),
+                new BigDecimal("87.50"),
+                8);
     }
 
     private static String answers(int count, String level) {
         return IntStream.range(0, count)
-            .mapToObj(i -> """
+                .mapToObj(
+                        i ->
+                                """
                 {"risk_level":"%s","p_reprueba":0.0128,"p_sobresaliente":0.1059,
                  "probabilidades":{"EnRiesgo":0.3,"RiesgoCritico":0.0128,"SinRiesgo":0.5,
-                 "Sobresaliente":0.1059}}""".formatted(level))
-            .collect(Collectors.joining(",", "[", "]"));
+                 "Sobresaliente":0.1059}}"""
+                                        .formatted(level))
+                .collect(Collectors.joining(",", "[", "]"));
     }
 
     @Test
@@ -87,15 +92,15 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_sendsTheVectorUnderTheNamesTheModelReads() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andExpect(method(HttpMethod.POST))
-            .andExpect(header("Authorization", "Bearer " + TOKEN))
-            .andExpect(jsonPath("$.items[0].being[0]").value(8))
-            .andExpect(jsonPath("$.items[0].knowing[1]").value(35))
-            .andExpect(jsonPath("$.items[0].doing[0]").value(25))
-            .andExpect(jsonPath("$.items[0].deciding[0]").value(4))
-            .andExpect(jsonPath("$.items[0].attendance_pct").value(87.50))
-            .andExpect(jsonPath("$.items[0].criterios_planificados").value(8))
-            .andRespond(withSuccess(answers(1, "EnRiesgo"), MediaType.APPLICATION_JSON));
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer " + TOKEN))
+                .andExpect(jsonPath("$.items[0].being[0]").value(8))
+                .andExpect(jsonPath("$.items[0].knowing[1]").value(35))
+                .andExpect(jsonPath("$.items[0].doing[0]").value(25))
+                .andExpect(jsonPath("$.items[0].deciding[0]").value(4))
+                .andExpect(jsonPath("$.items[0].attendance_pct").value(87.50))
+                .andExpect(jsonPath("$.items[0].criterios_planificados").value(8))
+                .andRespond(withSuccess(answers(1, "EnRiesgo"), MediaType.APPLICATION_JSON));
 
         adapter.predictBatch(List.of(vector()));
 
@@ -105,15 +110,18 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_readsTheTwoProbabilitiesAndTheCategory() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withSuccess(answers(1, "RiesgoCritico"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(answers(1, "RiesgoCritico"), MediaType.APPLICATION_JSON));
 
         List<RiskScore> scores = adapter.predictBatch(List.of(vector()));
 
-        assertThat(scores).singleElement().satisfies(score -> {
-            assertThat(score.level()).isEqualTo(RiskLevel.RIESGO_CRITICO);
-            assertThat(score.pFail()).isEqualByComparingTo("0.0128");
-            assertThat(score.pOutstanding()).isEqualByComparingTo("0.1059");
-        });
+        assertThat(scores)
+                .singleElement()
+                .satisfies(
+                        score -> {
+                            assertThat(score.level()).isEqualTo(RiskLevel.RIESGO_CRITICO);
+                            assertThat(score.pFail()).isEqualByComparingTo("0.0128");
+                            assertThat(score.pOutstanding()).isEqualByComparingTo("0.1059");
+                        });
     }
 
     /**
@@ -128,14 +136,14 @@ class RiskModelHttpClientAdapterTest {
             batch.add(vector());
         }
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andExpect(jsonPath("$.items.length()").value(500))
-            .andRespond(withSuccess(answers(500, "SinRiesgo"), MediaType.APPLICATION_JSON));
+                .andExpect(jsonPath("$.items.length()").value(500))
+                .andRespond(withSuccess(answers(500, "SinRiesgo"), MediaType.APPLICATION_JSON));
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andExpect(jsonPath("$.items.length()").value(500))
-            .andRespond(withSuccess(answers(500, "SinRiesgo"), MediaType.APPLICATION_JSON));
+                .andExpect(jsonPath("$.items.length()").value(500))
+                .andRespond(withSuccess(answers(500, "SinRiesgo"), MediaType.APPLICATION_JSON));
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andExpect(jsonPath("$.items.length()").value(200))
-            .andRespond(withSuccess(answers(200, "EnRiesgo"), MediaType.APPLICATION_JSON));
+                .andExpect(jsonPath("$.items.length()").value(200))
+                .andRespond(withSuccess(answers(200, "EnRiesgo"), MediaType.APPLICATION_JSON));
 
         List<RiskScore> scores = adapter.predictBatch(batch);
 
@@ -152,9 +160,9 @@ class RiskModelHttpClientAdapterTest {
             batch.add(vector());
         }
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withSuccess(answers(500, "SinRiesgo"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(answers(500, "SinRiesgo"), MediaType.APPLICATION_JSON));
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withSuccess(answers(1, "RiesgoCritico"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(answers(1, "RiesgoCritico"), MediaType.APPLICATION_JSON));
 
         List<RiskScore> scores = adapter.predictBatch(batch);
 
@@ -163,18 +171,18 @@ class RiskModelHttpClientAdapterTest {
     }
 
     /**
-     * The status has to survive into the message. Caught by a blanket handler and relabelled
-     * "could not reach the model service", a 422 about a mark over its dimension's cap becomes
+     * The status has to survive into the message. Caught by a blanket handler and relabelled "could
+     * not reach the model service", a 422 about a mark over its dimension's cap becomes
      * indistinguishable from the service being down, and the real reason exists nowhere.
      */
     @Test
     void predictBatch_theModelRejectsTheBatch_saysWhatItAnswered() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+                .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelRejectedException.class)
-            .hasMessageContaining("422");
+                .isInstanceOf(RiskModelRejectedException.class)
+                .hasMessageContaining("422");
     }
 
     /**
@@ -188,13 +196,14 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_theModelSaysWhyItRefused_keepsThatReason() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("{\"detail\":\"Items sin nota en alguna dimension: [0]\"}"));
+                .andRespond(
+                        withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body("{\"detail\":\"Items sin nota en alguna dimension: [0]\"}"));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelRejectedException.class)
-            .hasMessageContaining("Items sin nota en alguna dimension: [0]");
+                .isInstanceOf(RiskModelRejectedException.class)
+                .hasMessageContaining("Items sin nota en alguna dimension: [0]");
     }
 
     /**
@@ -208,54 +217,56 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_refused_saysWhatShapeItBelievedItWasSending() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+                .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelRejectedException.class)
-            .hasMessageContaining("being=1")
-            .hasMessageContaining("knowing=2")
-            .hasMessageContaining("doing=1")
-            .hasMessageContaining("deciding=1")
-            .hasMessageContaining("planned=8");
+                .isInstanceOf(RiskModelRejectedException.class)
+                .hasMessageContaining("being=1")
+                .hasMessageContaining("knowing=2")
+                .hasMessageContaining("doing=1")
+                .hasMessageContaining("deciding=1")
+                .hasMessageContaining("planned=8");
     }
 
     /** Counts, never marks: a refusal is logged, and a log is not a place for a class's grades. */
     @Test
     void predictBatch_refused_doesNotPutTheMarksThemselvesInTheMessage() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+                .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelRejectedException.class)
-            .hasMessageNotContaining("87.50")
-            .hasMessageNotContaining("35");
+                .isInstanceOf(RiskModelRejectedException.class)
+                .hasMessageNotContaining("87.50")
+                .hasMessageNotContaining("35");
     }
 
     /**
      * A schema refusal answers with the input that broke it, and that input is a class's marks.
      *
      * <p>FastAPI's validation errors carry {@code loc}, {@code msg} and {@code input}. The first
-     * two are the diagnosis; the third is the vectors echoed back — the grades of real children,
-     * on their way into a log file that outlives the request and gets copied into bug reports.
-     * Kept out entirely rather than truncated: a shorter excerpt of a student's marks is still a
+     * two are the diagnosis; the third is the vectors echoed back — the grades of real children, on
+     * their way into a log file that outlives the request and gets copied into bug reports. Kept
+     * out entirely rather than truncated: a shorter excerpt of a student's marks is still a
      * student's marks.
      */
     @Test
     void predictBatch_refusedOnSchema_keepsTheDiagnosisAndDropsTheMarks() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("""
+                .andRespond(
+                        withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(
+                                        """
                     {"detail":[{"type":"less_than_equal",
                                 "loc":["body","items",0,"attendance_pct"],
                                 "msg":"Input should be less than or equal to 100",
                                 "input":137.5}]}"""));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelRejectedException.class)
-            .hasMessageContaining("body.items.0.attendance_pct")
-            .hasMessageContaining("Input should be less than or equal to 100")
-            .hasMessageNotContaining("137.5");
+                .isInstanceOf(RiskModelRejectedException.class)
+                .hasMessageContaining("body.items.0.attendance_pct")
+                .hasMessageContaining("Input should be less than or equal to 100")
+                .hasMessageNotContaining("137.5");
     }
 
     /**
@@ -267,15 +278,16 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_refusedWithAnUnreadableBody_quotesNoneOfIt() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-                .contentType(MediaType.TEXT_PLAIN)
-                .body("Ana Quispe 87.5 / Luis Mamani 42.0"));
+                .andRespond(
+                        withStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .body("Ana Quispe 87.5 / Luis Mamani 42.0"));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelRejectedException.class)
-            .hasMessageNotContaining("Ana Quispe")
-            .hasMessageNotContaining("87.5")
-            .hasMessageContaining("unreadable");
+                .isInstanceOf(RiskModelRejectedException.class)
+                .hasMessageNotContaining("Ana Quispe")
+                .hasMessageNotContaining("87.5")
+                .hasMessageContaining("unreadable");
     }
 
     /**
@@ -288,22 +300,20 @@ class RiskModelHttpClientAdapterTest {
      */
     @Test
     void predictBatch_theModelIsDown_isNotTheSameFailureAsBeingRefused() {
-        server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withServerError());
+        server.expect(requestTo(BASE_URL + "/predict/batch")).andRespond(withServerError());
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelUnavailableException.class)
-            .isNotInstanceOf(RiskModelRejectedException.class);
+                .isInstanceOf(RiskModelUnavailableException.class)
+                .isNotInstanceOf(RiskModelRejectedException.class);
     }
 
     @Test
     void predictBatch_theModelIsBroken_saysWhatItAnswered() {
-        server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withServerError());
+        server.expect(requestTo(BASE_URL + "/predict/batch")).andRespond(withServerError());
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelUnavailableException.class)
-            .hasMessageContaining("500");
+                .isInstanceOf(RiskModelUnavailableException.class)
+                .hasMessageContaining("500");
     }
 
     /**
@@ -311,9 +321,9 @@ class RiskModelHttpClientAdapterTest {
      *
      * <p>Java's own client defaults to HTTP/2, and over plaintext that means opening with an h2c
      * upgrade. Uvicorn answers "Unsupported upgrade request" and carries on in 1.1 — but the body
-     * is gone by then, and FastAPI rejects the request for a missing body while the marks that
-     * were supposed to be in it never left this side. The failure names a field, not a protocol,
-     * which is what made it cost a day.
+     * is gone by then, and FastAPI rejects the request for a missing body while the marks that were
+     * supposed to be in it never left this side. The failure names a field, not a protocol, which
+     * is what made it cost a day.
      *
      * <p>Pinned here because nothing else catches it: every test in this file stubs the transport,
      * so the version is invisible until it meets the real server.
@@ -321,7 +331,7 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictionHttpClient_offersOnlyTheVersionTheModelSpeaks() {
         assertThat(RiskModelHttpClientAdapter.predictionHttpClient(Duration.ofSeconds(5)).version())
-            .isEqualTo(HttpClient.Version.HTTP_1_1);
+                .isEqualTo(HttpClient.Version.HTTP_1_1);
     }
 
     /**
@@ -343,11 +353,11 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_fewerAnswersThanVectors_refusesToPairThemUp() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withSuccess(answers(1, "SinRiesgo"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(answers(1, "SinRiesgo"), MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector(), vector())))
-            .isInstanceOf(RiskModelUnavailableException.class)
-            .hasMessageContaining("1 scores for 2 vectors");
+                .isInstanceOf(RiskModelUnavailableException.class)
+                .hasMessageContaining("1 scores for 2 vectors");
     }
 
     /**
@@ -357,24 +367,28 @@ class RiskModelHttpClientAdapterTest {
     @Test
     void predictBatch_aCategoryThisSystemDoesNotKnow_refusesToGuess() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withSuccess(answers(1, "RiesgoModerado"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(answers(1, "RiesgoModerado"), MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> adapter.predictBatch(List.of(vector())))
-            .isInstanceOf(RiskModelUnavailableException.class)
-            .hasMessageContaining("RiesgoModerado");
+                .isInstanceOf(RiskModelUnavailableException.class)
+                .hasMessageContaining("RiesgoModerado");
     }
 
-    /** A diagnostic field added on the model's side must not turn every prediction into a failure. */
+    /**
+     * A diagnostic field added on the model's side must not turn every prediction into a failure.
+     */
     @Test
     void predictBatch_anAnswerCarryingFieldsThisSideDoesNotRead_isStillRead() {
         server.expect(requestTo(BASE_URL + "/predict/batch"))
-            .andRespond(withSuccess("""
+                .andRespond(
+                        withSuccess(
+                                """
                 [{"risk_level":"SinRiesgo","p_reprueba":0.02,"p_sobresaliente":0.10,
                   "probabilidades":{"SinRiesgo":0.88},"modelo":"tfdf-2026-09","latencia_ms":12}]""",
-                MediaType.APPLICATION_JSON));
+                                MediaType.APPLICATION_JSON));
 
         assertThat(adapter.predictBatch(List.of(vector())))
-            .singleElement()
-            .satisfies(score -> assertThat(score.level()).isEqualTo(RiskLevel.SIN_RIESGO));
+                .singleElement()
+                .satisfies(score -> assertThat(score.level()).isEqualTo(RiskLevel.SIN_RIESGO));
     }
 }

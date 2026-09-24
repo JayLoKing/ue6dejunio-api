@@ -1,18 +1,17 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.adaptation;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 public class AdaptationService implements IAdaptationService {
@@ -33,8 +32,8 @@ public class AdaptationService implements IAdaptationService {
             throw new ResourceNotFoundException("Estudiante", c.studentId());
         }
         if (adaptationDomain.existsByPlanAndStudent(c.planId(), c.studentId())) {
-            throw new DuplicateResourceException("adaptacion (plan + estudiante)",
-                c.planId() + "/" + c.studentId());
+            throw new DuplicateResourceException(
+                    "adaptacion (plan + estudiante)", c.planId() + "/" + c.studentId());
         }
         return adaptationDomain.create(c);
     }
@@ -49,8 +48,9 @@ public class AdaptationService implements IAdaptationService {
     @Override
     @Transactional(readOnly = true)
     public Adaptation getById(UUID id) {
-        return adaptationDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Adaptacion", id));
+        return adaptationDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Adaptacion", id));
     }
 
     @Override

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
-
 import java.time.LocalDate;
 
 /**
@@ -17,10 +16,9 @@ import java.time.LocalDate;
  * prose no lookup depends on, unlike a name.
  */
 public record UpdatePdcRequest(
-    @Min(1) @Max(12) @JsonProperty("plan_number") Integer planNumber,
-    @JsonFormat(pattern = "yyyy-MM-dd") @JsonProperty("period_start") LocalDate periodStart,
-    @JsonFormat(pattern = "yyyy-MM-dd") @JsonProperty("period_end") LocalDate periodEnd,
-    @Size(max = 4000) String holisticObjective,
-    @Size(max = 4000) String finalProduct,
-    @Size(max = 4000) String bibliography
-) {}
+        @Min(1) @Max(12) @JsonProperty("plan_number") Integer planNumber,
+        @JsonFormat(pattern = "yyyy-MM-dd") @JsonProperty("period_start") LocalDate periodStart,
+        @JsonFormat(pattern = "yyyy-MM-dd") @JsonProperty("period_end") LocalDate periodEnd,
+        @Size(max = 4000) String holisticObjective,
+        @Size(max = 4000) String finalProduct,
+        @Size(max = 4000) String bibliography) {}

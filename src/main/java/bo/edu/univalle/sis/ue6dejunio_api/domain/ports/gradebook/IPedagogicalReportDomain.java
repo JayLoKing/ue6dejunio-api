@@ -2,7 +2,6 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalReport;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalReportDraft;
-
 import java.util.Optional;
 import java.util.UUID;
 

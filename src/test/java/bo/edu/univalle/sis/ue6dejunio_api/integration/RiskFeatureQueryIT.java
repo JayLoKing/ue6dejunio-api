@@ -1,19 +1,18 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain.AttendanceRateRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain.CriterionScoreRow;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * The four reads that feed the model, against a real Postgres.
@@ -28,8 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class RiskFeatureQueryIT extends AbstractIntegrationTest {
 
-    @Autowired
-    private IRiskFeatureDomain features;
+    @Autowired private IRiskFeatureDomain features;
 
     private static final int TRIMESTER = 1;
     private static final LocalDate DAY_ONE = LocalDate.of(2026, 3, 2);
@@ -51,11 +49,15 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         anaEnrollment = seedEnrollment(ana, courseId);
     }
 
-    private void seedAttendance(UUID enrollmentId, UUID classGroupId, LocalDate date, String status) {
+    private void seedAttendance(
+            UUID enrollmentId, UUID classGroupId, LocalDate date, String status) {
         jdbc.update(
-            "INSERT INTO attendance (id_course_enrollment, id_class_group, date, status) "
-                + "VALUES (?,?,?,?)",
-            enrollmentId, classGroupId, java.sql.Date.valueOf(date), status);
+                "INSERT INTO attendance (id_course_enrollment, id_class_group, date, status) "
+                        + "VALUES (?,?,?,?)",
+                enrollmentId,
+                classGroupId,
+                java.sql.Date.valueOf(date),
+                status);
     }
 
     // ---------------------------------------------------------------- active class groups
@@ -73,7 +75,9 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
 
     @Test
     void activeClassGroupIds_leavesOutTheOnesTheSchoolClosed() {
-        jdbc.update("UPDATE class_groups SET is_active = false WHERE id_class_group = ?", languageGroup);
+        jdbc.update(
+                "UPDATE class_groups SET is_active = false WHERE id_class_group = ?",
+                languageGroup);
 
         assertThat(features.activeClassGroupIds(currentAcademicYear())).containsExactly(mathGroup);
     }
@@ -95,12 +99,15 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         List<CriterionScoreRow> rows = features.criterionScores(List.of(mathGroup), TRIMESTER);
 
         assertThat(rows).hasSize(2);
-        assertThat(rows).allSatisfy(r -> {
-            assertThat(r.studentId()).isEqualTo(ana);
-            assertThat(r.classGroupId()).isEqualTo(mathGroup);
-        });
-        assertThat(rows).extracting(CriterionScoreRow::dimension)
-            .containsExactlyInAnyOrder("Being", "Knowing");
+        assertThat(rows)
+                .allSatisfy(
+                        r -> {
+                            assertThat(r.studentId()).isEqualTo(ana);
+                            assertThat(r.classGroupId()).isEqualTo(mathGroup);
+                        });
+        assertThat(rows)
+                .extracting(CriterionScoreRow::dimension)
+                .containsExactlyInAnyOrder("Being", "Knowing");
     }
 
     /**
@@ -121,10 +128,14 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         // created_at has no sub-millisecond guarantee to separate them.
         jdbc.update("UPDATE assessment_scores SET created_at = TIMESTAMP '2026-03-10 09:00:00'");
 
-        List<BigDecimal> firstRun = features.criterionScores(List.of(mathGroup), TRIMESTER)
-            .stream().map(CriterionScoreRow::score).toList();
-        List<BigDecimal> secondRun = features.criterionScores(List.of(mathGroup), TRIMESTER)
-            .stream().map(CriterionScoreRow::score).toList();
+        List<BigDecimal> firstRun =
+                features.criterionScores(List.of(mathGroup), TRIMESTER).stream()
+                        .map(CriterionScoreRow::score)
+                        .toList();
+        List<BigDecimal> secondRun =
+                features.criterionScores(List.of(mathGroup), TRIMESTER).stream()
+                        .map(CriterionScoreRow::score)
+                        .toList();
 
         assertThat(firstRun).isEqualTo(secondRun);
     }
@@ -165,9 +176,10 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         List<CriterionScoreRow> rows = features.criterionScores(List.of(mathGroup), TRIMESTER);
 
         assertThat(rows).hasSize(2);
-        assertThat(rows).extracting(CriterionScoreRow::score)
-            .usingElementComparator(BigDecimal::compareTo)
-            .containsExactlyInAnyOrder(new BigDecimal("30.00"), new BigDecimal("20.00"));
+        assertThat(rows)
+                .extracting(CriterionScoreRow::score)
+                .usingElementComparator(BigDecimal::compareTo)
+                .containsExactlyInAnyOrder(new BigDecimal("30.00"), new BigDecimal("20.00"));
     }
 
     @Test
@@ -187,8 +199,9 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
     void criterionScores_leavesOutAStudentNoLongerOnTheRoll() {
         UUID criterion = seedCriterion(mathGroup, TRIMESTER, "Knowing", "Prueba 1");
         seedCriterionScore(anaEnrollment, criterion, 30.0);
-        jdbc.update("UPDATE course_enrollments SET status = 'Withdrawn' WHERE id_course_enrollment = ?",
-            anaEnrollment);
+        jdbc.update(
+                "UPDATE course_enrollments SET status = 'Withdrawn' WHERE id_course_enrollment = ?",
+                anaEnrollment);
 
         assertThat(features.criterionScores(List.of(mathGroup), TRIMESTER)).isEmpty();
     }
@@ -207,21 +220,24 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         seedCriterion(languageGroup, TRIMESTER, "Doing", "Lectura");
         seedCriterion(mathGroup, 2, "Knowing", "Otro trimestre");
 
-        Map<UUID, Integer> counts = features.plannedCriteriaCount(
-            List.of(mathGroup, languageGroup), TRIMESTER);
+        Map<UUID, Integer> counts =
+                features.plannedCriteriaCount(List.of(mathGroup, languageGroup), TRIMESTER);
 
-        assertThat(counts).containsOnly(
-            org.assertj.core.api.Assertions.entry(mathGroup, 2),
-            org.assertj.core.api.Assertions.entry(languageGroup, 1));
+        assertThat(counts)
+                .containsOnly(
+                        org.assertj.core.api.Assertions.entry(mathGroup, 2),
+                        org.assertj.core.api.Assertions.entry(languageGroup, 1));
     }
 
-    /** Absent, not zero: nothing planned is nothing to divide by, and the caller has to see that. */
+    /**
+     * Absent, not zero: nothing planned is nothing to divide by, and the caller has to see that.
+     */
     @Test
     void plannedCriteriaCount_aSubjectWithNothingPlannedIsAbsent() {
         seedCriterion(mathGroup, TRIMESTER, "Being", "Puntualidad");
 
         assertThat(features.plannedCriteriaCount(List.of(mathGroup, languageGroup), TRIMESTER))
-            .containsOnlyKeys(mathGroup);
+                .containsOnlyKeys(mathGroup);
     }
 
     // ---------------------------------------------------------------- attendance
@@ -253,8 +269,8 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
 
     /**
      * The one divergence worth stating outright, because it is the one a future reader will try to
-     * "fix": a day off with leave is not a day missed, for the model. The attendance panel drops
-     * it from the calculation entirely; the training set counted it as attended.
+     * "fix": a day off with leave is not a day missed, for the model. The attendance panel drops it
+     * from the calculation entirely; the training set counted it as attended.
      */
     @Test
     void attendanceRates_aDayOffWithLeaveCountsAsAttended() {
@@ -262,7 +278,7 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         seedAttendance(anaEnrollment, mathGroup, DAY_ONE.plusDays(1), "Absent");
 
         assertThat(features.attendanceRates(List.of(mathGroup), TRIMESTER).get(0).attendancePct())
-            .isEqualByComparingTo("50.00");
+                .isEqualByComparingTo("50.00");
     }
 
     /** Marked at course level, the day counts for every subject of that course. */
@@ -271,14 +287,15 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         seedAttendance(anaEnrollment, null, DAY_ONE, "Present");
         seedAttendance(anaEnrollment, null, DAY_ONE.plusDays(1), "Absent");
 
-        List<AttendanceRateRow> rates = features.attendanceRates(
-            List.of(mathGroup, languageGroup), TRIMESTER);
+        List<AttendanceRateRow> rates =
+                features.attendanceRates(List.of(mathGroup, languageGroup), TRIMESTER);
 
         assertThat(rates).hasSize(2);
-        assertThat(rates).extracting(AttendanceRateRow::classGroupId)
-            .containsExactlyInAnyOrder(mathGroup, languageGroup);
-        assertThat(rates).allSatisfy(r ->
-            assertThat(r.attendancePct()).isEqualByComparingTo("50.00"));
+        assertThat(rates)
+                .extracting(AttendanceRateRow::classGroupId)
+                .containsExactlyInAnyOrder(mathGroup, languageGroup);
+        assertThat(rates)
+                .allSatisfy(r -> assertThat(r.attendancePct()).isEqualByComparingTo("50.00"));
     }
 
     /**
@@ -316,7 +333,7 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         seedAttendance(anaEnrollment, mathGroup, LocalDate.of(2026, 7, 1), "Absent");
 
         assertThat(features.attendanceRates(List.of(mathGroup), TRIMESTER).get(0).attendancePct())
-            .isEqualByComparingTo("100.00");
+                .isEqualByComparingTo("100.00");
     }
 
     /** Nobody marked yet is not 0% attendance. Absent from the answer, so no vector claims it. */
@@ -335,14 +352,16 @@ class RiskFeatureQueryIT extends AbstractIntegrationTest {
         List<AttendanceRateRow> rates = features.attendanceRates(List.of(mathGroup), TRIMESTER);
 
         assertThat(rates).hasSize(2);
-        assertThat(rates).filteredOn(r -> r.studentId().equals(ana))
-            .allSatisfy(r -> assertThat(r.attendancePct()).isEqualByComparingTo("100.00"));
-        assertThat(rates).filteredOn(r -> r.studentId().equals(bruno))
-            .allSatisfy(r -> assertThat(r.attendancePct()).isEqualByComparingTo("0.00"));
+        assertThat(rates)
+                .filteredOn(r -> r.studentId().equals(ana))
+                .allSatisfy(r -> assertThat(r.attendancePct()).isEqualByComparingTo("100.00"));
+        assertThat(rates)
+                .filteredOn(r -> r.studentId().equals(bruno))
+                .allSatisfy(r -> assertThat(r.attendancePct()).isEqualByComparingTo("0.00"));
     }
 
     private int currentAcademicYear() {
         return jdbc.queryForObject(
-            "SELECT year FROM academic_years ORDER BY year DESC LIMIT 1", Integer.class);
+                "SELECT year FROM academic_years ORDER BY year DESC LIMIT 1", Integer.class);
     }
 }

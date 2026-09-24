@@ -1,12 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.course;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.CreateClassGroupCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
@@ -14,13 +14,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseComma
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseService implements ICourseService {
@@ -47,22 +46,30 @@ public class CourseService implements ICourseService {
         }
         Integer yearId = courseDomain.currentAcademicYearId();
         if (courseDomain.existsByGradeParallelYear(c.gradeId(), c.parallelId(), yearId)) {
-            throw new DuplicateResourceException("curso (grado+paralelo+anio)",
-                c.gradeId() + "/" + c.parallelId() + "/" + yearId);
+            throw new DuplicateResourceException(
+                    "curso (grado+paralelo+anio)",
+                    c.gradeId() + "/" + c.parallelId() + "/" + yearId);
         }
-        if (c.homeroomTeacherId() != null && !courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
+        if (c.homeroomTeacherId() != null
+                && !courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
             throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
         }
 
-        Course course = courseDomain.create(c.gradeId(), c.parallelId(), yearId, c.homeroomTeacherId());
+        Course course =
+                courseDomain.create(c.gradeId(), c.parallelId(), yearId, c.homeroomTeacherId());
 
         List<ClassGroup> classGroups = List.of();
         if (c.assignments() != null && !c.assignments().isEmpty()) {
-            List<CreateClassGroupCommand.Assignment> assignments = c.assignments().stream()
-                .map(a -> new CreateClassGroupCommand.Assignment(a.subjectId(), a.teacherId()))
-                .toList();
-            classGroups = classGroupService.createForCourse(
-                new CreateClassGroupCommand(course.id(), assignments));
+            List<CreateClassGroupCommand.Assignment> assignments =
+                    c.assignments().stream()
+                            .map(
+                                    a ->
+                                            new CreateClassGroupCommand.Assignment(
+                                                    a.subjectId(), a.teacherId()))
+                            .toList();
+            classGroups =
+                    classGroupService.createForCourse(
+                            new CreateClassGroupCommand(course.id(), assignments));
         }
         return new CourseWithSubjects(course, classGroups);
     }
@@ -103,8 +110,9 @@ public class CourseService implements ICourseService {
     @Override
     @Transactional(readOnly = true)
     public Course getById(UUID id) {
-        return courseDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Course", id));
+        return courseDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
     }
 
     @Override
@@ -114,14 +122,15 @@ public class CourseService implements ICourseService {
     }
 
     /**
-     * No sort is asked for because the listing already carries one: it orders by grade and parallel,
-     * and within a single gestión that pair is unique, so no row can appear on two pages or on none.
-     * Across gestiones the pair ties, which is why every whole-school report requires one.
+     * No sort is asked for because the listing already carries one: it orders by grade and
+     * parallel, and within a single gestión that pair is unique, so no row can appear on two pages
+     * or on none. Across gestiones the pair ties, which is why every whole-school report requires
+     * one.
      *
-     * <p>The loop asks how many rows are still missing rather than how many pages the store reports,
-     * because {@code totalPages} is derived from the size that was asked for and answers one for any
-     * set that fits in a single page — which is every set, until it is not. The empty page is the
-     * other exit: a store that keeps answering nothing would otherwise be read forever.
+     * <p>The loop asks how many rows are still missing rather than how many pages the store
+     * reports, because {@code totalPages} is derived from the size that was asked for and answers
+     * one for any set that fits in a single page — which is every set, until it is not. The empty
+     * page is the other exit: a store that keeps answering nothing would otherwise be read forever.
      */
     @Override
     @Transactional(readOnly = true)
@@ -129,8 +138,8 @@ public class CourseService implements ICourseService {
         List<Course> all = new ArrayList<>();
         int pageIndex = 0;
         while (true) {
-            PageResult<Course> page = courseDomain
-                .list(academicYearId, PageQuery.of(pageIndex, COURSE_PAGE_SIZE));
+            PageResult<Course> page =
+                    courseDomain.list(academicYearId, PageQuery.of(pageIndex, COURSE_PAGE_SIZE));
             all.addAll(page.content());
             if (page.content().isEmpty() || all.size() >= page.totalElements()) {
                 return all;

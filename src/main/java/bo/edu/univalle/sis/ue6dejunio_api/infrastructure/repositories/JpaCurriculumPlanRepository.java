@@ -1,6 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlanEntity;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -8,26 +13,23 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
 public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPlanEntity, UUID> {
 
-    boolean existsByCourse_IdAndTrimesterAndPlanNumber(UUID courseId, Integer trimester, Integer planNumber);
+    boolean existsByCourse_IdAndTrimesterAndPlanNumber(
+            UUID courseId, Integer trimester, Integer planNumber);
 
     boolean existsBySourcePlan_Id(UUID sourcePlanId);
 
     /** Which of the given courses already hold that numbered month, in one query. */
-    @Query("""
+    @Query(
+            """
         SELECT p.course.id FROM CurriculumPlanEntity p
         WHERE p.course.id IN :courseIds AND p.trimester = :trimester AND p.planNumber = :planNumber
         """)
-    Set<UUID> courseIdsWithPlan(@Param("courseIds") List<UUID> courseIds,
-                                @Param("trimester") Integer trimester,
-                                @Param("planNumber") Integer planNumber);
+    Set<UUID> courseIdsWithPlan(
+            @Param("courseIds") List<UUID> courseIds,
+            @Param("trimester") Integer trimester,
+            @Param("planNumber") Integer planNumber);
 
     /**
      * A plan with its subject blocks joined, but not their weekly rows.
@@ -39,12 +41,21 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
      * persistence context. Two ordered queries, no fan-out per subject.
      */
     @Query("SELECT p FROM CurriculumPlanEntity p WHERE p.id = :id")
-    @EntityGraph(attributePaths = {
-        "course", "course.grade", "course.grade.level", "course.parallel",
-        "course.homeroomTeacher",
-        "subjects", "subjects.classGroup", "subjects.classGroup.subject",
-        "subjects.classGroup.subject.area", "subjects.classGroup.teacher",
-        "createdBy", "updatedBy"})
+    @EntityGraph(
+            attributePaths = {
+                "course",
+                "course.grade",
+                "course.grade.level",
+                "course.parallel",
+                "course.homeroomTeacher",
+                "subjects",
+                "subjects.classGroup",
+                "subjects.classGroup.subject",
+                "subjects.classGroup.subject.area",
+                "subjects.classGroup.teacher",
+                "createdBy",
+                "updatedBy"
+            })
     Optional<CurriculumPlanEntity> findWithContent(@Param("id") UUID id);
 
     /**
@@ -55,7 +66,8 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     Optional<String> findStatusById(@Param("id") UUID id);
 
     /** Who may write this plan: the homeroom teacher plus the teacher of each subject block. */
-    @Query("""
+    @Query(
+            """
         SELECT ht.id FROM CurriculumPlanEntity p JOIN p.course c JOIN c.homeroomTeacher ht
         WHERE p.id = :planId
         UNION
@@ -65,22 +77,24 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     Set<UUID> writerIdsOf(@Param("planId") UUID planId);
 
     /** Who may write one block: the homeroom teacher, or the teacher of that block's subject. */
-    @Query("""
+    @Query(
+            """
         SELECT ht.id FROM CurriculumPlanEntity p JOIN p.course c JOIN c.homeroomTeacher ht
         WHERE p.id = :planId
         UNION
         SELECT t.id FROM CurriculumPlanSubjectEntity s JOIN s.classGroup cg JOIN cg.teacher t
         WHERE s.curriculumPlan.id = :planId AND s.id = :planSubjectId
         """)
-    Set<UUID> subjectWriterIdsOf(@Param("planId") UUID planId,
-                                 @Param("planSubjectId") UUID planSubjectId);
+    Set<UUID> subjectWriterIdsOf(
+            @Param("planId") UUID planId, @Param("planSubjectId") UUID planSubjectId);
 
     /**
      * Who owns the plan as a document: whoever opened it, plus the homeroom teacher of its course.
      * A specialist's own single-subject plan is administered by the specialist who opened it; a
      * homeroom teacher's course-wide plan is not administered by the specialists inside it.
      */
-    @Query("""
+    @Query(
+            """
         SELECT cb.id FROM CurriculumPlanEntity p JOIN p.createdBy cb WHERE p.id = :planId
         UNION
         SELECT ht.id FROM CurriculumPlanEntity p JOIN p.course c JOIN c.homeroomTeacher ht
@@ -96,7 +110,8 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     // clause makes Hibernate render an inner join over the whole query, so a course with no
     // homeroom teacher assigned would drop every one of its plans from the listing — including
     // from the specialist who owns a block in them and matches through the EXISTS.
-    @Query("""
+    @Query(
+            """
         SELECT p FROM CurriculumPlanEntity p
         LEFT JOIN p.course c
         LEFT JOIN c.homeroomTeacher ht
@@ -109,24 +124,33 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
                    OR EXISTS (SELECT 1 FROM CurriculumPlanSubjectEntity s
                               WHERE s.curriculumPlan = p AND s.classGroup.teacher.id = :teacherId))
         """)
-    @EntityGraph(attributePaths = {
-        "course", "course.grade", "course.grade.level", "course.parallel",
-        "course.homeroomTeacher", "createdBy", "updatedBy"})
-    Page<CurriculumPlanEntity> search(@Param("courseId") UUID courseId,
-                                      @Param("trimester") Integer trimester,
-                                      @Param("status") String status,
-                                      @Param("excludeStatus") String excludeStatus,
-                                      @Param("teacherId") UUID teacherId,
-                                      Pageable pageable);
+    @EntityGraph(
+            attributePaths = {
+                "course",
+                "course.grade",
+                "course.grade.level",
+                "course.parallel",
+                "course.homeroomTeacher",
+                "createdBy",
+                "updatedBy"
+            })
+    Page<CurriculumPlanEntity> search(
+            @Param("courseId") UUID courseId,
+            @Param("trimester") Integer trimester,
+            @Param("status") String status,
+            @Param("excludeStatus") String excludeStatus,
+            @Param("teacherId") UUID teacherId,
+            Pageable pageable);
 
     /**
      * How many areas of knowledge each of these plans spans, asked for a whole page at once.
      *
      * <p>The listing query fetches no blocks — a row says how wide the plan is, it does not carry
-     * it — so the count comes from its own query rather than from walking the blocks per row.
-     * Plans with no blocks yet are simply absent from the result, which reads as zero.
+     * it — so the count comes from its own query rather than from walking the blocks per row. Plans
+     * with no blocks yet are simply absent from the result, which reads as zero.
      */
-    @Query("""
+    @Query(
+            """
         SELECT s.curriculumPlan.id AS planId,
                COUNT(DISTINCT s.classGroup.subject.area.id) AS total
         FROM CurriculumPlanSubjectEntity s
@@ -138,6 +162,7 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     /** One plan's id and a number counted against it. */
     interface PlanCount {
         UUID getPlanId();
+
         long getTotal();
     }
 }

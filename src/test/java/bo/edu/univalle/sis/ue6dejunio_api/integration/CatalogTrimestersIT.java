@@ -1,22 +1,20 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 /**
- * GET /api/catalog/trimesters — any authenticated user (Teacher included) can read; defaults to
- * the current (latest) academic year when id_academic_year is omitted.
- * Requires Docker/Testcontainers; SKIPPED in this environment (Docker unavailable).
+ * GET /api/catalog/trimesters — any authenticated user (Teacher included) can read; defaults to the
+ * current (latest) academic year when id_academic_year is omitted. Requires Docker/Testcontainers;
+ * SKIPPED in this environment (Docker unavailable).
  */
 class CatalogTrimestersIT extends AbstractIntegrationTest {
 
@@ -33,12 +31,19 @@ class CatalogTrimestersIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void trimesters_explicitYear_returnsSchemaSeededThreePeriodsOrderedByTrimester() throws Exception {
-        String body = mvc.perform(get("/api/catalog/trimesters")
-                .param("id_academic_year", academicYearId.toString())
-                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+    void trimesters_explicitYear_returnsSchemaSeededThreePeriodsOrderedByTrimester()
+            throws Exception {
+        String body =
+                mvc.perform(
+                                get("/api/catalog/trimesters")
+                                        .param("id_academic_year", academicYearId.toString())
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(teacher, "Teacher")))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
 
         JsonNode arr = json.readTree(body);
         assertThat(arr).hasSize(3);
@@ -48,15 +53,17 @@ class CatalogTrimestersIT extends AbstractIntegrationTest {
 
     @Test
     void trimesters_omittedYear_defaultsToCurrentAcademicYear() throws Exception {
-        mvc.perform(get("/api/catalog/trimesters")
-                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/catalog/trimesters")
+                                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
+                .andExpect(status().isOk());
     }
 
     @Test
     void trimesters_unauthenticated_returns401() throws Exception {
-        mvc.perform(get("/api/catalog/trimesters")
-                .param("id_academic_year", academicYearId.toString()))
-            .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        get("/api/catalog/trimesters")
+                                .param("id_academic_year", academicYearId.toString()))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -1,20 +1,19 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.UUID;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 /**
- * Spec: gradebook-read-authorization (Modified Capability) — retrofits
- * {@code @authz.canReadCourse} onto the previously-unguarded {@code GradebookController}
- * centralizer and attendance read endpoints. Behavior change: these reads were previously open
- * to any authenticated teacher (including technical teachers with no relation to the course).
+ * Spec: gradebook-read-authorization (Modified Capability) — retrofits {@code @authz.canReadCourse}
+ * onto the previously-unguarded {@code GradebookController} centralizer and attendance read
+ * endpoints. Behavior change: these reads were previously open to any authenticated teacher
+ * (including technical teachers with no relation to the course).
  */
 class GradebookReadAuthorizationIT extends AbstractIntegrationTest {
 
@@ -42,60 +41,75 @@ class GradebookReadAuthorizationIT extends AbstractIntegrationTest {
 
         // Without an ownership check any authenticated teacher could read another course's grades
         // just by guessing an enrollment id.
-        mvc.perform(get("/api/gradebook/student-summary")
-                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
-                .param("id_course_enrollment", enrollmentInA.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/gradebook/student-summary")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                                .param("id_course_enrollment", enrollmentInA.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void studentSummary_homeroomTeacher_ok() throws Exception {
         UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
 
-        mvc.perform(get("/api/gradebook/student-summary")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course_enrollment", enrollmentInA.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/student-summary")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course_enrollment", enrollmentInA.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
     void centralizer_director_ok() throws Exception {
-        mvc.perform(get("/api/gradebook/centralizer")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseA.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/centralizer")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course", courseA.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
     void centralizer_homeroomTeacher_ok() throws Exception {
-        mvc.perform(get("/api/gradebook/centralizer")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseA.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/centralizer")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseA.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
     void centralizer_nonOwnerTeacher_forbidden() throws Exception {
-        mvc.perform(get("/api/gradebook/centralizer")
-                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
-                .param("id_course", courseA.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/gradebook/centralizer")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                                .param("id_course", courseA.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void centralizer_unauthenticated_401() throws Exception {
-        mvc.perform(get("/api/gradebook/centralizer")
-                .param("id_course", courseA.toString())
-                .param("trimester", "1"))
-            .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        get("/api/gradebook/centralizer")
+                                .param("id_course", courseA.toString())
+                                .param("trimester", "1"))
+                .andExpect(status().isUnauthorized());
     }
 
-    // ---- report-card: one student's libreta, so it is guarded like the other per-student read ----
+    // ---- report-card: one student's libreta, so it is guarded like the other per-student read
+    // ----
 
     @Test
     void reportCard_nonOwnerTeacher_forbidden() throws Exception {
@@ -103,104 +117,125 @@ class GradebookReadAuthorizationIT extends AbstractIntegrationTest {
 
         // The libreta carries a child's whole year and their RUDE. Guessing an enrollment id must
         // not be enough to read it.
-        mvc.perform(get("/api/gradebook/report-card")
-                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
-                .param("id_course_enrollment", enrollmentInA.toString()))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/gradebook/report-card")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                                .param("id_course_enrollment", enrollmentInA.toString()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void reportCard_homeroomTeacher_ok() throws Exception {
         UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
 
-        mvc.perform(get("/api/gradebook/report-card")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course_enrollment", enrollmentInA.toString()))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/report-card")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course_enrollment", enrollmentInA.toString()))
+                .andExpect(status().isOk());
     }
 
     @Test
     void reportCard_director_ok() throws Exception {
         UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
 
-        mvc.perform(get("/api/gradebook/report-card")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course_enrollment", enrollmentInA.toString()))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/report-card")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course_enrollment", enrollmentInA.toString()))
+                .andExpect(status().isOk());
     }
 
     @Test
     void reportCard_unauthenticated_401() throws Exception {
         UUID enrollmentInA = seedEnrollment(seedStudent(), courseA);
 
-        mvc.perform(get("/api/gradebook/report-card")
-                .param("id_course_enrollment", enrollmentInA.toString()))
-            .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        get("/api/gradebook/report-card")
+                                .param("id_course_enrollment", enrollmentInA.toString()))
+                .andExpect(status().isUnauthorized());
     }
 
-    // ---- annual-centralizer: the year-end sheet reads the same course, so it is the same guard ----
+    // ---- annual-centralizer: the year-end sheet reads the same course, so it is the same guard
+    // ----
 
     @Test
     void annualCentralizer_director_ok() throws Exception {
-        mvc.perform(get("/api/gradebook/annual-centralizer")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/annual-centralizer")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course", courseA.toString()))
+                .andExpect(status().isOk());
     }
 
     @Test
     void annualCentralizer_homeroomTeacher_ok() throws Exception {
-        mvc.perform(get("/api/gradebook/annual-centralizer")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/annual-centralizer")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseA.toString()))
+                .andExpect(status().isOk());
     }
 
     @Test
     void annualCentralizer_nonOwnerTeacher_forbidden() throws Exception {
         // The annual sheet carries every trimester at once. Leaving it unguarded would hand a
         // stranger the whole year of a course the trimester endpoint already refuses them.
-        mvc.perform(get("/api/gradebook/annual-centralizer")
-                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/gradebook/annual-centralizer")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                                .param("id_course", courseA.toString()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void annualCentralizer_unauthenticated_401() throws Exception {
-        mvc.perform(get("/api/gradebook/annual-centralizer")
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/gradebook/annual-centralizer").param("id_course", courseA.toString()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
     void attendance_director_ok() throws Exception {
-        mvc.perform(get("/api/gradebook/attendance")
-                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/attendance")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_course", courseA.toString()))
+                .andExpect(status().isOk());
     }
 
     @Test
     void attendance_homeroomTeacher_ok() throws Exception {
-        mvc.perform(get("/api/gradebook/attendance")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/gradebook/attendance")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
+                                .param("id_course", courseA.toString()))
+                .andExpect(status().isOk());
     }
 
     @Test
     void attendance_nonOwnerTeacher_forbidden() throws Exception {
-        mvc.perform(get("/api/gradebook/attendance")
-                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher"))
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/gradebook/attendance")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(otherTeacher, "Teacher"))
+                                .param("id_course", courseA.toString()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void attendance_unauthenticated_401() throws Exception {
-        mvc.perform(get("/api/gradebook/attendance")
-                .param("id_course", courseA.toString()))
-            .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/gradebook/attendance").param("id_course", courseA.toString()))
+                .andExpect(status().isUnauthorized());
     }
 }

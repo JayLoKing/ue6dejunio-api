@@ -1,31 +1,30 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.course;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.course.CourseService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.course.CourseService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class CourseServiceTest {
@@ -39,8 +38,11 @@ class CourseServiceTest {
     }
 
     private CreateCourseCommand cmd(UUID homeroom) {
-        return new CreateCourseCommand(1, 1, homeroom, List.of(
-            new CreateCourseCommand.Assignment(UUID.randomUUID(), UUID.randomUUID())));
+        return new CreateCourseCommand(
+                1,
+                1,
+                homeroom,
+                List.of(new CreateCourseCommand.Assignment(UUID.randomUUID(), UUID.randomUUID())));
     }
 
     @Test
@@ -64,7 +66,7 @@ class CourseServiceTest {
         when(courseDomain.currentAcademicYearId()).thenReturn(1);
         when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(true);
         assertThatThrownBy(() -> courseService.create(cmd(null)))
-            .isInstanceOf(DuplicateResourceException.class);
+                .isInstanceOf(DuplicateResourceException.class);
     }
 
     @Test
@@ -76,14 +78,14 @@ class CourseServiceTest {
         when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(false);
         when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(false);
         assertThatThrownBy(() -> courseService.create(cmd(t)))
-            .isInstanceOf(ConflictException.class);
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test
     void create_gradeMissing_throws() {
         when(courseDomain.gradeExists(1)).thenReturn(false);
         assertThatThrownBy(() -> courseService.create(cmd(null)))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -93,7 +95,7 @@ class CourseServiceTest {
         when(courseDomain.findById(id)).thenReturn(Optional.of(course(id)));
         when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(false);
         assertThatThrownBy(() -> courseService.setHomeroomTeacher(id, t))
-            .isInstanceOf(ConflictException.class);
+                .isInstanceOf(ConflictException.class);
     }
 
     /**
@@ -105,8 +107,8 @@ class CourseServiceTest {
         Course onFirstPage = course(UUID.randomUUID());
         Course onSecondPage = course(UUID.randomUUID());
         when(courseDomain.list(eq(7), any(PageQuery.class)))
-            .thenReturn(new PageResult<>(List.of(onFirstPage), 0, 200, 2L))
-            .thenReturn(new PageResult<>(List.of(onSecondPage), 1, 200, 2L));
+                .thenReturn(new PageResult<>(List.of(onFirstPage), 0, 200, 2L))
+                .thenReturn(new PageResult<>(List.of(onSecondPage), 1, 200, 2L));
 
         assertThat(courseService.allOfYear(7)).containsExactly(onFirstPage, onSecondPage);
     }
@@ -118,7 +120,7 @@ class CourseServiceTest {
     @Test
     void allOfYear_stopsWhenAPageComesBackEmpty() {
         when(courseDomain.list(eq(7), any(PageQuery.class)))
-            .thenReturn(new PageResult<>(List.of(), 0, 200, 99L));
+                .thenReturn(new PageResult<>(List.of(), 0, 200, 99L));
 
         assertThat(courseService.allOfYear(7)).isEmpty();
     }

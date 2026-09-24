@@ -9,23 +9,23 @@ import java.util.UUID;
  * record carries the class group it belongs to.
  *
  * <p>The audit fields answer "who marked this, and who last changed it". Both write paths are
- * upserts, so {@code createdBy}/{@code createdAt} keep the first author while
- * {@code updatedBy}/{@code updatedAt} move with every correction.
+ * upserts, so {@code createdBy}/{@code createdAt} keep the first author while {@code
+ * updatedBy}/{@code updatedAt} move with every correction.
  */
 public record Attendance(
-    UUID id,
-    UUID courseEnrollmentId,
-    UUID classGroupId,
-    LocalDate date,
-    String status,
-    UUID createdBy,
-    LocalDateTime createdAt,
-    UUID updatedBy,
-    LocalDateTime updatedAt
-) {
+        UUID id,
+        UUID courseEnrollmentId,
+        UUID classGroupId,
+        LocalDate date,
+        String status,
+        UUID createdBy,
+        LocalDateTime createdAt,
+        UUID updatedBy,
+        LocalDateTime updatedAt) {
 
     /** Audit-less projection, for callers that neither persist nor read the audit trail. */
-    public Attendance(UUID id, UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
+    public Attendance(
+            UUID id, UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
         this(id, courseEnrollmentId, classGroupId, date, status, null, null, null, null);
     }
 }

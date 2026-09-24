@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -21,9 +23,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * The risk panel's endpoints.
@@ -41,6 +40,7 @@ public class RiskPredictionController {
 
     /** The gestión the school keeps records for. Outside it a sweep is a silent no-op. */
     private static final int FIRST_YEAR_ON_RECORD = 2000;
+
     private static final int LAST_YEAR_ON_RECORD = 2100;
 
     private final IRiskPredictionService predictionService;
@@ -54,32 +54,28 @@ public class RiskPredictionController {
     @PreAuthorize("hasRole('Director')")
     @Operation(summary = "Ejecuta el modelo predictivo para toda la gestión")
     public ResponseEntity<RiskRunResponse> predictYear(
-        @RequestParam @Min(FIRST_YEAR_ON_RECORD) @Max(LAST_YEAR_ON_RECORD) int academicYear,
-        @RequestParam @Min(1) @Max(3) int trimester
-    ) {
+            @RequestParam @Min(FIRST_YEAR_ON_RECORD) @Max(LAST_YEAR_ON_RECORD) int academicYear,
+            @RequestParam @Min(1) @Max(3) int trimester) {
         return ResponseEntity.ok(
-            RiskRunResponse.from(predictionService.predictYear(academicYear, trimester)));
+                RiskRunResponse.from(predictionService.predictYear(academicYear, trimester)));
     }
 
     @PostMapping("/class-groups/{classGroupId}/risk/predict")
     @PreAuthorize("@authz.canWriteClassGroup(authentication, #classGroupId)")
     @Operation(summary = "Ejecuta el modelo predictivo para una materia")
     public ResponseEntity<RiskRunResponse> predictClassGroup(
-        @PathVariable UUID classGroupId,
-        @RequestParam @Min(1) @Max(3) int trimester
-    ) {
+            @PathVariable UUID classGroupId, @RequestParam @Min(1) @Max(3) int trimester) {
         return ResponseEntity.ok(
-            RiskRunResponse.from(predictionService.predictClassGroup(classGroupId, trimester)));
+                RiskRunResponse.from(predictionService.predictClassGroup(classGroupId, trimester)));
     }
 
     @GetMapping("/class-groups/{classGroupId}/risk")
     @PreAuthorize("@authz.canReadClassGroup(authentication, #classGroupId)")
     @Operation(summary = "Predicciones vigentes de una materia, las de peor riesgo primero")
     public ResponseEntity<List<StudentRiskResponse>> byClassGroup(
-        @PathVariable UUID classGroupId,
-        @RequestParam @Min(1) @Max(3) int trimester
-    ) {
-        return ResponseEntity.ok(toResponses(predictionService.byClassGroup(classGroupId, trimester)));
+            @PathVariable UUID classGroupId, @RequestParam @Min(1) @Max(3) int trimester) {
+        return ResponseEntity.ok(
+                toResponses(predictionService.byClassGroup(classGroupId, trimester)));
     }
 
     /**
@@ -92,9 +88,7 @@ public class RiskPredictionController {
     @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
     @Operation(summary = "Predicciones vigentes de todas las materias de un curso")
     public ResponseEntity<List<StudentRiskResponse>> byCourse(
-        @PathVariable UUID courseId,
-        @RequestParam @Min(1) @Max(3) int trimester
-    ) {
+            @PathVariable UUID courseId, @RequestParam @Min(1) @Max(3) int trimester) {
         return ResponseEntity.ok(toResponses(predictionService.byCourse(courseId, trimester)));
     }
 
@@ -107,21 +101,27 @@ public class RiskPredictionController {
      */
     @GetMapping("/risk/institution")
     @PreAuthorize("hasRole('Director')")
-    @Operation(summary = "Estudiantes en riesgo de toda la unidad educativa en una gestion: un "
-        + "estudiante por fila con su peor materia, el de peor riesgo primero")
+    @Operation(
+            summary =
+                    "Estudiantes en riesgo de toda la unidad educativa en una gestion: un "
+                            + "estudiante por fila con su peor materia, el de peor riesgo primero")
     public ResponseEntity<List<InstitutionRiskEntryResponse>> institutionRisk(
-        // Required, unlike the listings above: a list spanning gestiones would rank a student of one
-        // year against a student of another, and the paged course read is only sound inside one.
-        @RequestParam("id_academic_year") Integer academicYearId,
-        @RequestParam @Min(1) @Max(3) int trimester,
-        @RequestParam(defaultValue = "10") @Min(1) @Max(50) int places
-    ) {
+            // Required, unlike the listings above: a list spanning gestiones would rank a student
+            // of one
+            // year against a student of another, and the paged course read is only sound inside
+            // one.
+            @RequestParam("id_academic_year") Integer academicYearId,
+            @RequestParam @Min(1) @Max(3) int trimester,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int places) {
         return ResponseEntity.ok(
-            predictionService.institutionRisk(academicYearId, trimester, places).stream()
-                .map(InstitutionRiskEntryResponse::from).toList());
+                predictionService.institutionRisk(academicYearId, trimester, places).stream()
+                        .map(InstitutionRiskEntryResponse::from)
+                        .toList());
     }
 
-    /** One student across every subject they sit — the view a tutor opens before talking to them. */
+    /**
+     * One student across every subject they sit — the view a tutor opens before talking to them.
+     */
     @GetMapping("/students/{studentId}/risk")
     @PreAuthorize("@authz.canReadStudent(authentication, #studentId)")
     @Operation(summary = "Predicciones vigentes de un estudiante en todas sus materias")
@@ -140,11 +140,9 @@ public class RiskPredictionController {
     @PreAuthorize("@authz.canWriteRiskPrediction(authentication, #id)")
     @Operation(summary = "Marca una predicción como atendida")
     public ResponseEntity<RiskPredictionResponse> markAttended(
-        @PathVariable UUID id,
-        @RequestParam boolean attended
-    ) {
+            @PathVariable UUID id, @RequestParam boolean attended) {
         return ResponseEntity.ok(
-            RiskPredictionResponse.from(predictionService.markAttended(id, attended)));
+                RiskPredictionResponse.from(predictionService.markAttended(id, attended)));
     }
 
     private static List<StudentRiskResponse> toResponses(List<StudentRisk> risks) {

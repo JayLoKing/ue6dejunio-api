@@ -1,5 +1,15 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.gradebook;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook.PedagogicalReportService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
@@ -16,13 +26,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IPedagogicalReportDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,16 +33,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * The informe pedagógico's derived half: section III's counts and section IV's list of who failed.
@@ -67,11 +66,13 @@ class PedagogicalReportServiceTest {
 
     /** The roster the mocked port hands back, built up by {@link #student}. */
     private final List<CourseStudent> roster = new ArrayList<>();
+
     private final List<AcademicScore> scores = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
-        service = new PedagogicalReportService(reports, courseService, enrollmentDomain, scoreDomain);
+        service =
+                new PedagogicalReportService(reports, courseService, enrollmentDomain, scoreDomain);
         courseId = UUID.randomUUID();
         mathGroup = UUID.randomUUID();
         languageGroup = UUID.randomUUID();
@@ -80,35 +81,80 @@ class PedagogicalReportServiceTest {
     }
 
     private void courseExists() {
-        when(courseService.getById(courseId)).thenReturn(new Course(courseId, 1, "Primero",
-            3, "C", 7, 2026, UUID.randomUUID(), "Nora Arnez Veliz", true));
+        when(courseService.getById(courseId))
+                .thenReturn(
+                        new Course(
+                                courseId,
+                                1,
+                                "Primero",
+                                3,
+                                "C",
+                                7,
+                                2026,
+                                UUID.randomUUID(),
+                                "Nora Arnez Veliz",
+                                true));
     }
 
     /** Adds a student to the roster and answers with the enrolment id their marks hang off. */
     private UUID student(String names, String lastNames, String gender) {
         UUID enrollmentId = UUID.randomUUID();
-        roster.add(new CourseStudent(enrollmentId, UUID.randomUUID(), "RUDE-" + roster.size(),
-            "CI-" + roster.size(), names, lastNames, "Effective", gender));
+        roster.add(
+                new CourseStudent(
+                        enrollmentId,
+                        UUID.randomUUID(),
+                        "RUDE-" + roster.size(),
+                        "CI-" + roster.size(),
+                        names,
+                        lastNames,
+                        "Effective",
+                        gender));
         return enrollmentId;
     }
 
     private void mark(UUID enrollmentId, UUID classGroupId, String subject, String total) {
-        scores.add(new AcademicScore(UUID.randomUUID(), enrollmentId, classGroupId, subject, 1,
-            null, null, null, null, new BigDecimal(total), null, null));
+        scores.add(
+                new AcademicScore(
+                        UUID.randomUUID(),
+                        enrollmentId,
+                        classGroupId,
+                        subject,
+                        1,
+                        null,
+                        null,
+                        null,
+                        null,
+                        new BigDecimal(total),
+                        null,
+                        null));
     }
 
     /** An area the teacher opened and never closed: a row with no total at all. */
     private void openedButUnmarked(UUID enrollmentId, UUID classGroupId, String subject) {
-        scores.add(new AcademicScore(UUID.randomUUID(), enrollmentId, classGroupId, subject, 1,
-            null, null, null, null, null, null, null));
+        scores.add(
+                new AcademicScore(
+                        UUID.randomUUID(),
+                        enrollmentId,
+                        classGroupId,
+                        subject,
+                        1,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null));
     }
 
     private void rosterAndScoresAreRead() {
         when(enrollmentDomain.activeStudentsByCourse(eq(courseId), any(PageQuery.class)))
-            .thenAnswer(call -> {
-                PageQuery query = call.getArgument(1);
-                return new PageResult<>(roster, query.page(), query.size(), roster.size());
-            });
+                .thenAnswer(
+                        call -> {
+                            PageQuery query = call.getArgument(1);
+                            return new PageResult<>(
+                                    roster, query.page(), query.size(), roster.size());
+                        });
         // Only when there is somebody to read marks for. An empty roster never reaches the score
         // port — an IN over no ids is a query worth nothing — and strict stubbing calls a stub that
         // was never used a mistake, which here it would be.
@@ -162,9 +208,17 @@ class PedagogicalReportServiceTest {
         courseExists();
         rosterAndScoresAreRead();
         LocalDateTime savedAt = LocalDateTime.of(2026, 5, 20, 16, 30);
-        when(reports.byCourseAndTrimester(courseId, 1)).thenReturn(Optional.of(new PedagogicalReport(
-            UUID.randomUUID(), courseId, 1, "Logros del curso", "Dificultades del curso",
-            List.of(), savedAt)));
+        when(reports.byCourseAndTrimester(courseId, 1))
+                .thenReturn(
+                        Optional.of(
+                                new PedagogicalReport(
+                                        UUID.randomUUID(),
+                                        courseId,
+                                        1,
+                                        "Logros del curso",
+                                        "Dificultades del curso",
+                                        List.of(),
+                                        savedAt)));
 
         PedagogicalReportSheet sheet = service.sheet(courseId, 1);
 
@@ -188,8 +242,9 @@ class PedagogicalReportServiceTest {
 
         assertThat(sheet.stats().passed().total()).isEqualTo(1);
         assertThat(sheet.stats().failed().total()).isEqualTo(1);
-        assertThat(sheet.failingStudents()).extracting(FailingStudentRow::fullName)
-            .containsExactly("Bruno Bermudez");
+        assertThat(sheet.failingStudents())
+                .extracting(FailingStudentRow::fullName)
+                .containsExactly("Bruno Bermudez");
     }
 
     @Test
@@ -273,10 +328,12 @@ class PedagogicalReportServiceTest {
         assertThat(sheet.failingStudents()).hasSize(1);
         FailingStudentRow row = sheet.failingStudents().get(0);
         assertThat(row.number()).isEqualTo(1);
-        assertThat(row.failedAreas()).extracting("subjectName")
-            .containsExactly("Lenguaje", "Matematicas");
-        assertThat(row.failedAreas()).extracting("mark")
-            .containsExactly(new BigDecimal("45"), new BigDecimal("40"));
+        assertThat(row.failedAreas())
+                .extracting("subjectName")
+                .containsExactly("Lenguaje", "Matematicas");
+        assertThat(row.failedAreas())
+                .extracting("mark")
+                .containsExactly(new BigDecimal("45"), new BigDecimal("40"));
     }
 
     /** Only the areas that failed. A student who failed one subject did not fail the others. */
@@ -291,7 +348,8 @@ class PedagogicalReportServiceTest {
         PedagogicalReportSheet sheet = sheetWithNoReportWritten();
 
         assertThat(sheet.failingStudents().get(0).failedAreas())
-            .extracting("subjectName").containsExactly("Matematicas");
+                .extracting("subjectName")
+                .containsExactly("Matematicas");
     }
 
     @Test
@@ -307,10 +365,12 @@ class PedagogicalReportServiceTest {
 
         PedagogicalReportSheet sheet = sheetWithNoReportWritten();
 
-        assertThat(sheet.failingStudents()).extracting(FailingStudentRow::fullName)
-            .containsExactly("Ana Alvarez", "Carla Caceres");
-        assertThat(sheet.failingStudents()).extracting(FailingStudentRow::number)
-            .containsExactly(1, 2);
+        assertThat(sheet.failingStudents())
+                .extracting(FailingStudentRow::fullName)
+                .containsExactly("Ana Alvarez", "Carla Caceres");
+        assertThat(sheet.failingStudents())
+                .extracting(FailingStudentRow::number)
+                .containsExactly(1, 2);
     }
 
     @Test
@@ -321,10 +381,21 @@ class PedagogicalReportServiceTest {
         mark(ana, mathGroup, "Matematicas", "20");
         mark(bruno, mathGroup, "Matematicas", "30");
         rosterAndScoresAreRead();
-        when(reports.byCourseAndTrimester(courseId, 1)).thenReturn(Optional.of(new PedagogicalReport(
-            UUID.randomUUID(), courseId, 1, null, null,
-            List.of(new PedagogicalReportNote(bruno, "Refuerzo en horario alterno", "Cuaderno")),
-            LocalDateTime.of(2026, 5, 20, 16, 30))));
+        when(reports.byCourseAndTrimester(courseId, 1))
+                .thenReturn(
+                        Optional.of(
+                                new PedagogicalReport(
+                                        UUID.randomUUID(),
+                                        courseId,
+                                        1,
+                                        null,
+                                        null,
+                                        List.of(
+                                                new PedagogicalReportNote(
+                                                        bruno,
+                                                        "Refuerzo en horario alterno",
+                                                        "Cuaderno")),
+                                        LocalDateTime.of(2026, 5, 20, 16, 30))));
 
         PedagogicalReportSheet sheet = service.sheet(courseId, 1);
 
@@ -347,10 +418,19 @@ class PedagogicalReportServiceTest {
         UUID ana = student("Ana", "Alvarez", "F");
         mark(ana, mathGroup, "Matematicas", "90");
         rosterAndScoresAreRead();
-        when(reports.byCourseAndTrimester(courseId, 1)).thenReturn(Optional.of(new PedagogicalReport(
-            UUID.randomUUID(), courseId, 1, null, null,
-            List.of(new PedagogicalReportNote(ana, "Acciones de cuando reprobaba", null)),
-            LocalDateTime.of(2026, 5, 20, 16, 30))));
+        when(reports.byCourseAndTrimester(courseId, 1))
+                .thenReturn(
+                        Optional.of(
+                                new PedagogicalReport(
+                                        UUID.randomUUID(),
+                                        courseId,
+                                        1,
+                                        null,
+                                        null,
+                                        List.of(
+                                                new PedagogicalReportNote(
+                                                        ana, "Acciones de cuando reprobaba", null)),
+                                        LocalDateTime.of(2026, 5, 20, 16, 30))));
 
         PedagogicalReportSheet sheet = service.sheet(courseId, 1);
 
@@ -358,7 +438,10 @@ class PedagogicalReportServiceTest {
         verify(reports, never()).save(any(), anyInt(), any());
     }
 
-    /** A course with nobody in it has no share to report. A printed 0% would read as "nobody passed". */
+    /**
+     * A course with nobody in it has no share to report. A printed 0% would read as "nobody
+     * passed".
+     */
     @Test
     void sheet_emptyClassroom_reportsNoShareRatherThanZeroPerCent() {
         courseExists();
@@ -395,8 +478,20 @@ class PedagogicalReportServiceTest {
     void sheet_readsOnlyTheTrimesterItWasAskedFor() {
         courseExists();
         UUID ana = student("Ana", "Alvarez", "F");
-        scores.add(new AcademicScore(UUID.randomUUID(), ana, mathGroup, "Matematicas", 2,
-            null, null, null, null, new BigDecimal("20"), null, null));
+        scores.add(
+                new AcademicScore(
+                        UUID.randomUUID(),
+                        ana,
+                        mathGroup,
+                        "Matematicas",
+                        2,
+                        null,
+                        null,
+                        null,
+                        null,
+                        new BigDecimal("20"),
+                        null,
+                        null));
         rosterAndScoresAreRead();
 
         PedagogicalReportSheet sheet = sheetWithNoReportWritten();
@@ -413,18 +508,27 @@ class PedagogicalReportServiceTest {
         mark(bruno, mathGroup, "Matematicas", "30");
         rosterAndScoresAreRead();
         when(enrollmentDomain.courseIdsByEnrollment(anyCollection()))
-            .thenReturn(Map.of(bruno, courseId));
-        PedagogicalReportDraft draft = new PedagogicalReportDraft("Logros", "Dificultades",
-            List.of(new PedagogicalReportNote(bruno, "Refuerzo", "Cuaderno")));
+                .thenReturn(Map.of(bruno, courseId));
+        PedagogicalReportDraft draft =
+                new PedagogicalReportDraft(
+                        "Logros",
+                        "Dificultades",
+                        List.of(new PedagogicalReportNote(bruno, "Refuerzo", "Cuaderno")));
         when(reports.save(eq(courseId), eq(1), any(PedagogicalReportDraft.class)))
-            .thenReturn(new PedagogicalReport(UUID.randomUUID(), courseId, 1, "Logros",
-                "Dificultades", List.of(new PedagogicalReportNote(bruno, "Refuerzo", "Cuaderno")),
-                LocalDateTime.of(2026, 5, 20, 16, 30)));
+                .thenReturn(
+                        new PedagogicalReport(
+                                UUID.randomUUID(),
+                                courseId,
+                                1,
+                                "Logros",
+                                "Dificultades",
+                                List.of(new PedagogicalReportNote(bruno, "Refuerzo", "Cuaderno")),
+                                LocalDateTime.of(2026, 5, 20, 16, 30)));
 
         PedagogicalReportSheet sheet = service.save(courseId, 1, draft);
 
         ArgumentCaptor<PedagogicalReportDraft> saved =
-            ArgumentCaptor.forClass(PedagogicalReportDraft.class);
+                ArgumentCaptor.forClass(PedagogicalReportDraft.class);
         verify(reports).save(eq(courseId), eq(1), saved.capture());
         assertThat(saved.getValue().achievements()).isEqualTo("Logros");
         assertThat(sheet.exists()).isTrue();
@@ -443,11 +547,20 @@ class PedagogicalReportServiceTest {
         courseExists();
         UUID stranger = UUID.randomUUID();
         when(enrollmentDomain.courseIdsByEnrollment(anyCollection()))
-            .thenReturn(Map.of(stranger, UUID.randomUUID()));
+                .thenReturn(Map.of(stranger, UUID.randomUUID()));
 
-        assertThatThrownBy(() -> service.save(courseId, 1, new PedagogicalReportDraft(null, null,
-            List.of(new PedagogicalReportNote(stranger, "Acciones", null)))))
-            .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.save(
+                                        courseId,
+                                        1,
+                                        new PedagogicalReportDraft(
+                                                null,
+                                                null,
+                                                List.of(
+                                                        new PedagogicalReportNote(
+                                                                stranger, "Acciones", null)))))
+                .isInstanceOf(ValidationException.class);
 
         verify(reports, never()).save(any(), anyInt(), any());
     }
@@ -458,9 +571,20 @@ class PedagogicalReportServiceTest {
         courseExists();
         when(enrollmentDomain.courseIdsByEnrollment(anyCollection())).thenReturn(Map.of());
 
-        assertThatThrownBy(() -> service.save(courseId, 1, new PedagogicalReportDraft(null, null,
-            List.of(new PedagogicalReportNote(UUID.randomUUID(), "Acciones", null)))))
-            .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.save(
+                                        courseId,
+                                        1,
+                                        new PedagogicalReportDraft(
+                                                null,
+                                                null,
+                                                List.of(
+                                                        new PedagogicalReportNote(
+                                                                UUID.randomUUID(),
+                                                                "Acciones",
+                                                                null)))))
+                .isInstanceOf(ValidationException.class);
 
         verify(reports, never()).save(any(), anyInt(), any());
     }
@@ -471,8 +595,15 @@ class PedagogicalReportServiceTest {
         courseExists();
         rosterAndScoresAreRead();
         when(reports.save(eq(courseId), eq(1), any(PedagogicalReportDraft.class)))
-            .thenReturn(new PedagogicalReport(UUID.randomUUID(), courseId, 1, "Sólo logros", null,
-                List.of(), LocalDateTime.of(2026, 5, 20, 16, 30)));
+                .thenReturn(
+                        new PedagogicalReport(
+                                UUID.randomUUID(),
+                                courseId,
+                                1,
+                                "Sólo logros",
+                                null,
+                                List.of(),
+                                LocalDateTime.of(2026, 5, 20, 16, 30)));
 
         service.save(courseId, 1, new PedagogicalReportDraft("Sólo logros", null, List.of()));
 

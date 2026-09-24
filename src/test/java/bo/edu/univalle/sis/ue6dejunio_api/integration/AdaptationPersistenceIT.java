@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
@@ -8,18 +11,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
-
-import java.sql.SQLException;
-import java.time.LocalDate;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The adaptation against a real database. Every test until now mocked the port, so a column the
@@ -30,7 +29,10 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
 
     @Autowired private IPdcService pdcService;
     @Autowired private IAdaptationService adaptationService;
-    /** The port under the service, which inserts without asking whether the row is already there. */
+
+    /**
+     * The port under the service, which inserts without asking whether the row is already there.
+     */
     @Autowired private IAdaptationDomain adaptationDomain;
 
     private UUID teacher;
@@ -41,16 +43,33 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
         teacher = seedUser("Teacher", false);
         UUID course = seedCourse(teacher, "A");
         seedClassGroup(course, teacher, "Matematicas");
-        plan = pdcService.create(new CreatePdcCommand(course, 4, 2,
-            LocalDate.of(2026, 8, 3), LocalDate.of(2026, 9, 4),
-            "Fortalecemos la práctica de valores sociocomunitarios.", null, null, null),
-            teacher).getId();
+        plan =
+                pdcService
+                        .create(
+                                new CreatePdcCommand(
+                                        course,
+                                        4,
+                                        2,
+                                        LocalDate.of(2026, 8, 3),
+                                        LocalDate.of(2026, 9, 4),
+                                        "Fortalecemos la práctica de valores sociocomunitarios.",
+                                        null,
+                                        null,
+                                        null),
+                                teacher)
+                        .getId();
     }
 
     private Adaptation adaptationFor(String conditionType) {
-        return adaptationService.create(new CreateAdaptationCommand(plan, seedStudent(),
-            conditionType, "Contenido adaptado", "Metodología adaptada", "Criterio adaptado",
-            teacher));
+        return adaptationService.create(
+                new CreateAdaptationCommand(
+                        plan,
+                        seedStudent(),
+                        conditionType,
+                        "Contenido adaptado",
+                        "Metodología adaptada",
+                        "Criterio adaptado",
+                        teacher));
     }
 
     // The condition is a column of the handed-in form, not a note: the same adapted content means
@@ -62,7 +81,7 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
 
         assertThat(created.conditionType()).isEqualTo("Talento extraordinario");
         assertThat(adaptationService.getById(created.id()).conditionType())
-            .isEqualTo("Talento extraordinario");
+                .isEqualTo("Talento extraordinario");
     }
 
     // A diagnosis gets corrected after the plan is written, so the update has to reach the column
@@ -71,8 +90,8 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
     void anUpdateCorrectsTheConditionAndLeavesTheRestStanding() {
         Adaptation created = adaptationFor("Discapacidad");
 
-        adaptationService.update(created.id(),
-            new UpdateAdaptationCommand("TEA", null, null, null, teacher));
+        adaptationService.update(
+                created.id(), new UpdateAdaptationCommand("TEA", null, null, null, teacher));
 
         Adaptation read = adaptationService.getById(created.id());
         assertThat(read.conditionType()).isEqualTo("TEA");
@@ -87,8 +106,9 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
     void anUpdateThatDoesNotNameTheConditionKeepsIt() {
         Adaptation created = adaptationFor("TDH");
 
-        adaptationService.update(created.id(),
-            new UpdateAdaptationCommand(null, null, "Otra metodología", null, teacher));
+        adaptationService.update(
+                created.id(),
+                new UpdateAdaptationCommand(null, null, "Otra metodología", null, teacher));
 
         Adaptation read = adaptationService.getById(created.id());
         assertThat(read.conditionType()).isEqualTo("TDH");
@@ -108,39 +128,58 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
     void theDatabaseItselfRefusesASecondAdaptationForTheSameStudent() {
         Adaptation first = adaptationFor("Discapacidad");
 
-        assertThatThrownBy(() -> adaptationDomain.create(new CreateAdaptationCommand(
-            plan, first.studentId(), "TEA", null, null, null, teacher)))
-            .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(
+                        () ->
+                                adaptationDomain.create(
+                                        new CreateAdaptationCommand(
+                                                plan,
+                                                first.studentId(),
+                                                "TEA",
+                                                null,
+                                                null,
+                                                null,
+                                                teacher)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     /**
      * What the losing half of the race actually looks like when it reaches the exception handler.
      *
      * <p>Not a detail: the handler has to tell this apart from a NOT NULL or a foreign key, which
-     * are this code writing a row it had no business writing and belong in a 500. Spring hands it
-     * a different type depending on who translated the failure — JdbcTemplate produces
-     * {@code DuplicateKeyException}, Hibernate wraps its own and produces the plain parent — and
-     * every write in this application goes through JPA. So the type alone cannot be the signal,
-     * and what survives both paths is the SQL state the driver reported.
+     * are this code writing a row it had no business writing and belong in a 500. Spring hands it a
+     * different type depending on who translated the failure — JdbcTemplate produces {@code
+     * DuplicateKeyException}, Hibernate wraps its own and produces the plain parent — and every
+     * write in this application goes through JPA. So the type alone cannot be the signal, and what
+     * survives both paths is the SQL state the driver reported.
      *
-     * <p>Pinned here rather than reasoned about: a handler keyed on the wrong signal answers 500
-     * to a conflict, and the first time anyone would notice is in production under load.
+     * <p>Pinned here rather than reasoned about: a handler keyed on the wrong signal answers 500 to
+     * a conflict, and the first time anyone would notice is in production under load.
      */
     @Test
     void theRaceArrivesThroughJpaAsAnIntegrityViolationCarryingTheUniqueSqlState() {
         Adaptation first = adaptationFor("Discapacidad");
 
-        assertThatThrownBy(() -> adaptationDomain.create(new CreateAdaptationCommand(
-            plan, first.studentId(), "TEA", null, null, null, teacher)))
-            .isInstanceOf(DataIntegrityViolationException.class)
-            .isNotInstanceOf(DuplicateKeyException.class)
-            .satisfies(thrown -> assertThat(sqlStateOf(thrown)).isEqualTo("23505"));
+        assertThatThrownBy(
+                        () ->
+                                adaptationDomain.create(
+                                        new CreateAdaptationCommand(
+                                                plan,
+                                                first.studentId(),
+                                                "TEA",
+                                                null,
+                                                null,
+                                                null,
+                                                teacher)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(DuplicateKeyException.class)
+                .satisfies(thrown -> assertThat(sqlStateOf(thrown)).isEqualTo("23505"));
     }
 
     /** The SQL state the driver reported, wherever in the cause chain Hibernate buried it. */
     private static String sqlStateOf(Throwable thrown) {
-        for (Throwable cause = thrown; cause != null && cause.getCause() != cause;
-             cause = cause.getCause()) {
+        for (Throwable cause = thrown;
+                cause != null && cause.getCause() != cause;
+                cause = cause.getCause()) {
             if (cause instanceof SQLException sql && sql.getSQLState() != null) {
                 return sql.getSQLState();
             }
@@ -163,7 +202,7 @@ class AdaptationPersistenceIT extends AbstractIntegrationTest {
         adaptationFor("Discapacidad");
 
         assertThat(adaptationService.listByPlan(plan, PageQuery.of(0, 20)).content())
-            .singleElement()
-            .satisfies(a -> assertThat(a.conditionType()).isEqualTo("Discapacidad"));
+                .singleElement()
+                .satisfies(a -> assertThat(a.conditionType()).isEqualTo("Discapacidad"));
     }
 }

@@ -11,9 +11,8 @@ import java.util.UUID;
  * @param status what the student now is
  * @param reason the category behind it — one of {@link StudentWithdrawalReason}'s labels
  * @param note the Director's own words. Present when the category is the open one, which says
- *             nothing on its own; {@code null} otherwise
- * @param changedBy who decided. {@code null} only if the account is later removed, which the
- *                  schema allows so a deleted user cannot take a student's record with them
+ *     nothing on its own; {@code null} otherwise
+ * @param changedBy who decided. {@code null} only if the account is later removed, which the schema
+ *     allows so a deleted user cannot take a student's record with them
  */
-public record StudentStatusChange(String status, String reason, String note, UUID changedBy) {
-}
+public record StudentStatusChange(String status, String reason, String note, UUID changedBy) {}

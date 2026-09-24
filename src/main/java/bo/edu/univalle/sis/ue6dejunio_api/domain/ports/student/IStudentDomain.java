@@ -6,7 +6,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +13,7 @@ import java.util.UUID;
 
 public interface IStudentDomain {
     Student save(Student student);
+
     Optional<Student> findById(UUID id);
 
     /** The students behind a whole batch of RUDE codes, in one lookup. */
@@ -21,7 +21,9 @@ public interface IStudentDomain {
 
     /** The students behind a whole batch of identity cards, in one lookup. */
     List<Student> findByIdentityCardIn(Collection<String> identityCards);
-    PageResult<StudentDirectoryItem> searchDirectory(StudentDirectoryQuery query, PageQuery pageQuery);
+
+    PageResult<StudentDirectoryItem> searchDirectory(
+            StudentDirectoryQuery query, PageQuery pageQuery);
 
     /**
      * Moves the student to another status and records why, in whose words, and by whom.

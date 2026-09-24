@@ -9,9 +9,9 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions;
  *
  * <p>They are different problems for different people. An outage is somebody's to restart. This is
  * a disagreement between the batch this side assembled and the rule the model enforces — the
- * service was running the whole time, and no amount of retrying will change the answer. Reported
- * as "the model is unavailable" it sends a teacher to look at a process that is working, which is
- * the most expensive wrong place to send them.
+ * service was running the whole time, and no amount of retrying will change the answer. Reported as
+ * "the model is unavailable" it sends a teacher to look at a process that is working, which is the
+ * most expensive wrong place to send them.
  *
  * <p>The model states its reason in the response body, and that sentence is carried in the message
  * rather than logged and dropped: it names the offending vectors, and it exists only at the moment

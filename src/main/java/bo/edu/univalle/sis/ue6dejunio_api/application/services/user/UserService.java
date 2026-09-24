@@ -1,10 +1,10 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.user;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
@@ -14,11 +14,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserService;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 @Transactional
@@ -43,11 +42,12 @@ public class UserService implements IUserService {
     private final PasswordGenerator passwordGenerator;
     private final IEmailService emailService;
 
-    public UserService(IUserDomain userDomain,
-                       IRoleDomain roleDomain,
-                       PasswordEncoder passwordEncoder,
-                       PasswordGenerator passwordGenerator,
-                       IEmailService emailService) {
+    public UserService(
+            IUserDomain userDomain,
+            IRoleDomain roleDomain,
+            PasswordEncoder passwordEncoder,
+            PasswordGenerator passwordGenerator,
+            IEmailService emailService) {
         this.userDomain = userDomain;
         this.roleDomain = roleDomain;
         this.passwordEncoder = passwordEncoder;
@@ -63,24 +63,27 @@ public class UserService implements IUserService {
         if (userDomain.existsByCi(command.ci())) {
             throw new DuplicateResourceException("ci", command.ci());
         }
-        Role role = roleDomain.findById(command.roleId())
-            .orElseThrow(() -> new ResourceNotFoundException("Rol", command.roleId()));
+        Role role =
+                roleDomain
+                        .findById(command.roleId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Rol", command.roleId()));
         rejectDirector(role);
 
         String temporaryPassword = passwordGenerator.generate();
 
-        User user = User.builder()
-            .ci(command.ci())
-            .names(command.names())
-            .lastNames(command.lastNames())
-            .phone(command.phone())
-            .email(command.email())
-            .password(passwordEncoder.encode(temporaryPassword))
-            .mustChangePassword(true)
-            .technical(isTechnicalTeacher(role, command.technical()))
-            .role(role)
-            .active(true)
-            .build();
+        User user =
+                User.builder()
+                        .ci(command.ci())
+                        .names(command.names())
+                        .lastNames(command.lastNames())
+                        .phone(command.phone())
+                        .email(command.email())
+                        .password(passwordEncoder.encode(temporaryPassword))
+                        .mustChangePassword(true)
+                        .technical(isTechnicalTeacher(role, command.technical()))
+                        .role(role)
+                        .active(true)
+                        .build();
 
         User saved = userDomain.save(user);
         emailService.sendWelcomeCredentials(saved.getEmail(), saved.fullName(), temporaryPassword);
@@ -89,16 +92,21 @@ public class UserService implements IUserService {
 
     @Override
     public User update(UUID id, UpdateUserCommand command) {
-        User user = userDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+        User user =
+                userDomain
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
 
         if (command.names() != null) user.setNames(command.names());
         if (command.lastNames() != null) user.setLastNames(command.lastNames());
         if (command.phone() != null) user.setPhone(command.phone());
         if (command.active() != null) user.setActive(command.active());
         if (command.roleId() != null) {
-            Role role = roleDomain.findById(command.roleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Rol", command.roleId()));
+            Role role =
+                    roleDomain
+                            .findById(command.roleId())
+                            .orElseThrow(
+                                    () -> new ResourceNotFoundException("Rol", command.roleId()));
             rejectDirector(role);
             user.setRole(role);
             // A Secretary who used to teach keeps no trace of it. The flag survived the role change
@@ -112,7 +120,7 @@ public class UserService implements IUserService {
     private static void rejectDirector(Role role) {
         if (DIRECTOR_ROLE.equals(role.name())) {
             throw new ValidationException(
-                "El rol Director no puede asignarse desde el registro de usuarios");
+                    "El rol Director no puede asignarse desde el registro de usuarios");
         }
     }
 
@@ -124,8 +132,9 @@ public class UserService implements IUserService {
     @Override
     @Transactional(readOnly = true)
     public User getById(UUID id) {
-        return userDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+        return userDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
     }
 
     @Override
@@ -141,8 +150,10 @@ public class UserService implements IUserService {
 
     @Override
     public User activate(UUID id) {
-        User user = userDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+        User user =
+                userDomain
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
         user.setActive(true);
         return userDomain.save(user);
     }

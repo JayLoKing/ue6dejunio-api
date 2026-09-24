@@ -1,12 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.common;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class PageResultTest {
 
@@ -65,10 +64,10 @@ class PageResultTest {
     void rejectsCoordinatesThatCannotDescribeAPage() {
         // A ValidationException, not a raw one: bad bounds are a 400, never a 500.
         assertThatThrownBy(() -> new PageResult<>(List.of(), -1, 10, 0))
-            .isInstanceOf(ValidationException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new PageResult<>(List.of(), 0, 0, 0))
-            .isInstanceOf(ValidationException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new PageResult<>(List.of(), 0, 10, -1))
-            .isInstanceOf(ValidationException.class);
+                .isInstanceOf(ValidationException.class);
     }
 }

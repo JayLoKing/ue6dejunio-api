@@ -5,11 +5,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.CreateProgressC
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.PlanProgress;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.progress.IProgressDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.progress.IProgressService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProgressService implements IProgressService {
@@ -26,8 +25,13 @@ public class ProgressService implements IProgressService {
         if (!progressDomain.planExists(c.planId())) {
             throw new ResourceNotFoundException("PDC", c.planId());
         }
-        return progressDomain.create(c.planId(), c.progressDate(), c.advancedContent(),
-            c.percentage(), c.observations(), c.createdBy());
+        return progressDomain.create(
+                c.planId(),
+                c.progressDate(),
+                c.advancedContent(),
+                c.percentage(),
+                c.observations(),
+                c.createdBy());
     }
 
     @Override

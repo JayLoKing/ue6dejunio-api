@@ -4,7 +4,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
-
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -15,14 +14,14 @@ import java.util.UUID;
 public interface IRiskPredictionDomain {
 
     /**
-     * Writes a run's worth of predictions, correcting the standing row for each
-     * (student, subject, trimester) rather than appending beside it.
+     * Writes a run's worth of predictions, correcting the standing row for each (student, subject,
+     * trimester) rather than appending beside it.
      *
      * <p>Batched, and reports what each row held before. The table is an upsert target, so the
      * previous level is gone the instant the new one lands — and the previous level is the only
      * thing that can answer "did this student get worse", which is the one question worth writing
-     * to a teacher about. Read here, inside the write, because reading it separately is a race:
-     * two runs overlapping would both see the same "before" and both announce the same change.
+     * to a teacher about. Read here, inside the write, because reading it separately is a race: two
+     * runs overlapping would both see the same "before" and both announce the same change.
      *
      * <p>Reporting rather than deciding: this returns the fact (what was there, what is there now)
      * and leaves what counts as news to the service.
@@ -54,15 +53,15 @@ public interface IRiskPredictionDomain {
      * Each crossing is a real transition, and each one was a message. A teacher told four times
      * about the same child stops reading any of it.
      *
-     * <p>The grain is the prediction row, which is already unique on student, subject and
-     * trimester — so it is exactly "once a day per student per subject" without a second key.
+     * <p>The grain is the prediction row, which is already unique on student, subject and trimester
+     * — so it is exactly "once a day per student per subject" without a second key.
      *
      * @param notBefore predictions announced at or after this instant are left out. The start of
-     *                  today, for a once-a-day bound.
+     *     today, for a once-a-day bound.
      * @return the ids the caller may announce. Everything else has already been said today.
      */
-    Set<UUID> claimForNotification(Collection<UUID> predictionIds, LocalDateTime now,
-                                   LocalDateTime notBefore);
+    Set<UUID> claimForNotification(
+            Collection<UUID> predictionIds, LocalDateTime now, LocalDateTime notBefore);
 
     /** Everyone predicted in one subject this trimester, worst first. */
     List<StudentRisk> byClassGroupAndTrimester(UUID classGroupId, int trimester);
@@ -85,7 +84,9 @@ public interface IRiskPredictionDomain {
      */
     record UpsertResult(RiskPrediction stored, RiskLevel previousLevel) {
 
-        /** Whether the discrete category moved. The probability moves on every run; this does not. */
+        /**
+         * Whether the discrete category moved. The probability moves on every run; this does not.
+         */
         public boolean levelChanged() {
             return previousLevel == null || previousLevel != stored.riskLevel();
         }

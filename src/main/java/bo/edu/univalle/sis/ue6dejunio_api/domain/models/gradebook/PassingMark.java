@@ -16,8 +16,7 @@ public final class PassingMark {
     /** 51 out of 100. A mark of exactly 51 passes; 50 does not. */
     public static final BigDecimal MINIMUM = new BigDecimal("51");
 
-    private PassingMark() {
-    }
+    private PassingMark() {}
 
     /** Whether this mark reaches the minimum. An absent mark is neither passed nor failed. */
     public static boolean reachedBy(BigDecimal mark) {

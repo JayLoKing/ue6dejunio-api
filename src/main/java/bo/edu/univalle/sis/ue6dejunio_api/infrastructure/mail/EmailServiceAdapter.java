@@ -3,6 +3,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mail;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,9 +12,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class EmailServiceAdapter implements IEmailService {
@@ -24,10 +23,9 @@ public class EmailServiceAdapter implements IEmailService {
     private final String fromName;
 
     public EmailServiceAdapter(
-        JavaMailSender mailSender,
-        @Value("${app.mail.from}") String from,
-        @Value("${app.mail.from-name}") String fromName
-    ) {
+            JavaMailSender mailSender,
+            @Value("${app.mail.from}") String from,
+            @Value("${app.mail.from-name}") String fromName) {
         this.mailSender = mailSender;
         this.from = from;
         this.fromName = fromName;
@@ -38,7 +36,8 @@ public class EmailServiceAdapter implements IEmailService {
     public void sendWelcomeCredentials(String toEmail, String fullName, String temporaryPassword) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(from, fromName);
             helper.setTo(toEmail);
             helper.setSubject("Bienvenido(a) al Sistema UE 6 de Junio - Credenciales de acceso");
@@ -56,7 +55,8 @@ public class EmailServiceAdapter implements IEmailService {
     public void sendPasswordReset(String toEmail, String fullName, String resetLink) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(from, fromName);
             helper.setTo(toEmail);
             helper.setSubject("Recuperación de contraseña - Sistema UE 6 de Junio");
@@ -83,7 +83,8 @@ public class EmailServiceAdapter implements IEmailService {
               <p style="font-size:12px;color:#666;">Mensaje autom&aacute;tico, no responder.</p>
             </body>
             </html>
-            """.formatted(fullName, resetLink);
+            """
+                .formatted(fullName, resetLink);
     }
 
     private String buildBody(String fullName, String email, String password) {
@@ -102,6 +103,7 @@ public class EmailServiceAdapter implements IEmailService {
               <p style="font-size:12px;color:#666;">Mensaje autom&aacute;tico, no responder.</p>
             </body>
             </html>
-            """.formatted(fullName, email, password);
+            """
+                .formatted(fullName, email, password);
     }
 }

@@ -21,9 +21,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseE
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IPedagogicalReportDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IPedagogicalReportService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -34,6 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The informe pedagógico: sections I, III and the marks of IV derived from the record, sections II
@@ -53,8 +52,11 @@ public class PedagogicalReportService implements IPedagogicalReportService {
      */
     private static final int ROSTER_PAGE_SIZE = 200;
 
-    /** {@code students.gender}, as {@code V3} constrains it. Nullable, which section III respects. */
+    /**
+     * {@code students.gender}, as {@code V3} constrains it. Nullable, which section III respects.
+     */
     private static final String MALE = "M";
+
     private static final String FEMALE = "F";
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
@@ -64,10 +66,11 @@ public class PedagogicalReportService implements IPedagogicalReportService {
     private final ICourseEnrollmentDomain enrollmentDomain;
     private final IScoreDomain scoreDomain;
 
-    public PedagogicalReportService(IPedagogicalReportDomain reports,
-                                    ICourseService courseService,
-                                    ICourseEnrollmentDomain enrollmentDomain,
-                                    IScoreDomain scoreDomain) {
+    public PedagogicalReportService(
+            IPedagogicalReportDomain reports,
+            ICourseService courseService,
+            ICourseEnrollmentDomain enrollmentDomain,
+            IScoreDomain scoreDomain) {
         this.reports = reports;
         this.courseService = courseService;
         this.enrollmentDomain = enrollmentDomain;
@@ -117,18 +120,15 @@ public class PedagogicalReportService implements IPedagogicalReportService {
         }
         if (notes.stream().anyMatch(n -> n.courseEnrollmentId() == null)) {
             throw new ValidationException(
-                "Cada observación del informe tiene que nombrar la matrícula del estudiante");
+                    "Cada observación del informe tiene que nombrar la matrícula del estudiante");
         }
-        List<UUID> enrollmentIds = notes.stream()
-            .map(PedagogicalReportNote::courseEnrollmentId)
-            .distinct()
-            .toList();
+        List<UUID> enrollmentIds =
+                notes.stream().map(PedagogicalReportNote::courseEnrollmentId).distinct().toList();
         Map<UUID, UUID> courseOf = enrollmentDomain.courseIdsByEnrollment(enrollmentIds);
-        boolean foreign = enrollmentIds.stream()
-            .anyMatch(id -> !courseId.equals(courseOf.get(id)));
+        boolean foreign = enrollmentIds.stream().anyMatch(id -> !courseId.equals(courseOf.get(id)));
         if (foreign) {
             throw new ValidationException(
-                "El informe sólo puede describir a estudiantes matriculados en el curso");
+                    "El informe sólo puede describir a estudiantes matriculados en el curso");
         }
     }
 
@@ -150,14 +150,21 @@ public class PedagogicalReportService implements IPedagogicalReportService {
         List<StudentTrimester> roster = new ArrayList<>();
         int pageIndex = 0;
         while (true) {
-            PageResult<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId,
-                PageQuery.of(pageIndex, ROSTER_PAGE_SIZE,
-                    SortField.asc("student.lastNames"), SortField.asc("student.names"),
-                    SortField.asc("id")));
+            PageResult<CourseStudent> page =
+                    enrollmentDomain.activeStudentsByCourse(
+                            courseId,
+                            PageQuery.of(
+                                    pageIndex,
+                                    ROSTER_PAGE_SIZE,
+                                    SortField.asc("student.lastNames"),
+                                    SortField.asc("student.names"),
+                                    SortField.asc("id")));
             Map<UUID, List<AcademicScore>> scores = scoresByEnrollment(page, trimester);
             for (CourseStudent cs : page.content()) {
-                roster.add(new StudentTrimester(cs,
-                    areasOf(scores.getOrDefault(cs.courseEnrollmentId(), List.of()))));
+                roster.add(
+                        new StudentTrimester(
+                                cs,
+                                areasOf(scores.getOrDefault(cs.courseEnrollmentId(), List.of()))));
             }
             if (readEverything(roster.size(), page.content().size(), page.totalElements())) {
                 return roster;
@@ -172,15 +179,15 @@ public class PedagogicalReportService implements IPedagogicalReportService {
     }
 
     /** One batched load for the whole page, then in-memory grouping — never a query per student. */
-    private Map<UUID, List<AcademicScore>> scoresByEnrollment(PageResult<CourseStudent> page,
-                                                              int trimester) {
+    private Map<UUID, List<AcademicScore>> scoresByEnrollment(
+            PageResult<CourseStudent> page, int trimester) {
         List<UUID> ids = page.content().stream().map(CourseStudent::courseEnrollmentId).toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         return scoreDomain.findByCourseEnrollmentIn(ids).stream()
-            .filter(s -> Integer.valueOf(trimester).equals(s.trimester()))
-            .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
+                .filter(s -> Integer.valueOf(trimester).equals(s.trimester()))
+                .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
     }
 
     /**
@@ -196,28 +203,36 @@ public class PedagogicalReportService implements IPedagogicalReportService {
      */
     private static List<MarkedArea> areasOf(List<AcademicScore> scoresOfTrimester) {
         return scoresOfTrimester.stream()
-            .filter(s -> s.totalScore() != null)
-            .map(s -> new MarkedArea(s.classGroupId(), s.subjectName(), s.totalScore()))
-            .sorted(Comparator
-                .comparing(MarkedArea::subjectName, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(a -> a.classGroupId().toString()))
-            .toList();
+                .filter(s -> s.totalScore() != null)
+                .map(s -> new MarkedArea(s.classGroupId(), s.subjectName(), s.totalScore()))
+                .sorted(
+                        Comparator.comparing(
+                                        MarkedArea::subjectName,
+                                        Comparator.nullsLast(Comparator.naturalOrder()))
+                                .thenComparing(a -> a.classGroupId().toString()))
+                .toList();
     }
 
-    private PedagogicalReportSheet render(Course course, int trimester, List<StudentTrimester> roster,
-                                          Optional<PedagogicalReport> written) {
-        Map<UUID, PedagogicalReportNote> noteOf = written
-            .map(PedagogicalReportService::notesByEnrollment)
-            .orElseGet(Map::of);
+    private PedagogicalReportSheet render(
+            Course course,
+            int trimester,
+            List<StudentTrimester> roster,
+            Optional<PedagogicalReport> written) {
+        Map<UUID, PedagogicalReportNote> noteOf =
+                written.map(PedagogicalReportService::notesByEnrollment).orElseGet(Map::of);
         return new PedagogicalReportSheet(
-            course.id(), course.gradeName(), course.parallelName(), course.year(),
-            course.homeroomTeacherName(), trimester,
-            written.isPresent(),
-            written.map(PedagogicalReport::achievements).orElse(null),
-            written.map(PedagogicalReport::difficulties).orElse(null),
-            statsOf(roster),
-            failingRows(roster, noteOf),
-            written.map(PedagogicalReport::updatedAt).orElse(null));
+                course.id(),
+                course.gradeName(),
+                course.parallelName(),
+                course.year(),
+                course.homeroomTeacherName(),
+                trimester,
+                written.isPresent(),
+                written.map(PedagogicalReport::achievements).orElse(null),
+                written.map(PedagogicalReport::difficulties).orElse(null),
+                statsOf(roster),
+                failingRows(roster, noteOf),
+                written.map(PedagogicalReport::updatedAt).orElse(null));
     }
 
     private static Map<UUID, PedagogicalReportNote> notesByEnrollment(PedagogicalReport report) {
@@ -238,17 +253,19 @@ public class PedagogicalReportService implements IPedagogicalReportService {
      */
     private static PedagogicalReportStats statsOf(List<StudentTrimester> roster) {
         List<CourseStudent> effective = roster.stream().map(StudentTrimester::student).toList();
-        List<CourseStudent> failed = roster.stream()
-            .filter(StudentTrimester::failedSomething)
-            .map(StudentTrimester::student)
-            .toList();
-        List<CourseStudent> passed = roster.stream()
-            .filter(s -> s.wasJudged() && !s.failedSomething())
-            .map(StudentTrimester::student)
-            .toList();
+        List<CourseStudent> failed =
+                roster.stream()
+                        .filter(StudentTrimester::failedSomething)
+                        .map(StudentTrimester::student)
+                        .toList();
+        List<CourseStudent> passed =
+                roster.stream()
+                        .filter(s -> s.wasJudged() && !s.failedSomething())
+                        .map(StudentTrimester::student)
+                        .toList();
         int total = effective.size();
         return new PedagogicalReportStats(
-            tally(effective, total), tally(passed, total), tally(failed, total));
+                tally(effective, total), tally(passed, total), tally(failed, total));
     }
 
     /**
@@ -268,7 +285,8 @@ public class PedagogicalReportService implements IPedagogicalReportService {
                 female++;
             }
         }
-        return new GenderTally(male, female, students.size(), share(students.size(), effectiveTotal));
+        return new GenderTally(
+                male, female, students.size(), share(students.size(), effectiveTotal));
     }
 
     /**
@@ -283,8 +301,8 @@ public class PedagogicalReportService implements IPedagogicalReportService {
             return null;
         }
         return BigDecimal.valueOf(count)
-            .multiply(HUNDRED)
-            .divide(BigDecimal.valueOf(effectiveTotal), 2, RoundingMode.HALF_UP);
+                .multiply(HUNDRED)
+                .divide(BigDecimal.valueOf(effectiveTotal), 2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -298,8 +316,8 @@ public class PedagogicalReportService implements IPedagogicalReportService {
      * failing set moves every time a mark is corrected, and a teacher whose student passed on
      * appeal should find their text intact if the correction is undone.
      */
-    private static List<FailingStudentRow> failingRows(List<StudentTrimester> roster,
-                                                       Map<UUID, PedagogicalReportNote> noteOf) {
+    private static List<FailingStudentRow> failingRows(
+            List<StudentTrimester> roster, Map<UUID, PedagogicalReportNote> noteOf) {
         List<FailingStudentRow> rows = new ArrayList<>();
         int number = 1;
         for (StudentTrimester entry : roster) {
@@ -308,10 +326,15 @@ public class PedagogicalReportService implements IPedagogicalReportService {
             }
             CourseStudent student = entry.student();
             PedagogicalReportNote note = noteOf.get(student.courseEnrollmentId());
-            rows.add(new FailingStudentRow(number++, student.courseEnrollmentId(),
-                student.studentId(), student.fullName(), entry.failedAreas(),
-                note == null ? null : note.actions(),
-                note == null ? null : note.verificationSource()));
+            rows.add(
+                    new FailingStudentRow(
+                            number++,
+                            student.courseEnrollmentId(),
+                            student.studentId(),
+                            student.fullName(),
+                            entry.failedAreas(),
+                            note == null ? null : note.actions(),
+                            note == null ? null : note.verificationSource()));
         }
         return List.copyOf(rows);
     }
@@ -333,9 +356,9 @@ public class PedagogicalReportService implements IPedagogicalReportService {
 
         List<FailedArea> failedAreas() {
             return markedAreas.stream()
-                .filter(a -> !PassingMark.reachedBy(a.mark()))
-                .map(a -> new FailedArea(a.classGroupId(), a.subjectName(), a.mark()))
-                .toList();
+                    .filter(a -> !PassingMark.reachedBy(a.mark()))
+                    .map(a -> new FailedArea(a.classGroupId(), a.subjectName(), a.mark()))
+                    .toList();
         }
     }
 }

@@ -9,8 +9,7 @@ import jakarta.validation.constraints.Size;
  * that nothing in the system can be looked up by afterwards.
  */
 public record UpdateSubjectRequest(
-    @Size(min = 1, max = 100) String name,
-    @JsonProperty("id_area") Integer areaId,
-    Boolean technical,
-    Boolean active
-) {}
+        @Size(min = 1, max = 100) String name,
+        @JsonProperty("id_area") Integer areaId,
+        Boolean technical,
+        Boolean active) {}

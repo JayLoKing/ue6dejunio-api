@@ -10,17 +10,16 @@ import java.util.UUID;
  *
  * @param grade the course they sit in, or sat in. Absent for a student with no enrolment at all
  * @param academicYear the gestión the grade and parallel above belong to. A student who moves up
- *                     keeps this record and gains another year, so the grade means nothing without
- *                     the year it was true of
+ *     keeps this record and gains another year, so the grade means nothing without the year it was
+ *     true of
  */
 public record StudentDirectoryItem(
-    UUID id,
-    String rudeCode,
-    String identityCard,
-    String fullName,
-    String grade,
-    String parallel,
-    String level,
-    String status,
-    Integer academicYear
-) {}
+        UUID id,
+        String rudeCode,
+        String identityCard,
+        String fullName,
+        String grade,
+        String parallel,
+        String level,
+        String status,
+        Integer academicYear) {}

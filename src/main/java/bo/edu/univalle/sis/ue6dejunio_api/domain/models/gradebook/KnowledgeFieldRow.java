@@ -11,7 +11,4 @@ import java.util.List;
  * @param displayOrder the order the school's sheets read the fields in.
  */
 public record KnowledgeFieldRow(
-    String fieldName,
-    Integer displayOrder,
-    List<AnnualSubjectScore> subjects
-) {}
+        String fieldName, Integer displayOrder, List<AnnualSubjectScore> subjects) {}

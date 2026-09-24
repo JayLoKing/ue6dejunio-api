@@ -4,10 +4,9 @@ import java.util.List;
 import java.util.UUID;
 
 public record CourseAttendanceStats(
-    UUID courseId,
-    String scope,
-    Integer trimester,
-    AttendanceCounts overall,
-    List<MonthlyAttendance> byMonth,
-    List<TrimesterAttendance> byTrimester
-) {}
+        UUID courseId,
+        String scope,
+        Integer trimester,
+        AttendanceCounts overall,
+        List<MonthlyAttendance> byMonth,
+        List<TrimesterAttendance> byTrimester) {}

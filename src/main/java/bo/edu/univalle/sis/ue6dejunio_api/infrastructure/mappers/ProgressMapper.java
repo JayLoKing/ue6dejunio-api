@@ -8,7 +8,9 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ProgressMapper {
 
-    /** The author is already a raw id on the row: the progress note records who, not their record. */
+    /**
+     * The author is already a raw id on the row: the progress note records who, not their record.
+     */
     @Mapping(target = "planId", source = "curriculumPlan.id")
     PlanProgress toDomain(CurriculumPlanProgressEntity entity);
 }

@@ -1,13 +1,22 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelRejectedException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -21,19 +30,8 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.net.http.HttpClient;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.StringJoiner;
-import java.util.stream.Collectors;
 
 /**
  * The model, over HTTP.
@@ -62,7 +60,9 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      */
     private static final int MAX_REASON = 500;
 
-    /** Enough to see the pattern. A refused batch of five hundred is five hundred of the same bug. */
+    /**
+     * Enough to see the pattern. A refused batch of five hundred is five hundred of the same bug.
+     */
     private static final int SHAPES_LOGGED = 3;
 
     /**
@@ -85,23 +85,23 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * falling back to, not a reason for the whole context to refuse to start.
      *
      * @param connectTimeout how long to wait for the model to accept a connection. Short: either
-     *                       the process is listening on the other side of loopback or it is not.
-     * @param readTimeout    how long to wait for it to answer once it has. Generous by comparison,
-     *                       because the first call of the day loads TensorFlow before it predicts
-     *                       anything, and a timeout that fires on a cold start would make the
-     *                       feature look broken every morning.
+     *     the process is listening on the other side of loopback or it is not.
+     * @param readTimeout how long to wait for it to answer once it has. Generous by comparison,
+     *     because the first call of the day loads TensorFlow before it predicts anything, and a
+     *     timeout that fires on a cold start would make the feature look broken every morning.
      */
     @Autowired
     public RiskModelHttpClientAdapter(
-        ObjectProvider<RestClient.Builder> builders,
-        @Value("${app.prediction.url}") String baseUrl,
-        @Value("${app.prediction.token}") String token,
-        @Value("${app.prediction.connect-timeout:5s}") Duration connectTimeout,
-        @Value("${app.prediction.read-timeout:60s}") Duration readTimeout
-    ) {
-        this(builders.getIfAvailable(RestClient::builder)
-                .requestFactory(requestFactory(connectTimeout, readTimeout)),
-            baseUrl, token);
+            ObjectProvider<RestClient.Builder> builders,
+            @Value("${app.prediction.url}") String baseUrl,
+            @Value("${app.prediction.token}") String token,
+            @Value("${app.prediction.connect-timeout:5s}") Duration connectTimeout,
+            @Value("${app.prediction.read-timeout:60s}") Duration readTimeout) {
+        this(
+                builders.getIfAvailable(RestClient::builder)
+                        .requestFactory(requestFactory(connectTimeout, readTimeout)),
+                baseUrl,
+                token);
     }
 
     /**
@@ -112,9 +112,10 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      */
     private static JdkClientHttpRequestFactory requestFactory(Duration connect, Duration read) {
         JdkClientHttpRequestFactory factory =
-            new JdkClientHttpRequestFactory(predictionHttpClient(connect));
+                new JdkClientHttpRequestFactory(predictionHttpClient(connect));
         // The connect timeout belongs to the client and covers only the handshake. Everything after
-        // it — a model that accepted the socket and then went quiet — is bounded here or not at all.
+        // it — a model that accepted the socket and then went quiet — is bounded here or not at
+        // all.
         factory.setReadTimeout(read);
         return factory;
     }
@@ -125,9 +126,9 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * <p>Java's own client defaults to HTTP/2. Over plaintext that is an h2c upgrade, and uvicorn —
      * which serves the model — does not implement it: it logs "Unsupported upgrade request" and
      * falls back to 1.1, but the request body does not survive the exchange. FastAPI then rejects
-     * the call for a missing body, and the vector this side spent three queries assembling is
-     * never seen by anything. The error names a field and not a protocol, which is exactly what
-     * makes it expensive to find.
+     * the call for a missing body, and the vector this side spent three queries assembling is never
+     * seen by anything. The error names a field and not a protocol, which is exactly what makes it
+     * expensive to find.
      *
      * <p>It also waits forever by default. The sweep runs outside a transaction and calls the model
      * once per chunk of five hundred, so a service that accepts the connection and then stops
@@ -136,17 +137,17 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      */
     static HttpClient predictionHttpClient(Duration connectTimeout) {
         return HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)
-            .connectTimeout(connectTimeout)
-            .build();
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(connectTimeout)
+                .build();
     }
 
     /** Takes the builder directly, so a test can put a stub server behind this client. */
     RiskModelHttpClientAdapter(RestClient.Builder builder, String baseUrl, String token) {
-        this.restClient = builder
-            .baseUrl(baseUrl)
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .build();
+        this.restClient =
+                builder.baseUrl(baseUrl)
+                        .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .build();
         this.token = token;
     }
 
@@ -158,7 +159,8 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
 
         List<RiskScore> scores = new ArrayList<>(batch.size());
         for (int from = 0; from < batch.size(); from += MAX_BATCH) {
-            List<RiskFeatures> chunk = batch.subList(from, Math.min(from + MAX_BATCH, batch.size()));
+            List<RiskFeatures> chunk =
+                    batch.subList(from, Math.min(from + MAX_BATCH, batch.size()));
             scores.addAll(scoreChunk(chunk));
         }
         return scores;
@@ -169,9 +171,12 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
 
         if (answers == null || answers.size() != chunk.size()) {
             throw new RiskModelUnavailableException(
-                "The model answered " + (answers == null ? "nothing" : answers.size() + " scores")
-                    + " for " + chunk.size() + " vectors. Position is the only thing tying a score "
-                    + "to its student, so a different length cannot be read as a partial result.");
+                    "The model answered "
+                            + (answers == null ? "nothing" : answers.size() + " scores")
+                            + " for "
+                            + chunk.size()
+                            + " vectors. Position is the only thing tying a score "
+                            + "to its student, so a different length cannot be read as a partial result.");
         }
 
         return answers.stream().map(RiskModelHttpClientAdapter::toScore).toList();
@@ -187,28 +192,43 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      */
     private List<PredictionResponse> send(List<RiskFeatures> chunk) {
         try {
-            return restClient.post()
-                .uri("/predict/batch")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .body(new BatchRequest(chunk.stream().map(FeatureDto::from).toList()))
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, (request, response) -> {
-                    String reason = reasonFrom(response);
-                    log.error("The model answered {} to a batch of {}: {}",
-                        response.getStatusCode(), chunk.size(), reason);
+            return restClient
+                    .post()
+                    .uri("/predict/batch")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .body(new BatchRequest(chunk.stream().map(FeatureDto::from).toList()))
+                    .retrieve()
+                    .onStatus(
+                            HttpStatusCode::isError,
+                            (request, response) -> {
+                                String reason = reasonFrom(response);
+                                log.error(
+                                        "The model answered {} to a batch of {}: {}",
+                                        response.getStatusCode(),
+                                        chunk.size(),
+                                        reason);
 
-                    String message = "The model answered " + response.getStatusCode()
-                        + " to a batch of " + chunk.size() + " vectors: " + reason
-                        + ". Sent " + shapeOf(chunk);
+                                String message =
+                                        "The model answered "
+                                                + response.getStatusCode()
+                                                + " to a batch of "
+                                                + chunk.size()
+                                                + " vectors: "
+                                                + reason
+                                                + ". Sent "
+                                                + shapeOf(chunk);
 
-                    // A 4xx is a refusal, not an outage: the service answered, and it answered that
-                    // this batch breaks a rule it enforces. Retrying cannot change that, and saying
-                    // "unavailable" sends somebody to restart a process that never stopped.
-                    throw response.getStatusCode().is4xxClientError()
-                        ? new RiskModelRejectedException(message)
-                        : new RiskModelUnavailableException(message);
-                })
-                .body(new ParameterizedTypeReference<List<PredictionResponse>>() {});
+                                // A 4xx is a refusal, not an outage: the service answered, and it
+                                // answered that
+                                // this batch breaks a rule it enforces. Retrying cannot change
+                                // that, and saying
+                                // "unavailable" sends somebody to restart a process that never
+                                // stopped.
+                                throw response.getStatusCode().is4xxClientError()
+                                        ? new RiskModelRejectedException(message)
+                                        : new RiskModelUnavailableException(message);
+                            })
+                    .body(new ParameterizedTypeReference<List<PredictionResponse>>() {});
         } catch (RiskModelUnavailableException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -228,12 +248,23 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      */
     private static String shapeOf(List<RiskFeatures> chunk) {
         return chunk.stream()
-            .limit(SHAPES_LOGGED)
-            .map(v -> "[being=" + v.being().size() + " knowing=" + v.knowing().size()
-                + " doing=" + v.doing().size() + " deciding=" + v.deciding().size()
-                + " attendance=" + (v.attendancePct() == null ? "null" : "set")
-                + " planned=" + v.plannedCriteria() + "]")
-            .collect(Collectors.joining(", "));
+                .limit(SHAPES_LOGGED)
+                .map(
+                        v ->
+                                "[being="
+                                        + v.being().size()
+                                        + " knowing="
+                                        + v.knowing().size()
+                                        + " doing="
+                                        + v.doing().size()
+                                        + " deciding="
+                                        + v.deciding().size()
+                                        + " attendance="
+                                        + (v.attendancePct() == null ? "null" : "set")
+                                        + " planned="
+                                        + v.plannedCriteria()
+                                        + "]")
+                .collect(Collectors.joining(", "));
     }
 
     /**
@@ -300,17 +331,20 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
     }
 
     private static RiskScore toScore(PredictionResponse answer) {
-        RiskLevel level = RiskLevel.fromModel(answer.riskLevel())
-            .orElseThrow(() -> new RiskModelUnavailableException(
-                "The model answered a category this system does not know: " + answer.riskLevel()
-                    + ". A retrained model with a new category has to be taught here before its "
-                    + "answers can be stored."));
+        RiskLevel level =
+                RiskLevel.fromModel(answer.riskLevel())
+                        .orElseThrow(
+                                () ->
+                                        new RiskModelUnavailableException(
+                                                "The model answered a category this system does not know: "
+                                                        + answer.riskLevel()
+                                                        + ". A retrained model with a new category has to be taught here before its "
+                                                        + "answers can be stored."));
         return new RiskScore(level, answer.pFail(), answer.pOutstanding());
     }
 
     /** The endpoint takes the vectors wrapped in {@code items}; it answers with a bare list. */
-    private record BatchRequest(List<FeatureDto> items) {
-    }
+    private record BatchRequest(List<FeatureDto> items) {}
 
     /**
      * One vector as the model spells it.
@@ -324,21 +358,20 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      * this class never has to hold two vocabularies at once to follow a field.
      */
     private record FeatureDto(
-        List<BigDecimal> being,
-        List<BigDecimal> knowing,
-        List<BigDecimal> doing,
-        List<BigDecimal> deciding,
-        @JsonProperty("attendance_pct") BigDecimal attendancePct,
-        @JsonProperty("criterios_planificados") Integer plannedCriteria
-    ) {
+            List<BigDecimal> being,
+            List<BigDecimal> knowing,
+            List<BigDecimal> doing,
+            List<BigDecimal> deciding,
+            @JsonProperty("attendance_pct") BigDecimal attendancePct,
+            @JsonProperty("criterios_planificados") Integer plannedCriteria) {
         static FeatureDto from(RiskFeatures features) {
             return new FeatureDto(
-                features.being(),
-                features.knowing(),
-                features.doing(),
-                features.deciding(),
-                features.attendancePct(),
-                features.plannedCriteria());
+                    features.being(),
+                    features.knowing(),
+                    features.doing(),
+                    features.deciding(),
+                    features.attendancePct(),
+                    features.plannedCriteria());
         }
     }
 
@@ -353,9 +386,7 @@ public class RiskModelHttpClientAdapter implements IRiskModelClient {
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record PredictionResponse(
-        @JsonProperty("risk_level") String riskLevel,
-        @JsonProperty("p_reprueba") BigDecimal pFail,
-        @JsonProperty("p_sobresaliente") BigDecimal pOutstanding
-    ) {
-    }
+            @JsonProperty("risk_level") String riskLevel,
+            @JsonProperty("p_reprueba") BigDecimal pFail,
+            @JsonProperty("p_sobresaliente") BigDecimal pOutstanding) {}
 }

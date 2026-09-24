@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.event.DomainEvent;
-
 import java.util.UUID;
 
 /**
@@ -15,5 +14,4 @@ import java.util.UUID;
  * subject for a trimester, because the features are read for a whole class group at once; a per
  * student event would be re-broadened at the first listener.
  */
-public record RiskInputsChanged(UUID classGroupId, int trimester) implements DomainEvent {
-}
+public record RiskInputsChanged(UUID classGroupId, int trimester) implements DomainEvent {}

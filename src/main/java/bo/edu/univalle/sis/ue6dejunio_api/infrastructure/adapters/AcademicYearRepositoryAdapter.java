@@ -22,8 +22,8 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
     @Transactional
     public Integer ensureYear(int year) {
         return yearRepo.findByYear(year)
-            .map(AcademicYearEntity::getId)
-            .orElseGet(() -> insertOrRecoverExisting(year));
+                .map(AcademicYearEntity::getId)
+                .orElseGet(() -> insertOrRecoverExisting(year));
     }
 
     /**
@@ -37,16 +37,14 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
         try {
             return yearRepo.save(entity).getId();
         } catch (DataIntegrityViolationException e) {
-            return yearRepo.findByYear(year)
-                .map(AcademicYearEntity::getId)
-                .orElseThrow(() -> e);
+            return yearRepo.findByYear(year).map(AcademicYearEntity::getId).orElseThrow(() -> e);
         }
     }
 
     @Override
     public Integer currentYearId() {
         return yearRepo.findTopByOrderByYearDesc()
-            .map(AcademicYearEntity::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", "actual"));
+                .map(AcademicYearEntity::getId)
+                .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", "actual"));
     }
 }

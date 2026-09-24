@@ -1,15 +1,14 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.RiskPredictionEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictionEntity, UUID> {
 
@@ -22,16 +21,17 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
      * one bounded read either way, instead of one per student.
      */
     List<RiskPredictionEntity> findByTrimesterAndClassGroupIdInAndStudentIdIn(
-        Integer trimester, Collection<UUID> classGroupIds, Collection<UUID> studentIds);
+            Integer trimester, Collection<UUID> classGroupIds, Collection<UUID> studentIds);
 
     /**
      * A named set of predictions by id, for the caller that already knows which rows it means.
      *
-     * <p>Unordered on purpose: the caller holds its own ordering — these are the rows it just
-     * wrote — and re-imposing the severity CASE here would suggest a ranking that is not what this
-     * read is for.
+     * <p>Unordered on purpose: the caller holds its own ordering — these are the rows it just wrote
+     * — and re-imposing the severity CASE here would suggest a ranking that is not what this read
+     * is for.
      */
-    @Query("""
+    @Query(
+            """
         SELECT p, s.names, s.lastNames, g.subject.name
         FROM RiskPredictionEntity p, StudentEntity s, ClassGroupEntity g
         WHERE s.id = p.studentId AND g.id = p.classGroupId
@@ -47,7 +47,8 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
      * {@code EnRiesgo} above {@code RiesgoCritico} and quietly bury the students the list exists
      * for. Ties break on the same name order every other listing in this system uses.
      */
-    @Query("""
+    @Query(
+            """
         SELECT p, s.names, s.lastNames, g.subject.name
         FROM RiskPredictionEntity p, StudentEntity s, ClassGroupEntity g
         WHERE s.id = p.studentId AND g.id = p.classGroupId
@@ -60,11 +61,12 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
                  END,
                  s.lastNames, s.names
         """)
-    List<Object[]> findByClassGroupWithNames(@Param("classGroupId") UUID classGroupId,
-                                             @Param("trimester") Integer trimester);
+    List<Object[]> findByClassGroupWithNames(
+            @Param("classGroupId") UUID classGroupId, @Param("trimester") Integer trimester);
 
     /** Every subject of one course, same ordering, plus the subject name to tell them apart. */
-    @Query("""
+    @Query(
+            """
         SELECT p, s.names, s.lastNames, g.subject.name
         FROM RiskPredictionEntity p, StudentEntity s, ClassGroupEntity g
         WHERE s.id = p.studentId AND g.id = p.classGroupId
@@ -77,8 +79,8 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
                  END,
                  s.lastNames, s.names, g.subject.name
         """)
-    List<Object[]> findByCourseWithNames(@Param("courseId") UUID courseId,
-                                         @Param("trimester") Integer trimester);
+    List<Object[]> findByCourseWithNames(
+            @Param("courseId") UUID courseId, @Param("trimester") Integer trimester);
 
     /**
      * Stamps every one of these predictions that has not been announced since {@code notBefore}.
@@ -93,23 +95,26 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
      *     from the read below — this number is only useful to a log.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+    @Query(
+            """
         UPDATE RiskPredictionEntity p
            SET p.lastNotifiedAt = :now
          WHERE p.id IN :ids
            AND (p.lastNotifiedAt IS NULL OR p.lastNotifiedAt < :notBefore)
         """)
-    int claimForNotification(@Param("ids") Collection<UUID> ids,
-                             @Param("now") LocalDateTime now,
-                             @Param("notBefore") LocalDateTime notBefore);
+    int claimForNotification(
+            @Param("ids") Collection<UUID> ids,
+            @Param("now") LocalDateTime now,
+            @Param("notBefore") LocalDateTime notBefore);
 
     /** The rows carrying exactly this instant: what {@link #claimForNotification} just won. */
     @Query("SELECT p.id FROM RiskPredictionEntity p WHERE p.id IN :ids AND p.lastNotifiedAt = :now")
-    List<UUID> findIdsNotifiedAt(@Param("ids") Collection<UUID> ids,
-                                 @Param("now") LocalDateTime now);
+    List<UUID> findIdsNotifiedAt(
+            @Param("ids") Collection<UUID> ids, @Param("now") LocalDateTime now);
 
     /** One student across every subject they sit, worst first, newest trimester first. */
-    @Query("""
+    @Query(
+            """
         SELECT p, s.names, s.lastNames, g.subject.name
         FROM RiskPredictionEntity p, StudentEntity s, ClassGroupEntity g
         WHERE s.id = p.studentId AND g.id = p.classGroupId

@@ -1,12 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.servlet.MockMvc;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * The gestión list behind the student directory's year filter.
@@ -24,27 +24,34 @@ class CatalogAcademicYearsIT extends AbstractIntegrationTest {
      */
     @Test
     void academicYears_areListedNewestFirst() throws Exception {
-        mvc.perform(get("/api/catalog/academic-years")
-                .header("Authorization", "Bearer " + tokenFor(
-                    seedUser("Director", false), "Director")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].year").value(2026))
-            .andExpect(jsonPath("$[1].year").value(2025));
+        mvc.perform(
+                        get("/api/catalog/academic-years")
+                                .header(
+                                        "Authorization",
+                                        "Bearer "
+                                                + tokenFor(
+                                                        seedUser("Director", false), "Director")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].year").value(2026))
+                .andExpect(jsonPath("$[1].year").value(2025));
     }
 
     @Test
     void academicYears_secretaryReads() throws Exception {
-        mvc.perform(get("/api/catalog/academic-years")
-                .header("Authorization", "Bearer " + tokenFor(
-                    seedUser("Secretary", false), "Secretary")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").exists())
-            .andExpect(jsonPath("$[0].year").exists());
+        mvc.perform(
+                        get("/api/catalog/academic-years")
+                                .header(
+                                        "Authorization",
+                                        "Bearer "
+                                                + tokenFor(
+                                                        seedUser("Secretary", false), "Secretary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").exists())
+                .andExpect(jsonPath("$[0].year").exists());
     }
 
     @Test
     void academicYears_withoutAToken_refused() throws Exception {
-        mvc.perform(get("/api/catalog/academic-years"))
-            .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/catalog/academic-years")).andExpect(status().isUnauthorized());
     }
 }

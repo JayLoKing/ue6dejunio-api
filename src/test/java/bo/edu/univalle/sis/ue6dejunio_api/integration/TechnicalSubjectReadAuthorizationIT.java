@@ -1,15 +1,14 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.UUID;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Spec: what the homeroom teacher may do with a technical subject of their own course — Música,
@@ -53,70 +52,95 @@ class TechnicalSubjectReadAuthorizationIT extends AbstractIntegrationTest {
      */
     private void seedTechnicalSubject(String name) {
         jdbc.update(
-            "INSERT INTO subjects (name, id_area, is_technical) "
-                + "SELECT ?, id_area, true FROM knowledge_areas WHERE name = ? "
-                + "ON CONFLICT DO NOTHING",
-            name, "Cosmos y Pensamiento");
+                "INSERT INTO subjects (name, id_area, is_technical) "
+                        + "SELECT ?, id_area, true FROM knowledge_areas WHERE name = ? "
+                        + "ON CONFLICT DO NOTHING",
+                name,
+                "Cosmos y Pensamiento");
     }
 
     @Test
     void homeroomTeacher_listsTheCriteriaOfATechnicalSubjectSomebodyElseTeaches() throws Exception {
         // The screen that used to answer "Acceso denegado / Código 403".
-        mvc.perform(get("/api/criteria")
-                .param("id_class_group", musicClassGroup.toString())
-                .param("trimester", "1")
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/criteria")
+                                .param("id_class_group", musicClassGroup.toString())
+                                .param("trimester", "1")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isOk());
     }
 
     @Test
     void homeroomTeacher_readsTheMarksOfATechnicalSubjectSomebodyElseTeaches() throws Exception {
-        mvc.perform(get("/api/assessment-scores/criterion/" + musicCriterion)
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/assessment-scores/criterion/" + musicCriterion)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isOk());
 
-        mvc.perform(get("/api/criteria/" + musicCriterion)
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/criteria/" + musicCriterion)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isOk());
     }
 
     @Test
     void homeroomTeacher_cannotCreateACriterionInATechnicalSubjectSomebodyElseTeaches()
-        throws Exception {
-        // Read-only means read-only. The teacher in charge of the subject defines what it evaluates.
-        String body = """
+            throws Exception {
+        // Read-only means read-only. The teacher in charge of the subject defines what it
+        // evaluates.
+        String body =
+                """
             {"id_class_group":"%s","trimester":1,"dimension":"Knowing","name":"Mia"}
-            """.formatted(musicClassGroup);
+            """
+                        .formatted(musicClassGroup);
 
-        mvc.perform(post("/api/criteria")
-                .contentType("application/json")
-                .content(body)
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/api/criteria")
+                                .contentType("application/json")
+                                .content(body)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void technicalTeacher_stillOwnsTheSubjectTheyWerePutInChargeOf() throws Exception {
-        mvc.perform(get("/api/criteria")
-                .param("id_class_group", musicClassGroup.toString())
-                .param("trimester", "1")
-                .header("Authorization", "Bearer " + tokenFor(technicalTeacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/criteria")
+                                .param("id_class_group", musicClassGroup.toString())
+                                .param("trimester", "1")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(technicalTeacher, "Teacher")))
+                .andExpect(status().isOk());
     }
 
     @Test
     void teacherOfAnotherCourse_reachesNeitherTheCriteriaNorTheMarks() throws Exception {
         // Widening the read for the homeroom teacher must not have opened it for everybody holding
         // the Teacher role.
-        mvc.perform(get("/api/criteria")
-                .param("id_class_group", musicClassGroup.toString())
-                .param("trimester", "1")
-                .header("Authorization", "Bearer " + tokenFor(strangerTeacher, "Teacher")))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/criteria")
+                                .param("id_class_group", musicClassGroup.toString())
+                                .param("trimester", "1")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(strangerTeacher, "Teacher")))
+                .andExpect(status().isForbidden());
 
-        mvc.perform(get("/api/assessment-scores/criterion/" + musicCriterion)
-                .header("Authorization", "Bearer " + tokenFor(strangerTeacher, "Teacher")))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/assessment-scores/criterion/" + musicCriterion)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(strangerTeacher, "Teacher")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -126,14 +150,19 @@ class TechnicalSubjectReadAuthorizationIT extends AbstractIntegrationTest {
         // through on its own and nothing here is special-cased.
         UUID ownCourse = seedCourse(homeroomTeacher, "C");
         UUID ownMusic = seedClassGroup(ownCourse, homeroomTeacher, "Educacion Musical");
-        String body = """
+        String body =
+                """
             {"id_class_group":"%s","trimester":1,"dimension":"Knowing","name":"Mia"}
-            """.formatted(ownMusic);
+            """
+                        .formatted(ownMusic);
 
-        mvc.perform(post("/api/criteria")
-                .contentType("application/json")
-                .content(body)
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        post("/api/criteria")
+                                .contentType("application/json")
+                                .content(body)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isOk());
     }
 }

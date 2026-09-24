@@ -11,6 +11,6 @@ import java.util.UUID;
  * how to stack them.
  *
  * @param mark the area's total for that trimester. Never null — an area with no mark was never
- *             judged and so cannot be among the ones a student failed.
+ *     judged and so cannot be among the ones a student failed.
  */
 public record FailedArea(UUID classGroupId, String subjectName, BigDecimal mark) {}

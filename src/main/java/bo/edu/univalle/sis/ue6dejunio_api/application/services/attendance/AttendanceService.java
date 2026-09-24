@@ -16,11 +16,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDom
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -31,6 +26,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AttendanceService implements IAttendanceService {
@@ -50,9 +49,11 @@ public class AttendanceService implements IAttendanceService {
     private final IDomainEventPublisher events;
     private final Clock clock;
 
-    public AttendanceService(IAttendanceDomain attendanceDomain,
-                             ITrimesterPeriodDomain trimesterPeriodDomain,
-                             IDomainEventPublisher events, Clock clock) {
+    public AttendanceService(
+            IAttendanceDomain attendanceDomain,
+            ITrimesterPeriodDomain trimesterPeriodDomain,
+            IDomainEventPublisher events,
+            Clock clock) {
         this.attendanceDomain = attendanceDomain;
         this.trimesterPeriodDomain = trimesterPeriodDomain;
         this.events = events;
@@ -101,14 +102,16 @@ public class AttendanceService implements IAttendanceService {
         attendanceDomain.upsertDailyBatch(date, statusByCourseEnrollmentId);
         // The deduplicated keys and not `marks`: the same enrolment listed twice is one student
         // whose attendance changed once, and the queue would collapse the repeat anyway.
-        events.publish(new DailyAttendanceRecorded(
-            List.copyOf(statusByCourseEnrollmentId.keySet()), date));
+        events.publish(
+                new DailyAttendanceRecorded(
+                        List.copyOf(statusByCourseEnrollmentId.keySet()), date));
         return new DailyBatchResult(marks.size(), statusByCourseEnrollmentId.size());
     }
 
     @Override
     @Transactional
-    public DailyBatchResult registerSessionBatch(UUID classGroupId, LocalDate date, List<DailyMark> marks) {
+    public DailyBatchResult registerSessionBatch(
+            UUID classGroupId, LocalDate date, List<DailyMark> marks) {
         requireEditableSchoolDay(date);
         if (marks.isEmpty()) {
             return new DailyBatchResult(0, 0);
@@ -126,7 +129,8 @@ public class AttendanceService implements IAttendanceService {
         // Second bounded query instead of a course lookup per mark. Everyone in the batch must
         // belong to the course this class group teaches, and the whole batch fails before
         // anything is persisted — same atomicity contract as the daily batch.
-        Set<UUID> inCourse = attendanceDomain.courseEnrollmentIdsInCourse(courseEnrollmentIds, courseId);
+        Set<UUID> inCourse =
+                attendanceDomain.courseEnrollmentIdsInCourse(courseEnrollmentIds, courseId);
         for (DailyMark m : marks) {
             if (!inCourse.contains(m.courseEnrollmentId())) {
                 throw new ConflictException("El estudiante no pertenece al curso de la materia");
@@ -143,9 +147,9 @@ public class AttendanceService implements IAttendanceService {
     }
 
     /**
-     * Attendance is writable for any school day (Mon-Fri) of the current ISO week, so a teacher
-     * who forgot to mark — or marked wrong — can still fix it before the week closes. Once the
-     * week rolls over the records are frozen, because they feed regularity reporting.
+     * Attendance is writable for any school day (Mon-Fri) of the current ISO week, so a teacher who
+     * forgot to mark — or marked wrong — can still fix it before the week closes. Once the week
+     * rolls over the records are frozen, because they feed regularity reporting.
      *
      * <p>The window is anchored on the ISO week of {@code today}, so Saturday and Sunday still
      * allow correcting that same week's Mon-Fri; only the date being written must be a school day.
@@ -161,13 +165,14 @@ public class AttendanceService implements IAttendanceService {
         }
         if (date.isBefore(today.with(DayOfWeek.MONDAY))) {
             throw new ConflictException(
-                "solo puede modificar registros de la semana en curso (lunes a viernes)");
+                    "solo puede modificar registros de la semana en curso (lunes a viernes)");
         }
     }
 
     @Override
     @Transactional
-    public Attendance registerSession(UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
+    public Attendance registerSession(
+            UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
         requireEditableSchoolDay(date);
         if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
             throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
@@ -177,7 +182,8 @@ public class AttendanceService implements IAttendanceService {
         if (!ceCourse.equals(cgCourse)) {
             throw new ConflictException("El estudiante no pertenece al curso de la materia");
         }
-        Attendance saved = attendanceDomain.upsertSession(courseEnrollmentId, classGroupId, date, status);
+        Attendance saved =
+                attendanceDomain.upsertSession(courseEnrollmentId, classGroupId, date, status);
         events.publish(new SessionAttendanceRecorded(classGroupId, date));
         return saved;
     }
@@ -199,19 +205,23 @@ public class AttendanceService implements IAttendanceService {
         List<TrimesterPeriod> periods = trimesterPeriodDomain.findByAcademicYear(academicYearId);
         if (periods.isEmpty()) {
             throw new ConflictException(
-                "El curso no tiene trimestres configurados para su año académico. "
-                    + "El Director debe configurar los periodos de trimestre primero.");
+                    "El curso no tiene trimestres configurados para su año académico. "
+                            + "El Director debe configurar los periodos de trimestre primero.");
         }
 
         List<TrimesterPeriod> includedPeriods;
         String scope;
         if (trimester != null) {
-            TrimesterPeriod requested = periods.stream()
-                .filter(p -> p.trimester() == trimester)
-                .findFirst()
-                .orElseThrow(() -> new ConflictException(
-                    "El trimestre " + trimester
-                        + " no tiene un periodo configurado para el año académico del curso."));
+            TrimesterPeriod requested =
+                    periods.stream()
+                            .filter(p -> p.trimester() == trimester)
+                            .findFirst()
+                            .orElseThrow(
+                                    () ->
+                                            new ConflictException(
+                                                    "El trimestre "
+                                                            + trimester
+                                                            + " no tiene un periodo configurado para el año académico del curso."));
             includedPeriods = List.of(requested);
             scope = SCOPE_TRIMESTER;
         } else {
@@ -219,7 +229,8 @@ public class AttendanceService implements IAttendanceService {
             scope = SCOPE_ANNUAL;
         }
 
-        List<DailyStatusCount> rows = attendanceDomain.dailyStatusCountsByCourseGroupedByDate(courseId);
+        List<DailyStatusCount> rows =
+                attendanceDomain.dailyStatusCountsByCourseGroupedByDate(courseId);
 
         // All three views (overall / byMonth / byTrimester) are derived from the SAME filtered
         // set of in-period rows below, so their totals always reconcile by construction.
@@ -230,25 +241,42 @@ public class AttendanceService implements IAttendanceService {
         for (DailyStatusCount row : rows) {
             TrimesterPeriod period = periodContaining(includedPeriods, row.date());
             if (period == null) {
-                continue; // out-of-period date (vacation/holiday/other trimester/out-of-year): excluded everywhere
+                continue; // out-of-period date (vacation/holiday/other trimester/out-of-year):
+                // excluded everywhere
             }
-            long[] monthCounts = perMonth.computeIfAbsent(YearMonth.from(row.date()), k -> new long[4]);
-            long[] trimesterCounts = perTrimester.computeIfAbsent(period.trimester(), k -> new long[4]);
+            long[] monthCounts =
+                    perMonth.computeIfAbsent(YearMonth.from(row.date()), k -> new long[4]);
+            long[] trimesterCounts =
+                    perTrimester.computeIfAbsent(period.trimester(), k -> new long[4]);
             addToCounts(monthCounts, row.status(), row.count());
             addToCounts(trimesterCounts, row.status(), row.count());
             addToCounts(overallCounts, row.status(), row.count());
         }
 
-        List<MonthlyAttendance> byMonth = perMonth.entrySet().stream()
-            .map(e -> new MonthlyAttendance(e.getKey().getYear(), e.getKey().getMonthValue(),
-                toAttendanceCounts(e.getValue())))
-            .toList();
+        List<MonthlyAttendance> byMonth =
+                perMonth.entrySet().stream()
+                        .map(
+                                e ->
+                                        new MonthlyAttendance(
+                                                e.getKey().getYear(),
+                                                e.getKey().getMonthValue(),
+                                                toAttendanceCounts(e.getValue())))
+                        .toList();
 
-        List<TrimesterAttendance> byTrimester = trimester != null
-            ? List.of(new TrimesterAttendance(trimester, toAttendanceCounts(perTrimester.getOrDefault(trimester, new long[4]))))
-            : perTrimester.entrySet().stream()
-                .map(e -> new TrimesterAttendance(e.getKey(), toAttendanceCounts(e.getValue())))
-                .toList();
+        List<TrimesterAttendance> byTrimester =
+                trimester != null
+                        ? List.of(
+                                new TrimesterAttendance(
+                                        trimester,
+                                        toAttendanceCounts(
+                                                perTrimester.getOrDefault(trimester, new long[4]))))
+                        : perTrimester.entrySet().stream()
+                                .map(
+                                        e ->
+                                                new TrimesterAttendance(
+                                                        e.getKey(),
+                                                        toAttendanceCounts(e.getValue())))
+                                .toList();
 
         AttendanceCounts overall = toAttendanceCounts(overallCounts);
         return new CourseAttendanceStats(courseId, scope, trimester, overall, byMonth, byTrimester);
@@ -263,15 +291,18 @@ public class AttendanceService implements IAttendanceService {
         return null;
     }
 
-    /** Defensive: an unknown status must never 500 a read. The DB CHECK constraint already
-     * restricts {@code status}, so this is belt-and-suspenders — log and skip, don't throw. */
+    /**
+     * Defensive: an unknown status must never 500 a read. The DB CHECK constraint already restricts
+     * {@code status}, so this is belt-and-suspenders — log and skip, don't throw.
+     */
     private static void addToCounts(long[] counts, String status, long amount) {
         switch (status) {
             case STATUS_PRESENT -> counts[0] += amount;
             case STATUS_ABSENT -> counts[1] += amount;
             case STATUS_LATE -> counts[2] += amount;
             case STATUS_EXCUSED -> counts[3] += amount;
-            default -> log.warn("Unknown attendance status '{}' skipped in stats aggregation", status);
+            default ->
+                    log.warn("Unknown attendance status '{}' skipped in stats aggregation", status);
         }
     }
 

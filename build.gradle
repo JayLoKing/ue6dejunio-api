@@ -4,7 +4,7 @@ plugins {
 	id 'checkstyle'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
-	id 'com.diffplug.spotless' version '6.25.0'
+	id 'com.diffplug.spotless' version '7.0.2'
 	id 'com.github.spotbugs' version '6.0.18'
 }
 
@@ -124,33 +124,15 @@ spotbugs {
 }
 
 spotless {
-	// The plugin wires spotlessCheck into `check` itself, so dropping a dependsOn is not enough --
-	// this is its own switch for it. `spotlessApply` and `spotlessCheck` stay runnable by hand.
-	enforceCheck = false
-
 	java {
 		target 'src/**/*.java'
-		googleJavaFormat('1.22.0').aosp()
+		// Not below 1.28.0 on this toolchain: google-java-format reaches into javac internals, and
+		// 1.22.0 called `Log$DeferredDiagnosticHandler.getDiagnostics()` expecting a Queue where
+		// JDK 25 returns a List -- NoSuchMethodError on the first file it touched, whichever it was.
+		googleJavaFormat('1.28.0').aosp()
 		removeUnusedImports()
 		trimTrailingWhitespace()
 		endWithNewline()
 	}
 }
 
-// `check` no longer gates on spotlessCheck, and the reason is not that formatting stopped
-// mattering. google-java-format 1.22.0 reaches into javac internals that JDK 25 moved --
-// `Log$DeferredDiagnosticHandler.getDiagnostics()` returns a List where it returned a Queue -- so
-// spotlessJava throws NoSuchMethodError on the first file it touches, whichever that is. Wired into
-// `check`, that made the whole task fail before a single test ran: no tests, no jacoco, no
-// checkstyle, no spotbugs, on a build where nothing was wrong with the code.
-//
-// Bumping to google-java-format 1.28.0 does clear the error, and was measured rather than assumed:
-// it then wants to rewrite 497 of the 572 Java files here, because this codebase's import grouping
-// and 4-space continuations are not what AOSP emits. That is a deliberate, isolated commit
-// somebody has to choose to make, not a side effect of getting `check` working again.
-//
-// Until then formatting is checked by hand with `./gradlew spotlessCheck` -- once the bump lands --
-// and the gate stays off so the checks that do work keep running.
-tasks.named('check') {
-	// spotlessCheck deliberately omitted -- see above.
-}

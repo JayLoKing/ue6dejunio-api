@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -9,8 +8,8 @@ import java.math.RoundingMode;
  * The libreta's "Literal" column: the annual mark spelled out beside its numeral.
  *
  * <p>The school's spreadsheet resolves this with a lookup table of 1..100 typed into hidden
- * columns. Here it is generated, because a typed table is a hundred chances to misspell a mark on
- * a document a parent signs, and because the row nobody checked is the one that is wrong.
+ * columns. Here it is generated, because a typed table is a hundred chances to misspell a mark on a
+ * document a parent signs, and because the row nobody checked is the one that is wrong.
  *
  * <p>Spanish contracts the twenties into one word and separates everything above thirty with a
  * lowercase {@code y}, so the two cases are built differently rather than from one template.
@@ -26,19 +25,43 @@ import java.math.RoundingMode;
 public final class GradeInWords {
 
     private static final String[] UNITS = {
-        "Cero", "Uno", "Dos", "Tres", "Cuatro", "Cinco", "Seis", "Siete", "Ocho", "Nueve",
-        "Diez", "Once", "Doce", "Trece", "Catorce", "Quince",
-        "Dieciséis", "Diecisiete", "Dieciocho", "Diecinueve", "Veinte",
-        "Veintiuno", "Veintidós", "Veintitrés", "Veinticuatro", "Veinticinco",
-        "Veintiséis", "Veintisiete", "Veintiocho", "Veintinueve"
+        "Cero",
+        "Uno",
+        "Dos",
+        "Tres",
+        "Cuatro",
+        "Cinco",
+        "Seis",
+        "Siete",
+        "Ocho",
+        "Nueve",
+        "Diez",
+        "Once",
+        "Doce",
+        "Trece",
+        "Catorce",
+        "Quince",
+        "Dieciséis",
+        "Diecisiete",
+        "Dieciocho",
+        "Diecinueve",
+        "Veinte",
+        "Veintiuno",
+        "Veintidós",
+        "Veintitrés",
+        "Veinticuatro",
+        "Veinticinco",
+        "Veintiséis",
+        "Veintisiete",
+        "Veintiocho",
+        "Veintinueve"
     };
 
     private static final String[] TENS = {
         "", "", "", "Treinta", "Cuarenta", "Cincuenta", "Sesenta", "Setenta", "Ochenta", "Noventa"
     };
 
-    private GradeInWords() {
-    }
+    private GradeInWords() {}
 
     /**
      * The mark in words, or an empty string when there is no mark.
@@ -51,10 +74,10 @@ public final class GradeInWords {
      *
      * <p>The rounding is HALF_UP, chosen deliberately and not by default: it is what the school's
      * own spreadsheet does with ROUND today, and the libreta is meant to match the document they
-     * already sign. It has a consequence worth stating where it happens — an average of 50.6
-     * prints as 51, which is the passing mark, so the libreta can show a pass for a student whose
-     * stored average is below it. That was the school's call, not an oversight; changing it means
-     * changing what their document says, not fixing a bug.
+     * already sign. It has a consequence worth stating where it happens — an average of 50.6 prints
+     * as 51, which is the passing mark, so the libreta can show a pass for a student whose stored
+     * average is below it. That was the school's call, not an oversight; changing it means changing
+     * what their document says, not fixing a bug.
      *
      * @param mark the annual average, or null when nothing is graded.
      */
@@ -69,7 +92,7 @@ public final class GradeInWords {
             // not IllegalArgumentException: the caller printing a libreta gets an answer it can
             // show, rather than the opaque 500 an unmapped runtime exception becomes.
             throw new ValidationException(
-                "La nota " + whole + " está fuera de la escala 0 a 100 de la libreta");
+                    "La nota " + whole + " está fuera de la escala 0 a 100 de la libreta");
         }
         if (whole == 100) {
             return "Cien";

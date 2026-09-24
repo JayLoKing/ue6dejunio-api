@@ -7,10 +7,9 @@ import java.util.UUID;
  * criterion belongs to, so the item carries no ceiling of its own.
  */
 public record AssessmentEvent(
-    UUID id,
-    UUID criterionId,
-    UUID classGroupId,
-    Integer trimester,
-    String dimension,
-    String title
-) {}
+        UUID id,
+        UUID criterionId,
+        UUID classGroupId,
+        Integer trimester,
+        String dimension,
+        String title) {}

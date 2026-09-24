@@ -1,5 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
@@ -22,15 +24,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.SubjectEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.TrimesterPeriodEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
-import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 /**
  * What the generated mappers actually produce.
@@ -38,8 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>These replaced hand-written {@code toDomain} methods in the adapters, and the whole risk of
  * that swap is a source path pointing at the wrong column — which compiles, and which no test that
  * mocks the port can see. So the assertions are field by field, and every mapper is also asked what
- * it does with the association missing: a plan row whose student was removed used to reach a
- * {@code getId()} on null.
+ * it does with the association missing: a plan row whose student was removed used to reach a {@code
+ * getId()} on null.
  */
 class RepositoryMapperTest {
 
@@ -49,7 +48,7 @@ class RepositoryMapperTest {
     private final SubjectMapper subjectMapper = Mappers.getMapper(SubjectMapper.class);
     private final CriterionMapper criterionMapper = Mappers.getMapper(CriterionMapper.class);
     private final TrimesterPeriodMapper trimesterPeriodMapper =
-        Mappers.getMapper(TrimesterPeriodMapper.class);
+            Mappers.getMapper(TrimesterPeriodMapper.class);
     private final ProgressMapper progressMapper = Mappers.getMapper(ProgressMapper.class);
     private final AdaptationMapper adaptationMapper = Mappers.getMapper(AdaptationMapper.class);
 

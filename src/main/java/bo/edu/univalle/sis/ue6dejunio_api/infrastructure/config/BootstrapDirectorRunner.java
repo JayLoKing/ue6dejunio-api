@@ -38,15 +38,14 @@ public class BootstrapDirectorRunner implements CommandLineRunner {
     private final String lastNames;
 
     public BootstrapDirectorRunner(
-        IUserDomain userDomain,
-        IRoleDomain roleDomain,
-        PasswordEncoder passwordEncoder,
-        @Value("${app.bootstrap.director.email:}") String email,
-        @Value("${app.bootstrap.director.password:}") String password,
-        @Value("${app.bootstrap.director.ci:}") String ci,
-        @Value("${app.bootstrap.director.names:}") String names,
-        @Value("${app.bootstrap.director.last-names:}") String lastNames
-    ) {
+            IUserDomain userDomain,
+            IRoleDomain roleDomain,
+            PasswordEncoder passwordEncoder,
+            @Value("${app.bootstrap.director.email:}") String email,
+            @Value("${app.bootstrap.director.password:}") String password,
+            @Value("${app.bootstrap.director.ci:}") String ci,
+            @Value("${app.bootstrap.director.names:}") String names,
+            @Value("${app.bootstrap.director.last-names:}") String lastNames) {
         this.userDomain = userDomain;
         this.roleDomain = roleDomain;
         this.passwordEncoder = passwordEncoder;
@@ -62,31 +61,39 @@ public class BootstrapDirectorRunner implements CommandLineRunner {
         if (isBlank(email) || isBlank(password)) {
             // Half-configured is a mistake, and it is said out loud rather than resolved into an
             // account nobody meant to create.
-            log.info("Bootstrap: sin credenciales de Director en el entorno, no se crea ninguna "
-                + "cuenta. Configurar BOOTSTRAP_DIRECTOR_EMAIL y BOOTSTRAP_DIRECTOR_PASSWORD.");
+            log.info(
+                    "Bootstrap: sin credenciales de Director en el entorno, no se crea ninguna "
+                            + "cuenta. Configurar BOOTSTRAP_DIRECTOR_EMAIL y BOOTSTRAP_DIRECTOR_PASSWORD.");
             return;
         }
         if (userDomain.findByEmail(email).isPresent()) {
             return;
         }
-        Role role = roleDomain.findByName("Director")
-            .orElseThrow(() -> new IllegalStateException("Rol Director no existe en la BDD"));
+        Role role =
+                roleDomain
+                        .findByName("Director")
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Rol Director no existe en la BDD"));
 
-        User user = User.builder()
-            .ci(ci)
-            .names(names)
-            .lastNames(lastNames)
-            .email(email)
-            .password(passwordEncoder.encode(password))
-            .mustChangePassword(true)
-            .role(role)
-            .active(true)
-            .build();
+        User user =
+                User.builder()
+                        .ci(ci)
+                        .names(names)
+                        .lastNames(lastNames)
+                        .email(email)
+                        .password(passwordEncoder.encode(password))
+                        .mustChangePassword(true)
+                        .role(role)
+                        .active(true)
+                        .build();
         userDomain.save(user);
         // The e-mail identifies the account and is what the person will type; the password is not
         // logged, and the first login has to replace it anyway.
-        log.info("Bootstrap: usuario DIRECTOR creado [{}]. Cambiar contrasena tras primer login.",
-            email);
+        log.info(
+                "Bootstrap: usuario DIRECTOR creado [{}]. Cambiar contrasena tras primer login.",
+                email);
     }
 
     private static boolean isBlank(String value) {

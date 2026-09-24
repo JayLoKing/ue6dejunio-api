@@ -2,7 +2,6 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.DimensionAvg;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -24,10 +23,11 @@ public interface IAssessmentScoreDomain {
 
     /**
      * Average of each dimension over its criteria, not over its raw scores: every criterion first
-     * averages its own activity items, and only then do the criteria average into the dimension.
-     * A criterion with ten items therefore weighs the same as one scored directly.
+     * averages its own activity items, and only then do the criteria average into the dimension. A
+     * criterion with ten items therefore weighs the same as one scored directly.
      */
-    List<DimensionAvg> dimensionAverages(UUID courseEnrollmentId, UUID classGroupId, Integer trimester);
+    List<DimensionAvg> dimensionAverages(
+            UUID courseEnrollmentId, UUID classGroupId, Integer trimester);
 
     UUID courseOfCourseEnrollment(UUID courseEnrollmentId);
 

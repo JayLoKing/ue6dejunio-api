@@ -1,12 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.sse;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationSent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +8,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Who is listening right now, and how to reach them.
@@ -57,16 +56,20 @@ public class NotificationStreamRegistry {
     /** The one the client refetches on. */
     private static final String NOTIFICATION_EVENT = "notification";
 
-    /** Says only that the connection is alive. Its absence is what the client's watchdog measures. */
+    /**
+     * Says only that the connection is alive. Its absence is what the client's watchdog measures.
+     */
     private static final String HEARTBEAT_EVENT = "heartbeat";
 
-    /** Sent the moment the stream opens, so the client knows it is connected and may stop polling. */
+    /**
+     * Sent the moment the stream opens, so the client knows it is connected and may stop polling.
+     */
     private static final String READY_EVENT = "ready";
 
     /**
      * A list rather than a set: it is insertion-ordered, which is what lets the cap evict the
-     * oldest stream instead of an arbitrary one. Copy-on-write is the right trade at this size —
-     * at most {@link #MAX_STREAMS_PER_READER} entries, written on connect and read on every push.
+     * oldest stream instead of an arbitrary one. Copy-on-write is the right trade at this size — at
+     * most {@link #MAX_STREAMS_PER_READER} entries, written on connect and read on every push.
      */
     private final Map<UUID, List<SseEmitter>> streams = new ConcurrentHashMap<>();
 
@@ -89,16 +92,18 @@ public class NotificationStreamRegistry {
         }
 
         emitter.onCompletion(() -> forget(readerId, emitter));
-        emitter.onError(e -> {
-            log.debug("The stream of {} failed", readerId, e);
-            forget(readerId, emitter);
-        });
+        emitter.onError(
+                e -> {
+                    log.debug("The stream of {} failed", readerId, e);
+                    forget(readerId, emitter);
+                });
         // A timeout does not complete the emitter by itself, and an emitter that is neither
         // completed nor forgotten is the connection this map keeps writing to forever.
-        emitter.onTimeout(() -> {
-            forget(readerId, emitter);
-            emitter.complete();
-        });
+        emitter.onTimeout(
+                () -> {
+                    forget(readerId, emitter);
+                    emitter.complete();
+                });
 
         // Before anything else: this is what makes the response headers reach the browser, which
         // is how the client learns it is connected rather than still opening. A write that fails
@@ -120,18 +125,22 @@ public class NotificationStreamRegistry {
      */
     private List<SseEmitter> register(UUID readerId, SseEmitter emitter) {
         List<SseEmitter> evicted = new ArrayList<>();
-        streams.compute(readerId, (id, open) -> {
-            List<SseEmitter> held = open == null ? new CopyOnWriteArrayList<>() : open;
-            held.add(emitter);
-            while (held.size() > MAX_STREAMS_PER_READER) {
-                evicted.add(held.remove(0));
-            }
-            return held;
-        });
+        streams.compute(
+                readerId,
+                (id, open) -> {
+                    List<SseEmitter> held = open == null ? new CopyOnWriteArrayList<>() : open;
+                    held.add(emitter);
+                    while (held.size() > MAX_STREAMS_PER_READER) {
+                        evicted.add(held.remove(0));
+                    }
+                    return held;
+                });
         return evicted;
     }
 
-    /** Whether this exact stream is still registered. For the tests that assert what was evicted. */
+    /**
+     * Whether this exact stream is still registered. For the tests that assert what was evicted.
+     */
     boolean holds(UUID readerId, SseEmitter emitter) {
         List<SseEmitter> open = streams.get(readerId);
         return open != null && open.contains(emitter);
@@ -144,7 +153,11 @@ public class NotificationStreamRegistry {
             return;
         }
         for (SseEmitter emitter : open) {
-            send(event.receiverId(), emitter, NOTIFICATION_EVENT, event.notificationId().toString());
+            send(
+                    event.receiverId(),
+                    emitter,
+                    NOTIFICATION_EVENT,
+                    event.notificationId().toString());
         }
     }
 
@@ -195,9 +208,11 @@ public class NotificationStreamRegistry {
 
     /** Takes the stream out, and the reader too once they hold none — an empty list is a leak. */
     private void forget(UUID readerId, SseEmitter emitter) {
-        streams.computeIfPresent(readerId, (id, open) -> {
-            open.remove(emitter);
-            return open.isEmpty() ? null : open;
-        });
+        streams.computeIfPresent(
+                readerId,
+                (id, open) -> {
+                    open.remove(emitter);
+                    return open.isEmpty() ? null : open;
+                });
     }
 }

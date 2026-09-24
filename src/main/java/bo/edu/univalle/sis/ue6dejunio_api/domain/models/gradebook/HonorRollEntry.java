@@ -15,18 +15,17 @@ import java.util.UUID;
  * podium mixes classrooms, and a name with no classroom beside it names nobody in a building with
  * two students called the same.
  *
- * @param position      the place on the podium, starting at one.
- * @param gradeName     the year of schooling the student sits in.
- * @param parallelName  the parallel within that year.
- * @param finalAverage  never null: a student with nothing graded holds no place at all.
+ * @param position the place on the podium, starting at one.
+ * @param gradeName the year of schooling the student sits in.
+ * @param parallelName the parallel within that year.
+ * @param finalAverage never null: a student with nothing graded holds no place at all.
  */
 public record HonorRollEntry(
-    int position,
-    UUID courseEnrollmentId,
-    UUID studentId,
-    String fullName,
-    UUID courseId,
-    String gradeName,
-    String parallelName,
-    BigDecimal finalAverage
-) {}
+        int position,
+        UUID courseEnrollmentId,
+        UUID studentId,
+        String fullName,
+        UUID courseId,
+        String gradeName,
+        String parallelName,
+        BigDecimal finalAverage) {}

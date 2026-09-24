@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SweepTarget;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -67,12 +66,12 @@ public interface IRiskSweepQueueDomain {
      * Removes the marks that were swept, and only those.
      *
      * <p>Takes one trimester rather than a set of pairs because that is how a sweep spends the
-     * queue: the model is asked per trimester, so a clear follows one answer about one trimester.
-     * A signature carrying mixed pairs would have to be matched as a row value, and could clear a
+     * queue: the model is asked per trimester, so a clear follows one answer about one trimester. A
+     * signature carrying mixed pairs would have to be matched as a row value, and could clear a
      * subject's <em>other</em> trimester the moment a drain held both.
      *
      * @param asOf the newest mark {@link #pending(int)} returned. A row marked after it belongs to
-     *             a change the sweep did not see, so it survives and the next tick takes it.
+     *     a change the sweep did not see, so it survives and the next tick takes it.
      * @return how many rows were removed
      */
     int clearSwept(Collection<UUID> classGroupIds, int trimester, LocalDateTime asOf);

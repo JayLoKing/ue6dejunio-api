@@ -6,14 +6,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumPlan
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.ProgressMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaPlanProgressRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -23,9 +22,10 @@ public class ProgressRepositoryAdapter implements IProgressDomain {
     private final JpaCurriculumPlanRepository planRepo;
     private final ProgressMapper mapper;
 
-    public ProgressRepositoryAdapter(JpaPlanProgressRepository progressRepo,
-                                     JpaCurriculumPlanRepository planRepo,
-                                     ProgressMapper mapper) {
+    public ProgressRepositoryAdapter(
+            JpaPlanProgressRepository progressRepo,
+            JpaCurriculumPlanRepository planRepo,
+            ProgressMapper mapper) {
         this.progressRepo = progressRepo;
         this.planRepo = planRepo;
         this.mapper = mapper;
@@ -38,7 +38,13 @@ public class ProgressRepositoryAdapter implements IProgressDomain {
 
     @Override
     @Transactional
-    public PlanProgress create(UUID planId, LocalDate date, String content, BigDecimal pct, String obs, UUID createdBy) {
+    public PlanProgress create(
+            UUID planId,
+            LocalDate date,
+            String content,
+            BigDecimal pct,
+            String obs,
+            UUID createdBy) {
         CurriculumPlanProgressEntity e = new CurriculumPlanProgressEntity();
         e.setCurriculumPlan(planRepo.getReferenceById(planId));
         e.setProgressDate(date != null ? date : LocalDate.now());
@@ -52,7 +58,8 @@ public class ProgressRepositoryAdapter implements IProgressDomain {
 
     @Override
     public List<PlanProgress> listByPlan(UUID planId) {
-        return progressRepo.findByCurriculumPlan_IdOrderByProgressDateDesc(planId)
-            .stream().map(mapper::toDomain).toList();
+        return progressRepo.findByCurriculumPlan_IdOrderByProgressDateDesc(planId).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 }

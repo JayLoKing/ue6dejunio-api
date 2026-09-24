@@ -30,9 +30,10 @@ public class KnowledgeAreaService implements IKnowledgeAreaService {
         }
         // Naming an area and deciding where it prints are two different thoughts. Said nothing
         // about, it goes after the ones already there.
-        Integer order = command.displayOrder() != null
-            ? command.displayOrder()
-            : areaDomain.maxDisplayOrder() + 1;
+        Integer order =
+                command.displayOrder() != null
+                        ? command.displayOrder()
+                        : areaDomain.maxDisplayOrder() + 1;
         return areaDomain.save(new KnowledgeArea(null, command.name(), order));
     }
 
@@ -44,17 +45,17 @@ public class KnowledgeAreaService implements IKnowledgeAreaService {
             throw new DuplicateResourceException("name", command.name());
         }
         // An edit that says nothing about the order is not asking for it to be reset.
-        Integer order = command.displayOrder() != null
-            ? command.displayOrder()
-            : current.displayOrder();
+        Integer order =
+                command.displayOrder() != null ? command.displayOrder() : current.displayOrder();
         return areaDomain.save(new KnowledgeArea(id, command.name(), order));
     }
 
     @Override
     @Transactional(readOnly = true)
     public KnowledgeArea getById(Integer id) {
-        return areaDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("KnowledgeArea", id));
+        return areaDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("KnowledgeArea", id));
     }
 
     @Override
@@ -71,7 +72,7 @@ public class KnowledgeAreaService implements IKnowledgeAreaService {
         // Answered here so the school reads what it has to do first instead of a 500.
         if (areaDomain.hasSubjects(id)) {
             throw new ConflictException(
-                "No se puede eliminar: el area de saberes tiene materias asociadas");
+                    "No se puede eliminar: el area de saberes tiene materias asociadas");
         }
         areaDomain.deleteById(id);
     }

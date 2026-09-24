@@ -1,12 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
-import java.util.List;
 
 public record SecurityUserAdapter(User user) implements UserDetails {
 

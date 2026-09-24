@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,13 +26,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.UUID;
-
 @RestController
 @Validated
 @RequestMapping("/api/trimester-periods")
-@Tag(name = "Trimester Periods", description = "Rangos de fecha de trimestre por anio academico (Director)")
+@Tag(
+        name = "Trimester Periods",
+        description = "Rangos de fecha de trimestre por anio academico (Director)")
 @SecurityRequirement(name = "bearerAuth")
 public class TrimesterPeriodController {
 
@@ -42,9 +43,12 @@ public class TrimesterPeriodController {
 
     @PostMapping
     @Operation(summary = "Configurar un periodo de trimestre para un anio academico")
-    public ResponseEntity<TrimesterPeriodResponse> create(@Valid @RequestBody CreateTrimesterPeriodRequest r) {
-        TrimesterPeriod created = trimesterPeriodService.create(new CreateTrimesterPeriodCommand(
-            r.academicYearId(), r.trimester(), r.startDate(), r.endDate()));
+    public ResponseEntity<TrimesterPeriodResponse> create(
+            @Valid @RequestBody CreateTrimesterPeriodRequest r) {
+        TrimesterPeriod created =
+                trimesterPeriodService.create(
+                        new CreateTrimesterPeriodCommand(
+                                r.academicYearId(), r.trimester(), r.startDate(), r.endDate()));
         return ResponseEntity.ok(TrimesterPeriodResponse.from(created));
     }
 
@@ -55,21 +59,25 @@ public class TrimesterPeriodController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar periodos configurados de un anio academico (id_academic_year requerido)")
+    @Operation(
+            summary =
+                    "Listar periodos configurados de un anio academico (id_academic_year requerido)")
     public ResponseEntity<List<TrimesterPeriodResponse>> list(
-        @RequestParam("id_academic_year") @NotNull Integer academicYearId
-    ) {
-        List<TrimesterPeriodResponse> body = trimesterPeriodService.listByAcademicYear(academicYearId)
-            .stream().map(TrimesterPeriodResponse::from).toList();
+            @RequestParam("id_academic_year") @NotNull Integer academicYearId) {
+        List<TrimesterPeriodResponse> body =
+                trimesterPeriodService.listByAcademicYear(academicYearId).stream()
+                        .map(TrimesterPeriodResponse::from)
+                        .toList();
         return ResponseEntity.ok(body);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar fechas de un periodo de trimestre")
-    public ResponseEntity<TrimesterPeriodResponse> update(@PathVariable UUID id,
-                                                          @Valid @RequestBody UpdateTrimesterPeriodRequest r) {
-        TrimesterPeriod updated = trimesterPeriodService.update(id,
-            new UpdateTrimesterPeriodCommand(r.startDate(), r.endDate()));
+    public ResponseEntity<TrimesterPeriodResponse> update(
+            @PathVariable UUID id, @Valid @RequestBody UpdateTrimesterPeriodRequest r) {
+        TrimesterPeriod updated =
+                trimesterPeriodService.update(
+                        id, new UpdateTrimesterPeriodCommand(r.startDate(), r.endDate()));
         return ResponseEntity.ok(TrimesterPeriodResponse.from(updated));
     }
 

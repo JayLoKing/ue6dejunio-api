@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(
-    name = "app.security.rate-limit.ip-resolver",
-    havingValue = "direct",
-    matchIfMissing = true)
+        name = "app.security.rate-limit.ip-resolver",
+        havingValue = "direct",
+        matchIfMissing = true)
 public class DirectRemoteAddrResolver implements ClientIpResolver {
 
     @Override

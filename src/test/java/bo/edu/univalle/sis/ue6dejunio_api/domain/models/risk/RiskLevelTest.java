@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
 
 class RiskLevelTest {
 
@@ -43,16 +43,17 @@ class RiskLevelTest {
      */
     @Test
     void theCategoriesAreDeclaredFromFailingToOutstanding() {
-        assertThat(RiskLevel.values()).containsExactly(
-            RiskLevel.RIESGO_CRITICO,
-            RiskLevel.EN_RIESGO,
-            RiskLevel.SIN_RIESGO,
-            RiskLevel.SOBRESALIENTE);
+        assertThat(RiskLevel.values())
+                .containsExactly(
+                        RiskLevel.RIESGO_CRITICO,
+                        RiskLevel.EN_RIESGO,
+                        RiskLevel.SIN_RIESGO,
+                        RiskLevel.SOBRESALIENTE);
     }
 
     /**
-     * Only the failing category calls anyone. EnRiesgo passes, by a hair, and a message about
-     * every student who passes narrowly is a message the school stops reading.
+     * Only the failing category calls anyone. EnRiesgo passes, by a hair, and a message about every
+     * student who passes narrowly is a message the school stops reading.
      */
     @Test
     void demandsAttention_onlyTheFailingCategory() {

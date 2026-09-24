@@ -56,9 +56,9 @@ public enum RiskLevel {
     /**
      * Whether reaching this level is worth writing to a teacher about.
      *
-     * <p>Only the failing one. Announcing {@code EnRiesgo} would announce most of the school —
-     * it is the largest category in the training data — and an inbox that fills with it is an
-     * inbox nobody opens on the day the real one arrives.
+     * <p>Only the failing one. Announcing {@code EnRiesgo} would announce most of the school — it
+     * is the largest category in the training data — and an inbox that fills with it is an inbox
+     * nobody opens on the day the real one arrives.
      */
     public boolean demandsAttention() {
         return this == RIESGO_CRITICO;

@@ -1,14 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.UUID;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Spec: Score read ownership guard — ScoreController.byCourseEnrollment (course-wide consolidated,
@@ -35,19 +34,31 @@ class ScoreAuthorizationIT extends AbstractIntegrationTest {
 
     @Test
     void nonOwnerTeacher_byCourseEnrollment_forbidden() throws Exception {
-        mvc.perform(get("/api/scores").param("id_course_enrollment", enrollmentId.toString())
-                .header("Authorization", "Bearer " + tokenFor(otherTeacher, "Teacher")))
-            .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/scores")
+                                .param("id_course_enrollment", enrollmentId.toString())
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(otherTeacher, "Teacher")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void homeroomOwnerAndDirector_byCourseEnrollment_ok() throws Exception {
-        mvc.perform(get("/api/scores").param("id_course_enrollment", enrollmentId.toString())
-                .header("Authorization", "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/scores")
+                                .param("id_course_enrollment", enrollmentId.toString())
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isOk());
 
-        mvc.perform(get("/api/scores").param("id_course_enrollment", enrollmentId.toString())
-                .header("Authorization", "Bearer " + tokenFor(director, "Director")))
-            .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/scores")
+                                .param("id_course_enrollment", enrollmentId.toString())
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director, "Director")))
+                .andExpect(status().isOk());
     }
 }

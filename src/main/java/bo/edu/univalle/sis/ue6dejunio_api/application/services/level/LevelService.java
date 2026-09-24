@@ -1,10 +1,10 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.level;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.CreateLevelCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.Level;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.level.UpdateLevelCommand;
@@ -44,8 +44,9 @@ public class LevelService implements ILevelService {
     @Override
     @Transactional(readOnly = true)
     public Level getById(Integer id) {
-        return levelDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Level", id));
+        return levelDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Level", id));
     }
 
     @Override

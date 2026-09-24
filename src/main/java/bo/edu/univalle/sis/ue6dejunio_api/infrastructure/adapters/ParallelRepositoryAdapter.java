@@ -8,11 +8,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ParallelEntity
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.ParallelMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -22,9 +21,10 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
     private final JpaCourseRepository courseRepo;
     private final ParallelMapper mapper;
 
-    public ParallelRepositoryAdapter(JpaParallelRepository parallelRepo,
-                                     JpaCourseRepository courseRepo,
-                                     ParallelMapper mapper) {
+    public ParallelRepositoryAdapter(
+            JpaParallelRepository parallelRepo,
+            JpaCourseRepository courseRepo,
+            ParallelMapper mapper) {
         this.parallelRepo = parallelRepo;
         this.courseRepo = courseRepo;
         this.mapper = mapper;
@@ -33,9 +33,10 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
     @Override
     @Transactional
     public Parallel save(Parallel parallel) {
-        ParallelEntity e = parallel.id() == null
-            ? new ParallelEntity()
-            : parallelRepo.findById(parallel.id()).orElseGet(ParallelEntity::new);
+        ParallelEntity e =
+                parallel.id() == null
+                        ? new ParallelEntity()
+                        : parallelRepo.findById(parallel.id()).orElseGet(ParallelEntity::new);
         e.setName(parallel.name());
         if (parallel.id() != null) e.setId(parallel.id());
         return mapper.toDomain(parallelRepo.save(e));

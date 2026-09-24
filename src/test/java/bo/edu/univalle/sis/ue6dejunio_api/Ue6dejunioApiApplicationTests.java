@@ -9,6 +9,5 @@ import org.springframework.test.context.ActiveProfiles;
 class Ue6dejunioApiApplicationTests {
 
     @Test
-    void contextLoads() {
-    }
+    void contextLoads() {}
 }

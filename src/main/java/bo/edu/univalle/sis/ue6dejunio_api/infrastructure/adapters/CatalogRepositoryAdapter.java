@@ -11,11 +11,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRe
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Repository
 @Transactional(readOnly = true)
@@ -29,9 +28,12 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     private final JpaUserRepository userRepo;
     private final JpaAcademicYearRepository academicYearRepo;
 
-    public CatalogRepositoryAdapter(JpaSubjectRepository subjectRepo, JpaGradeRepository gradeRepo,
-                                    JpaParallelRepository parallelRepo, JpaUserRepository userRepo,
-                                    JpaAcademicYearRepository academicYearRepo) {
+    public CatalogRepositoryAdapter(
+            JpaSubjectRepository subjectRepo,
+            JpaGradeRepository gradeRepo,
+            JpaParallelRepository parallelRepo,
+            JpaUserRepository userRepo,
+            JpaAcademicYearRepository academicYearRepo) {
         this.subjectRepo = subjectRepo;
         this.gradeRepo = gradeRepo;
         this.parallelRepo = parallelRepo;
@@ -41,43 +43,56 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
 
     @Override
     public List<SubjectItem> subjects(Boolean technical) {
-        var list = technical == null
-            ? subjectRepo.findByActiveTrueOrderByName()
-            : subjectRepo.findByActiveTrueAndTechnicalOrderByName(technical);
+        var list =
+                technical == null
+                        ? subjectRepo.findByActiveTrueOrderByName()
+                        : subjectRepo.findByActiveTrueAndTechnicalOrderByName(technical);
         return list.stream()
-            .map(s -> new SubjectItem(s.getId(), s.getName(), s.isTechnical()))
-            .toList();
+                .map(s -> new SubjectItem(s.getId(), s.getName(), s.isTechnical()))
+                .toList();
     }
 
     @Override
     public List<GradeItem> grades() {
         return gradeRepo.findAll(Sort.by("id")).stream()
-            .map(g -> new GradeItem(g.getId(), g.getName(),
-                g.getLevel() != null ? g.getLevel().getName() : null))
-            .toList();
+                .map(
+                        g ->
+                                new GradeItem(
+                                        g.getId(),
+                                        g.getName(),
+                                        g.getLevel() != null ? g.getLevel().getName() : null))
+                .toList();
     }
 
     @Override
     public List<ParallelItem> parallels() {
         return parallelRepo.findAll(Sort.by("id")).stream()
-            .map(p -> new ParallelItem(p.getId(), p.getName()))
-            .toList();
+                .map(p -> new ParallelItem(p.getId(), p.getName()))
+                .toList();
     }
 
     @Override
     public List<TeacherItem> teachers(Boolean technical) {
-        var list = technical == null
-            ? userRepo.findByRole_NameAndActiveTrueOrderByLastNames(TEACHER_ROLE)
-            : userRepo.findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(TEACHER_ROLE, technical);
+        var list =
+                technical == null
+                        ? userRepo.findByRole_NameAndActiveTrueOrderByLastNames(TEACHER_ROLE)
+                        : userRepo.findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(
+                                TEACHER_ROLE, technical);
         return list.stream()
-            .map(u -> new TeacherItem(u.getId(), u.getNames() + " " + u.getLastNames(), u.getEmail(), u.isTechnical()))
-            .toList();
+                .map(
+                        u ->
+                                new TeacherItem(
+                                        u.getId(),
+                                        u.getNames() + " " + u.getLastNames(),
+                                        u.getEmail(),
+                                        u.isTechnical()))
+                .toList();
     }
 
     @Override
     public List<AcademicYearItem> academicYears() {
         return academicYearRepo.findAllByOrderByYearDesc().stream()
-            .map(y -> new AcademicYearItem(y.getId(), y.getYear()))
-            .toList();
+                .map(y -> new AcademicYearItem(y.getId(), y.getYear()))
+                .toList();
     }
 }

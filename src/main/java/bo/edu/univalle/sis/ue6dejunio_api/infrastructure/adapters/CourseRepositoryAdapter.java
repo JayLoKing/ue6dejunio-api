@@ -1,11 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
@@ -13,15 +13,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseR
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -35,9 +34,12 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     private final JpaAcademicYearRepository yearRepo;
     private final JpaUserRepository userRepo;
 
-    public CourseRepositoryAdapter(JpaCourseRepository courseRepo, JpaGradeRepository gradeRepo,
-                                   JpaParallelRepository parallelRepo, JpaAcademicYearRepository yearRepo,
-                                   JpaUserRepository userRepo) {
+    public CourseRepositoryAdapter(
+            JpaCourseRepository courseRepo,
+            JpaGradeRepository gradeRepo,
+            JpaParallelRepository parallelRepo,
+            JpaAcademicYearRepository yearRepo,
+            JpaUserRepository userRepo) {
         this.courseRepo = courseRepo;
         this.gradeRepo = gradeRepo;
         this.parallelRepo = parallelRepo;
@@ -58,25 +60,32 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     @Override
     public boolean userIsNonTechnicalTeacher(UUID userId) {
         return userRepo.findById(userId)
-            .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()) && !u.isTechnical())
-            .orElse(false);
+                .map(
+                        u ->
+                                u.getRole() != null
+                                        && TEACHER_ROLE.equals(u.getRole().getName())
+                                        && !u.isTechnical())
+                .orElse(false);
     }
 
     @Override
     public Integer currentAcademicYearId() {
         return yearRepo.findTopByOrderByYearDesc()
-            .map(AcademicYearEntity::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", "actual"));
+                .map(AcademicYearEntity::getId)
+                .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", "actual"));
     }
 
     @Override
-    public boolean existsByGradeParallelYear(Integer gradeId, Integer parallelId, Integer academicYearId) {
-        return courseRepo.existsByGrade_IdAndParallel_IdAndAcademicYear_Id(gradeId, parallelId, academicYearId);
+    public boolean existsByGradeParallelYear(
+            Integer gradeId, Integer parallelId, Integer academicYearId) {
+        return courseRepo.existsByGrade_IdAndParallel_IdAndAcademicYear_Id(
+                gradeId, parallelId, academicYearId);
     }
 
     @Override
     @Transactional
-    public Course create(Integer gradeId, Integer parallelId, Integer academicYearId, UUID homeroomTeacherId) {
+    public Course create(
+            Integer gradeId, Integer parallelId, Integer academicYearId, UUID homeroomTeacherId) {
         CourseEntity e = new CourseEntity();
         e.setGrade(gradeRepo.getReferenceById(gradeId));
         e.setParallel(parallelRepo.getReferenceById(parallelId));
@@ -92,8 +101,9 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     @Transactional
     public Course setHomeroomTeacher(UUID courseId, UUID teacherId) {
         CourseEntity e = load(courseId);
-        UserEntity teacher = userRepo.findById(teacherId)
-            .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
+        UserEntity teacher =
+                userRepo.findById(teacherId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
         e.setHomeroomTeacher(teacher);
         return toDomain(courseRepo.save(e));
     }
@@ -136,28 +146,34 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     public PageResult<Course> list(Integer academicYearId, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            courseRepo.search(academicYearId, pageable).map(this::toDomain));
+                courseRepo.search(academicYearId, pageable).map(this::toDomain));
     }
 
     @Override
     public Optional<Course> homeroomCourseOf(UUID teacherId) {
-        return courseRepo.findFirstByHomeroomTeacher_IdAndActiveTrueOrderByAcademicYear_YearDesc(teacherId)
-            .map(this::toDomain);
+        return courseRepo
+                .findFirstByHomeroomTeacher_IdAndActiveTrueOrderByAcademicYear_YearDesc(teacherId)
+                .map(this::toDomain);
     }
 
     private CourseEntity load(UUID id) {
-        return courseRepo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Course", id));
+        return courseRepo
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
     }
 
     private Course toDomain(CourseEntity e) {
         UserEntity ht = e.getHomeroomTeacher();
         return new Course(
-            e.getId(),
-            e.getGrade().getId(), e.getGrade().getName(),
-            e.getParallel().getId(), e.getParallel().getName(),
-            e.getAcademicYear().getId(), e.getAcademicYear().getYear(),
-            ht != null ? ht.getId() : null,
-            ht != null ? ht.getNames() + " " + ht.getLastNames() : null,
-            e.isActive());
+                e.getId(),
+                e.getGrade().getId(),
+                e.getGrade().getName(),
+                e.getParallel().getId(),
+                e.getParallel().getName(),
+                e.getAcademicYear().getId(),
+                e.getAcademicYear().getYear(),
+                ht != null ? ht.getId() : null,
+                ht != null ? ht.getNames() + " " + ht.getLastNames() : null,
+                e.isActive());
     }
 }

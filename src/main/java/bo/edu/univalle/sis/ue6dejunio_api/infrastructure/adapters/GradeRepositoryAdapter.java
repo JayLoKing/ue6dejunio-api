@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.grade.Grade;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.grade.IGradeDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.GradeEntity;
@@ -11,11 +11,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.GradeMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaLevelRepository;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -26,10 +25,11 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     private final JpaCourseRepository courseRepo;
     private final GradeMapper mapper;
 
-    public GradeRepositoryAdapter(JpaGradeRepository gradeRepo,
-                                  JpaLevelRepository levelRepo,
-                                  JpaCourseRepository courseRepo,
-                                  GradeMapper mapper) {
+    public GradeRepositoryAdapter(
+            JpaGradeRepository gradeRepo,
+            JpaLevelRepository levelRepo,
+            JpaCourseRepository courseRepo,
+            GradeMapper mapper) {
         this.gradeRepo = gradeRepo;
         this.levelRepo = levelRepo;
         this.courseRepo = courseRepo;
@@ -39,8 +39,10 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     @Override
     @Transactional
     public Grade create(String name, Integer levelId) {
-        LevelEntity level = levelRepo.findById(levelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Level", levelId));
+        LevelEntity level =
+                levelRepo
+                        .findById(levelId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Level", levelId));
         GradeEntity g = new GradeEntity();
         g.setName(name);
         g.setLevel(level);
@@ -50,10 +52,14 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     @Override
     @Transactional
     public Grade update(Integer id, String name, Integer levelId) {
-        GradeEntity g = gradeRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Grade", id));
-        LevelEntity level = levelRepo.findById(levelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Level", levelId));
+        GradeEntity g =
+                gradeRepo
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Grade", id));
+        LevelEntity level =
+                levelRepo
+                        .findById(levelId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Level", levelId));
         g.setName(name);
         g.setLevel(level);
         return mapper.toDomain(gradeRepo.save(g));
@@ -95,5 +101,4 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     public void deleteById(Integer id) {
         gradeRepo.deleteById(id);
     }
-
 }

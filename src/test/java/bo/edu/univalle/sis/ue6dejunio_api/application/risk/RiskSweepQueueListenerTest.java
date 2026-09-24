@@ -1,24 +1,23 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.risk;
 
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskSweepQueueListener;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.DailyAttendanceRecorded;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SessionAttendanceRecorded;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskSweepQueueDomain;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskSweepQueueListener;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.DailyAttendanceRecorded;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskInputsChanged;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SessionAttendanceRecorded;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskSweepQueueDomain;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 class RiskSweepQueueListenerTest {
 
@@ -57,8 +56,7 @@ class RiskSweepQueueListenerTest {
     @Test
     @DisplayName("a daily roll call queues the courses its students belong to")
     void onDailyAttendanceRecorded_marksTheCourses() {
-        listener.onDailyAttendanceRecorded(
-            new DailyAttendanceRecorded(List.of(enrollment), DATE));
+        listener.onDailyAttendanceRecorded(new DailyAttendanceRecorded(List.of(enrollment), DATE));
 
         verify(queue).markCoursesOfEnrollmentsOn(List.of(enrollment), DATE);
     }
@@ -72,9 +70,10 @@ class RiskSweepQueueListenerTest {
     @DisplayName("a queue that refuses the mark does not fail the save behind it")
     void mark_whenTheQueueRefuses_swallowsAndLogs() {
         doThrow(new IllegalStateException("the queue is unreachable"))
-            .when(queue).markClassGroups(any(), anyInt());
+                .when(queue)
+                .markClassGroups(any(), anyInt());
 
         assertThatCode(() -> listener.onRiskInputsChanged(new RiskInputsChanged(classGroup, 1)))
-            .doesNotThrowAnyException();
+                .doesNotThrowAnyException();
     }
 }

@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.common;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
-
 import java.util.List;
 import java.util.function.Function;
 
@@ -30,7 +29,9 @@ public record PageResult<T>(List<T> content, int page, int size, long totalEleme
         content = content == null ? List.of() : List.copyOf(content);
     }
 
-    /** The page a query found nothing for. Keeps the coordinates asked, so the answer stays honest. */
+    /**
+     * The page a query found nothing for. Keeps the coordinates asked, so the answer stays honest.
+     */
     public static <T> PageResult<T> empty(PageQuery query) {
         return new PageResult<>(List.of(), query.page(), query.size(), 0L);
     }
@@ -40,7 +41,9 @@ public record PageResult<T>(List<T> content, int page, int size, long totalEleme
         return (int) Math.ceil((double) totalElements / (double) size);
     }
 
-    /** Same page, rows converted. Used to turn domain rows into responses without losing the page. */
+    /**
+     * Same page, rows converted. Used to turn domain rows into responses without losing the page.
+     */
     public <R> PageResult<R> map(Function<? super T, ? extends R> mapper) {
         List<R> mapped = content.stream().<R>map(mapper).toList();
         return new PageResult<>(mapped, page, size, totalElements);

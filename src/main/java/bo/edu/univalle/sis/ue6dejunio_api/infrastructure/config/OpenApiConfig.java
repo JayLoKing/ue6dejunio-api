@@ -10,19 +10,17 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @OpenAPIDefinition(
-    info = @Info(
-        title = "UE 6 de Junio API",
-        version = "0.0.1",
-        description = "Sistema de control pedagógico y analítica predictiva. RM 0001/2026."
-    ),
-    servers = {@Server(url = "/", description = "Default")},
-    security = {@SecurityRequirement(name = "bearerAuth")}
-)
+        info =
+                @Info(
+                        title = "UE 6 de Junio API",
+                        version = "0.0.1",
+                        description =
+                                "Sistema de control pedagógico y analítica predictiva. RM 0001/2026."),
+        servers = {@Server(url = "/", description = "Default")},
+        security = {@SecurityRequirement(name = "bearerAuth")})
 @SecurityScheme(
-    name = "bearerAuth",
-    type = SecuritySchemeType.HTTP,
-    scheme = "bearer",
-    bearerFormat = "JWT"
-)
-public class OpenApiConfig {
-}
+        name = "bearerAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT")
+public class OpenApiConfig {}

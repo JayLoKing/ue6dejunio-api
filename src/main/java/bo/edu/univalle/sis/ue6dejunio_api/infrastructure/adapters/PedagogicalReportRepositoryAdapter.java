@@ -4,10 +4,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalRep
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalReportDraft;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PedagogicalReportNote;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IPedagogicalReportDomain;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -17,20 +13,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The informe pedagógico's two tables, written as upserts rather than as read-then-write.
  *
  * <p>Plain SQL and not JPA, which is the one place this report parts company with the rest of the
  * gradebook. The reason is the shape of the write, not a preference: this is a document a teacher
- * saves repeatedly while drafting it, and the row it lands in is addressed by
- * {@code (id_course, trimester)} rather than by an id the caller holds. Asking JPA whether the row
- * exists and then inserting it is a check-then-act, and under {@code READ COMMITTED} two saves of
- * the same untouched report — a double-click on the button, or a client retrying a request still in
- * flight — both read nothing and both insert. The second then fails
- * {@code uq_pedagogical_report}, which the error handler turns into a 409 on an endpoint whose
- * whole point is that saving twice leaves the same document. {@code ON CONFLICT} makes the database
- * settle it in one statement, so the race has nowhere left to happen.
+ * saves repeatedly while drafting it, and the row it lands in is addressed by {@code (id_course,
+ * trimester)} rather than by an id the caller holds. Asking JPA whether the row exists and then
+ * inserting it is a check-then-act, and under {@code READ COMMITTED} two saves of the same
+ * untouched report — a double-click on the button, or a client retrying a request still in flight —
+ * both read nothing and both insert. The second then fails {@code uq_pedagogical_report}, which the
+ * error handler turns into a 409 on an endpoint whose whole point is that saving twice leaves the
+ * same document. {@code ON CONFLICT} makes the database settle it in one statement, so the race has
+ * nowhere left to happen.
  *
  * <p>Nothing is mapped as an entity for the same reason: there is no navigation to a course or an
  * enrolment anywhere here. The sheet's classroom comes from {@code ICourseService} and its roster
@@ -48,8 +47,7 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
 
     @Override
     public Optional<PedagogicalReport> byCourseAndTrimester(UUID courseId, int trimester) {
-        return findReport(courseId, trimester)
-            .map(row -> withNotes(row, storedNotes(row.id())));
+        return findReport(courseId, trimester).map(row -> withNotes(row, storedNotes(row.id())));
     }
 
     @Override
@@ -64,7 +62,9 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
          * `created_at` is deliberately absent from the DO UPDATE: on a correction the row already
          * has one, and it records when the teacher first opened this report.
          */
-        ReportRow report = jdbc.sql("""
+        ReportRow report =
+                jdbc.sql(
+                                """
                 INSERT INTO pedagogical_reports
                     (id_course, trimester, achievements, difficulties, created_at, updated_at)
                 VALUES (:course, :trimester, :achievements, :difficulties, :now, :now)
@@ -75,13 +75,13 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
                 RETURNING id_pedagogical_report, id_course, trimester,
                           achievements, difficulties, updated_at
             """)
-            .param("course", courseId)
-            .param("trimester", trimester)
-            .param("achievements", draft.achievements())
-            .param("difficulties", draft.difficulties())
-            .param("now", now)
-            .query(PedagogicalReportRepositoryAdapter::toReportRow)
-            .single();
+                        .param("course", courseId)
+                        .param("trimester", trimester)
+                        .param("achievements", draft.achievements())
+                        .param("difficulties", draft.difficulties())
+                        .param("now", now)
+                        .query(PedagogicalReportRepositoryAdapter::toReportRow)
+                        .single();
 
         // A null note list says this save is about the prose only, so section IV is read back
         // untouched. Treating it as an empty set instead would delete every paragraph on the
@@ -101,11 +101,12 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
      * wrote that student's paragraph, and fixing a word in it is not writing it anew. Leaving the
      * column out of the {@code DO UPDATE} is what keeps it.
      */
-    private void writeNotes(UUID reportId, Map<UUID, PedagogicalReportNote> wanted,
-                            LocalDateTime now) {
+    private void writeNotes(
+            UUID reportId, Map<UUID, PedagogicalReportNote> wanted, LocalDateTime now) {
         deleteNotesOutside(reportId, wanted.keySet());
         for (PedagogicalReportNote note : wanted.values()) {
-            jdbc.sql("""
+            jdbc.sql(
+                            """
                     INSERT INTO pedagogical_report_failures
                         (id_pedagogical_report, id_course_enrollment, actions, verification_source,
                          created_at, updated_at)
@@ -115,12 +116,12 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
                         verification_source = EXCLUDED.verification_source,
                         updated_at          = EXCLUDED.updated_at
                 """)
-                .param("report", reportId)
-                .param("enrollment", note.courseEnrollmentId())
-                .param("actions", note.actions())
-                .param("source", note.verificationSource())
-                .param("now", now)
-                .update();
+                    .param("report", reportId)
+                    .param("enrollment", note.courseEnrollmentId())
+                    .param("actions", note.actions())
+                    .param("source", note.verificationSource())
+                    .param("now", now)
+                    .update();
         }
     }
 
@@ -129,32 +130,35 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
         if (keep.isEmpty()) {
             // Split rather than folded into one statement: `NOT IN ()` is not valid SQL, and an
             // empty section IV is the ordinary way a teacher clears the table.
-            jdbc.sql("DELETE FROM pedagogical_report_failures WHERE id_pedagogical_report = :report")
-                .param("report", reportId)
-                .update();
+            jdbc.sql(
+                            "DELETE FROM pedagogical_report_failures WHERE id_pedagogical_report = :report")
+                    .param("report", reportId)
+                    .update();
             return;
         }
-        jdbc.sql("""
+        jdbc.sql(
+                        """
                 DELETE FROM pedagogical_report_failures
                 WHERE id_pedagogical_report = :report
                   AND id_course_enrollment NOT IN (:keep)
             """)
-            .param("report", reportId)
-            .param("keep", keep)
-            .update();
+                .param("report", reportId)
+                .param("keep", keep)
+                .update();
     }
 
     private Optional<ReportRow> findReport(UUID courseId, int trimester) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT id_pedagogical_report, id_course, trimester,
                        achievements, difficulties, updated_at
                 FROM pedagogical_reports
                 WHERE id_course = :course AND trimester = :trimester
             """)
-            .param("course", courseId)
-            .param("trimester", trimester)
-            .query(PedagogicalReportRepositoryAdapter::toReportRow)
-            .optional();
+                .param("course", courseId)
+                .param("trimester", trimester)
+                .query(PedagogicalReportRepositoryAdapter::toReportRow)
+                .optional();
     }
 
     /**
@@ -165,18 +169,21 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
      * nobody touched. The enrolment is unique within a report, so this order is total.
      */
     private List<PedagogicalReportNote> storedNotes(UUID reportId) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT id_course_enrollment, actions, verification_source
                 FROM pedagogical_report_failures
                 WHERE id_pedagogical_report = :report
                 ORDER BY id_course_enrollment
             """)
-            .param("report", reportId)
-            .query((rs, rowNum) -> new PedagogicalReportNote(
-                rs.getObject("id_course_enrollment", UUID.class),
-                rs.getString("actions"),
-                rs.getString("verification_source")))
-            .list();
+                .param("report", reportId)
+                .query(
+                        (rs, rowNum) ->
+                                new PedagogicalReportNote(
+                                        rs.getObject("id_course_enrollment", UUID.class),
+                                        rs.getString("actions"),
+                                        rs.getString("verification_source")))
+                .list();
     }
 
     /**
@@ -195,21 +202,32 @@ public class PedagogicalReportRepositoryAdapter implements IPedagogicalReportDom
     }
 
     private static PedagogicalReport withNotes(ReportRow row, List<PedagogicalReportNote> notes) {
-        return new PedagogicalReport(row.id(), row.courseId(), row.trimester(),
-            row.achievements(), row.difficulties(), notes, row.updatedAt());
+        return new PedagogicalReport(
+                row.id(),
+                row.courseId(),
+                row.trimester(),
+                row.achievements(),
+                row.difficulties(),
+                notes,
+                row.updatedAt());
     }
 
     private static ReportRow toReportRow(ResultSet rs, int rowNum) throws SQLException {
         return new ReportRow(
-            rs.getObject("id_pedagogical_report", UUID.class),
-            rs.getObject("id_course", UUID.class),
-            rs.getInt("trimester"),
-            rs.getString("achievements"),
-            rs.getString("difficulties"),
-            rs.getTimestamp("updated_at").toLocalDateTime());
+                rs.getObject("id_pedagogical_report", UUID.class),
+                rs.getObject("id_course", UUID.class),
+                rs.getInt("trimester"),
+                rs.getString("achievements"),
+                rs.getString("difficulties"),
+                rs.getTimestamp("updated_at").toLocalDateTime());
     }
 
     /** The report row on its own, before section IV is read onto it. */
-    private record ReportRow(UUID id, UUID courseId, Integer trimester, String achievements,
-                             String difficulties, LocalDateTime updatedAt) {}
+    private record ReportRow(
+            UUID id,
+            UUID courseId,
+            Integer trimester,
+            String achievements,
+            String difficulties,
+            LocalDateTime updatedAt) {}
 }

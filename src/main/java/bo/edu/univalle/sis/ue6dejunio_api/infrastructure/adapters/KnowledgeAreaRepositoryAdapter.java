@@ -7,11 +7,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.knowledgearea.IKnowledgeA
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.KnowledgeAreaEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaKnowledgeAreaRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -20,8 +19,8 @@ public class KnowledgeAreaRepositoryAdapter implements IKnowledgeAreaDomain {
     private final JpaKnowledgeAreaRepository areaRepo;
     private final JpaSubjectRepository subjectRepo;
 
-    public KnowledgeAreaRepositoryAdapter(JpaKnowledgeAreaRepository areaRepo,
-                                          JpaSubjectRepository subjectRepo) {
+    public KnowledgeAreaRepositoryAdapter(
+            JpaKnowledgeAreaRepository areaRepo, JpaSubjectRepository subjectRepo) {
         this.areaRepo = areaRepo;
         this.subjectRepo = subjectRepo;
     }
@@ -29,9 +28,10 @@ public class KnowledgeAreaRepositoryAdapter implements IKnowledgeAreaDomain {
     @Override
     @Transactional
     public KnowledgeArea save(KnowledgeArea area) {
-        KnowledgeAreaEntity e = area.id() == null
-            ? new KnowledgeAreaEntity()
-            : areaRepo.findById(area.id()).orElseGet(KnowledgeAreaEntity::new);
+        KnowledgeAreaEntity e =
+                area.id() == null
+                        ? new KnowledgeAreaEntity()
+                        : areaRepo.findById(area.id()).orElseGet(KnowledgeAreaEntity::new);
         e.setName(area.name());
         e.setDisplayOrder(area.displayOrder());
         if (area.id() != null) {
@@ -64,7 +64,7 @@ public class KnowledgeAreaRepositoryAdapter implements IKnowledgeAreaDomain {
     public PageResult<KnowledgeArea> list(PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            areaRepo.findAll(pageable).map(KnowledgeAreaRepositoryAdapter::toDomain));
+                areaRepo.findAll(pageable).map(KnowledgeAreaRepositoryAdapter::toDomain));
     }
 
     @Override

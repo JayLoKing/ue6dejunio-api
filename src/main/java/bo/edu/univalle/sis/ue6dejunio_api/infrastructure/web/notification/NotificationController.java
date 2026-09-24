@@ -5,9 +5,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.sse.NotificationStreamRegistry;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.NotificationResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.sse.NotificationStreamRegistry;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.SendNotificationRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UnreadCountResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,8 +16,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,11 +29,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.UUID;
 
 @RestController
 @Validated
@@ -43,8 +42,8 @@ public class NotificationController {
     private final INotificationService notificationService;
     private final NotificationStreamRegistry streams;
 
-    public NotificationController(INotificationService notificationService,
-                                  NotificationStreamRegistry streams) {
+    public NotificationController(
+            INotificationService notificationService, NotificationStreamRegistry streams) {
         this.notificationService = notificationService;
         this.streams = streams;
     }
@@ -60,26 +59,34 @@ public class NotificationController {
     // saying it was not the Director. Sending is the Director's; everyone else reads and answers.
     @PreAuthorize("hasRole('Director')")
     @Operation(summary = "Enviar notificacion (solo Director; sender = usuario autenticado)")
-    public ResponseEntity<NotificationResponse> send(@Valid @RequestBody SendNotificationRequest request,
-                                                     JwtAuthenticationToken token) {
-        Notification n = notificationService.send(new SendNotificationCommand(
-            currentUser(token), request.receiverId(), request.type(), request.subject(),
-            request.message(), request.resourceType(), request.resourceId()));
+    public ResponseEntity<NotificationResponse> send(
+            @Valid @RequestBody SendNotificationRequest request, JwtAuthenticationToken token) {
+        Notification n =
+                notificationService.send(
+                        new SendNotificationCommand(
+                                currentUser(token),
+                                request.receiverId(),
+                                request.type(),
+                                request.subject(),
+                                request.message(),
+                                request.resourceType(),
+                                request.resourceId()));
         return ResponseEntity.ok(NotificationResponse.from(n));
     }
 
     @GetMapping
     @Operation(summary = "Bandeja de entrada del usuario. unreadOnly opcional")
     public ResponseEntity<PagedResponse<NotificationResponse>> inbox(
-        JwtAuthenticationToken token,
-        @RequestParam(defaultValue = "false") boolean unreadOnly,
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit
-    ) {
+            JwtAuthenticationToken token,
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit) {
         PageQuery p = PageQuery.of(offset - 1, limit, SortField.desc("createdAt"));
-        return ResponseEntity.ok(PagedResponse.of(
-            notificationService.inbox(currentUser(token), unreadOnly, p)
-                .map(NotificationResponse::from)));
+        return ResponseEntity.ok(
+                PagedResponse.of(
+                        notificationService
+                                .inbox(currentUser(token), unreadOnly, p)
+                                .map(NotificationResponse::from)));
     }
 
     /**
@@ -103,8 +110,8 @@ public class NotificationController {
     @GetMapping("/unread-count")
     @Operation(summary = "Cantidad de notificaciones no leidas del usuario")
     public ResponseEntity<UnreadCountResponse> unreadCount(JwtAuthenticationToken token) {
-        return ResponseEntity.ok(new UnreadCountResponse(
-            notificationService.unreadCount(currentUser(token))));
+        return ResponseEntity.ok(
+                new UnreadCountResponse(notificationService.unreadCount(currentUser(token))));
     }
 
     @PostMapping("/{id}/read")

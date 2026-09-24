@@ -1,12 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.common;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class PageQueryTest {
 
@@ -24,9 +23,10 @@ class PageQueryTest {
         // El orden de los campos es el orden del ORDER BY: invertirlo cambia el resultado.
         PageQuery q = PageQuery.of(0, 30, SortField.asc("lastNames"), SortField.asc("names"));
 
-        assertThat(q.sort()).containsExactly(
-            new SortField("lastNames", SortDirection.ASC),
-            new SortField("names", SortDirection.ASC));
+        assertThat(q.sort())
+                .containsExactly(
+                        new SortField("lastNames", SortDirection.ASC),
+                        new SortField("names", SortDirection.ASC));
     }
 
     @Test

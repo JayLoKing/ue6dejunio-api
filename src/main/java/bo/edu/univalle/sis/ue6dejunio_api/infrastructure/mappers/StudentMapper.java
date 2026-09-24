@@ -15,7 +15,10 @@ public interface StudentMapper {
      * students is gone needs somebody to ask, and a UUID is not somebody.
      */
     @Mapping(target = "statusChangedById", source = "statusChangedBy.id")
-    @Mapping(target = "statusChangedByName", source = "statusChangedBy", qualifiedByName = "userFullName")
+    @Mapping(
+            target = "statusChangedByName",
+            source = "statusChangedBy",
+            qualifiedByName = "userFullName")
     Student toDomain(StudentEntity entity);
 
     /**

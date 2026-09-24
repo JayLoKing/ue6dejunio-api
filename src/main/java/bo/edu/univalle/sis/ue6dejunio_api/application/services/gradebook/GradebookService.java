@@ -1,13 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualSubjectScore;
@@ -29,9 +29,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -40,11 +37,13 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GradebookService implements IGradebookService {
@@ -61,11 +60,12 @@ public class GradebookService implements IGradebookService {
     private final ICourseService courseService;
     private final IClassGroupDomain classGroupDomain;
 
-    public GradebookService(ICourseEnrollmentDomain enrollmentDomain,
-                            IScoreDomain scoreDomain,
-                            IAttendanceDomain attendanceDomain,
-                            ICourseService courseService,
-                            IClassGroupDomain classGroupDomain) {
+    public GradebookService(
+            ICourseEnrollmentDomain enrollmentDomain,
+            IScoreDomain scoreDomain,
+            IAttendanceDomain attendanceDomain,
+            ICourseService courseService,
+            IClassGroupDomain classGroupDomain) {
         this.enrollmentDomain = enrollmentDomain;
         this.scoreDomain = scoreDomain;
         this.attendanceDomain = attendanceDomain;
@@ -76,18 +76,30 @@ public class GradebookService implements IGradebookService {
     @Override
     @Transactional(readOnly = true)
     public StudentTrimesterSummary studentSummary(UUID courseEnrollmentId, Integer trimester) {
-        CourseStudent cs = enrollmentDomain.courseStudentById(courseEnrollmentId)
-            .orElseThrow(() -> new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId));
+        CourseStudent cs =
+                enrollmentDomain
+                        .courseStudentById(courseEnrollmentId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "CourseEnrollment", courseEnrollmentId));
         return buildSummary(courseEnrollmentId, cs.studentId(), cs.fullName(), trimester);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<StudentTrimesterSummary> centralizer(UUID courseId, Integer trimester, PageQuery pageQuery) {
+    public PageResult<StudentTrimesterSummary> centralizer(
+            UUID courseId, Integer trimester, PageQuery pageQuery) {
         PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
         Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
-        return page.map(cs -> buildSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), trimester,
-            grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+        return page.map(
+                cs ->
+                        buildSummary(
+                                cs.courseEnrollmentId(),
+                                cs.studentId(),
+                                cs.fullName(),
+                                trimester,
+                                grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
     }
 
     @Override
@@ -99,53 +111,70 @@ public class GradebookService implements IGradebookService {
         // so reading the whole year costs the same single query.
         PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
         Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
-        return page.map(cs -> buildAnnualSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(),
-            grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+        return page.map(
+                cs ->
+                        buildAnnualSummary(
+                                cs.courseEnrollmentId(),
+                                cs.studentId(),
+                                cs.fullName(),
+                                grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
     }
 
     /** One batched load for the whole page, then in-memory grouping — never a query per student. */
     private Map<UUID, List<AcademicScore>> scoresByEnrollment(PageResult<CourseStudent> page) {
         List<UUID> ids = page.content().stream().map(CourseStudent::courseEnrollmentId).toList();
         return ids.isEmpty()
-            ? Map.of()
-            : scoreDomain.findByCourseEnrollmentIn(ids).stream()
-                .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
+                ? Map.of()
+                : scoreDomain.findByCourseEnrollmentIn(ids).stream()
+                        .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<CourseAttendanceRow> courseAttendance(UUID courseId, LocalDate date, PageQuery pageQuery) {
-        PageResult<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
+    public PageResult<CourseAttendanceRow> courseAttendance(
+            UUID courseId, LocalDate date, PageQuery pageQuery) {
+        PageResult<CourseStudent> page =
+                enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
         return attendanceRows(page, date, attendanceDomain::dailyByCourseEnrollmentIn);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<CourseAttendanceRow> classGroupAttendance(UUID classGroupId, LocalDate date,
-                                                          PageQuery pageQuery) {
+    public PageResult<CourseAttendanceRow> classGroupAttendance(
+            UUID classGroupId, LocalDate date, PageQuery pageQuery) {
         // The roster is the course's, but the rows are the subject's: a technical teacher marks the
         // same students the homeroom teacher does, only for their own class group.
         UUID courseId = attendanceDomain.courseOfClassGroup(classGroupId);
-        PageResult<CourseStudent> page = enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
-        return attendanceRows(page, date,
-            ids -> attendanceDomain.sessionByClassGroupAndCourseEnrollmentIn(classGroupId, ids));
+        PageResult<CourseStudent> page =
+                enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
+        return attendanceRows(
+                page,
+                date,
+                ids ->
+                        attendanceDomain.sessionByClassGroupAndCourseEnrollmentIn(
+                                classGroupId, ids));
     }
 
     /** One batched load for the whole page, then in-memory grouping — never a query per student. */
-    private PageResult<CourseAttendanceRow> attendanceRows(PageResult<CourseStudent> page, LocalDate date,
-                                                     Function<List<UUID>, List<Attendance>> loader) {
+    private PageResult<CourseAttendanceRow> attendanceRows(
+            PageResult<CourseStudent> page,
+            LocalDate date,
+            Function<List<UUID>, List<Attendance>> loader) {
         List<UUID> ids = page.content().stream().map(CourseStudent::courseEnrollmentId).toList();
-        Map<UUID, List<Attendance>> grouped = ids.isEmpty()
-            ? Map.of()
-            : loader.apply(ids).stream()
-                .collect(Collectors.groupingBy(Attendance::courseEnrollmentId));
-        return page.map(cs -> {
-            List<Attendance> att = grouped.getOrDefault(cs.courseEnrollmentId(), List.of());
-            if (date != null) {
-                att = att.stream().filter(a -> date.equals(a.date())).toList();
-            }
-            return new CourseAttendanceRow(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), att);
-        });
+        Map<UUID, List<Attendance>> grouped =
+                ids.isEmpty()
+                        ? Map.of()
+                        : loader.apply(ids).stream()
+                                .collect(Collectors.groupingBy(Attendance::courseEnrollmentId));
+        return page.map(
+                cs -> {
+                    List<Attendance> att = grouped.getOrDefault(cs.courseEnrollmentId(), List.of());
+                    if (date != null) {
+                        att = att.stream().filter(a -> date.equals(a.date())).toList();
+                    }
+                    return new CourseAttendanceRow(
+                            cs.courseEnrollmentId(), cs.studentId(), cs.fullName(), att);
+                });
     }
 
     @Override
@@ -161,7 +190,8 @@ public class GradebookService implements IGradebookService {
         // a student of 2024 against one of 2026 — two years the school never compared. It is also
         // what makes the paged course read sound: see ICourseService.allOfYear.
         if (academicYearId == null) {
-            throw new ValidationException("A school-wide honour roll needs the gestión it belongs to");
+            throw new ValidationException(
+                    "A school-wide honour roll needs the gestión it belongs to");
         }
         /*
          * The best of each course first, then the best of those. Taking `places` from every course
@@ -200,13 +230,14 @@ public class GradebookService implements IGradebookService {
      * entry would name one classroom on one reading and the other on the next, off marks that never
      * changed — the same rule the ranking already applies to the student's name.
      */
-    private static final BinaryOperator<HonorRollEntry> BEST_ENROLMENT = (kept, candidate) -> {
-        int byAverage = candidate.finalAverage().compareTo(kept.finalAverage());
-        if (byAverage != 0) {
-            return byAverage > 0 ? candidate : kept;
-        }
-        return classroomOf(candidate).compareTo(classroomOf(kept)) < 0 ? candidate : kept;
-    };
+    private static final BinaryOperator<HonorRollEntry> BEST_ENROLMENT =
+            (kept, candidate) -> {
+                int byAverage = candidate.finalAverage().compareTo(kept.finalAverage());
+                if (byAverage != 0) {
+                    return byAverage > 0 ? candidate : kept;
+                }
+                return classroomOf(candidate).compareTo(classroomOf(kept)) < 0 ? candidate : kept;
+            };
 
     /** The classroom the way the podium shows it, which is what makes the tie-break readable. */
     private static String classroomOf(HonorRollEntry entry) {
@@ -220,9 +251,16 @@ public class GradebookService implements IGradebookService {
             // Nothing graded is not a bad year: it is a year nobody judged, and last place would
             // say otherwise. They hold no place at all.
             if (annual.finalAverage() != null) {
-                candidates.add(new HonorRollEntry(0, annual.courseEnrollmentId(), annual.studentId(),
-                    annual.fullName(), course.id(), course.gradeName(), course.parallelName(),
-                    annual.finalAverage()));
+                candidates.add(
+                        new HonorRollEntry(
+                                0,
+                                annual.courseEnrollmentId(),
+                                annual.studentId(),
+                                annual.fullName(),
+                                course.id(),
+                                course.gradeName(),
+                                course.parallelName(),
+                                annual.finalAverage()));
             }
         }
         return ranked(candidates, places);
@@ -237,18 +275,29 @@ public class GradebookService implements IGradebookService {
      * something the reader can see.
      */
     private static List<HonorRollEntry> ranked(List<HonorRollEntry> entries, int places) {
-        List<HonorRollEntry> sorted = entries.stream()
-            .sorted(Comparator.comparing(HonorRollEntry::finalAverage).reversed()
-                .thenComparing(HonorRollEntry::fullName))
-            .limit(places)
-            .toList();
+        List<HonorRollEntry> sorted =
+                entries.stream()
+                        .sorted(
+                                Comparator.comparing(HonorRollEntry::finalAverage)
+                                        .reversed()
+                                        .thenComparing(HonorRollEntry::fullName))
+                        .limit(places)
+                        .toList();
         return IntStream.range(0, sorted.size())
-            .mapToObj(i -> {
-                HonorRollEntry e = sorted.get(i);
-                return new HonorRollEntry(i + 1, e.courseEnrollmentId(), e.studentId(), e.fullName(),
-                    e.courseId(), e.gradeName(), e.parallelName(), e.finalAverage());
-            })
-            .toList();
+                .mapToObj(
+                        i -> {
+                            HonorRollEntry e = sorted.get(i);
+                            return new HonorRollEntry(
+                                    i + 1,
+                                    e.courseEnrollmentId(),
+                                    e.studentId(),
+                                    e.fullName(),
+                                    e.courseId(),
+                                    e.gradeName(),
+                                    e.parallelName(),
+                                    e.finalAverage());
+                        })
+                .toList();
     }
 
     /**
@@ -272,14 +321,23 @@ public class GradebookService implements IGradebookService {
         List<StudentAnnualSummary> all = new ArrayList<>();
         int pageIndex = 0;
         while (true) {
-            PageResult<CourseStudent> page = enrollmentDomain
-                .studentsByCourse(courseId, PageQuery.of(pageIndex, ROSTER_PAGE_SIZE,
-                    SortField.asc("student.lastNames"), SortField.asc("student.names"),
-                    SortField.asc("id")));
+            PageResult<CourseStudent> page =
+                    enrollmentDomain.studentsByCourse(
+                            courseId,
+                            PageQuery.of(
+                                    pageIndex,
+                                    ROSTER_PAGE_SIZE,
+                                    SortField.asc("student.lastNames"),
+                                    SortField.asc("student.names"),
+                                    SortField.asc("id")));
             Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
             for (CourseStudent cs : page.content()) {
-                all.add(buildAnnualSummary(cs.courseEnrollmentId(), cs.studentId(), cs.fullName(),
-                    grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+                all.add(
+                        buildAnnualSummary(
+                                cs.courseEnrollmentId(),
+                                cs.studentId(),
+                                cs.fullName(),
+                                grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
             }
             if (readEverything(all.size(), page.content().size(), page.totalElements())) {
                 return all;
@@ -309,90 +367,146 @@ public class GradebookService implements IGradebookService {
         return new CourseOverview(course, classGroups, students);
     }
 
-    private StudentTrimesterSummary buildSummary(UUID courseEnrollmentId, UUID studentId,
-                                                 String fullName, Integer trimester) {
-        return buildSummary(courseEnrollmentId, studentId, fullName, trimester,
-            scoreDomain.findByCourseEnrollment(courseEnrollmentId));
+    private StudentTrimesterSummary buildSummary(
+            UUID courseEnrollmentId, UUID studentId, String fullName, Integer trimester) {
+        return buildSummary(
+                courseEnrollmentId,
+                studentId,
+                fullName,
+                trimester,
+                scoreDomain.findByCourseEnrollment(courseEnrollmentId));
     }
 
-    /** Overload consuming a pre-grouped (batch-loaded) score list; keeps the averaging math verbatim. */
-    private StudentTrimesterSummary buildSummary(UUID courseEnrollmentId, UUID studentId,
-                                                 String fullName, Integer trimester,
-                                                 List<AcademicScore> allScores) {
+    /**
+     * Overload consuming a pre-grouped (batch-loaded) score list; keeps the averaging math
+     * verbatim.
+     */
+    private StudentTrimesterSummary buildSummary(
+            UUID courseEnrollmentId,
+            UUID studentId,
+            String fullName,
+            Integer trimester,
+            List<AcademicScore> allScores) {
         List<AcademicScore> scores = ofTrimester(allScores, trimester);
-        List<SubjectScore> subjects = scores.stream()
-            .map(s -> new SubjectScore(s.classGroupId(), s.subjectName(), s.totalScore(),
-                s.totalScore() != null))
-            .toList();
-        return new StudentTrimesterSummary(courseEnrollmentId, studentId, fullName, trimester,
-            subjects, averageOfTotals(scores));
+        List<SubjectScore> subjects =
+                scores.stream()
+                        .map(
+                                s ->
+                                        new SubjectScore(
+                                                s.classGroupId(),
+                                                s.subjectName(),
+                                                s.totalScore(),
+                                                s.totalScore() != null))
+                        .toList();
+        return new StudentTrimesterSummary(
+                courseEnrollmentId,
+                studentId,
+                fullName,
+                trimester,
+                subjects,
+                averageOfTotals(scores));
     }
 
-    private StudentAnnualSummary buildAnnualSummary(UUID courseEnrollmentId, UUID studentId,
-                                                    String fullName, List<AcademicScore> allScores) {
-        List<AnnualSubjectScore> subjects = allScores.stream()
-            .collect(Collectors.groupingBy(AcademicScore::classGroupId, LinkedHashMap::new,
-                Collectors.toList()))
-            .values().stream()
-            .map(GradebookService::annualSubject)
-            // A report whose columns move between two loads is unreadable, and the order a batched
-            // query answers in is not guaranteed. The class group breaks ties so two areas sharing
-            // a name still land somewhere fixed.
-            .sorted(Comparator
-                .comparing(AnnualSubjectScore::subjectName,
-                    Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(s -> s.classGroupId().toString()))
-            .toList();
+    private StudentAnnualSummary buildAnnualSummary(
+            UUID courseEnrollmentId,
+            UUID studentId,
+            String fullName,
+            List<AcademicScore> allScores) {
+        List<AnnualSubjectScore> subjects =
+                allScores.stream()
+                        .collect(
+                                Collectors.groupingBy(
+                                        AcademicScore::classGroupId,
+                                        LinkedHashMap::new,
+                                        Collectors.toList()))
+                        .values()
+                        .stream()
+                        .map(GradebookService::annualSubject)
+                        // A report whose columns move between two loads is unreadable, and the
+                        // order a batched
+                        // query answers in is not guaranteed. The class group breaks ties so two
+                        // areas sharing
+                        // a name still land somewhere fixed.
+                        .sorted(
+                                Comparator.comparing(
+                                                AnnualSubjectScore::subjectName,
+                                                Comparator.nullsLast(Comparator.naturalOrder()))
+                                        .thenComparing(s -> s.classGroupId().toString()))
+                        .toList();
         // No null filter here: a group exists because it had at least one row, so
         // averageOfTotals never answered null for it. Guarding against it would be dead code
         // claiming a case the grouping cannot produce.
-        List<BigDecimal> areaAverages = subjects.stream()
-            .map(AnnualSubjectScore::average)
-            .toList();
-        return new StudentAnnualSummary(courseEnrollmentId, studentId, fullName, subjects,
-            averageOfTotals(ofTrimester(allScores, 1)),
-            averageOfTotals(ofTrimester(allScores, 2)),
-            averageOfTotals(ofTrimester(allScores, 3)),
-            mean(areaAverages));
+        List<BigDecimal> areaAverages = subjects.stream().map(AnnualSubjectScore::average).toList();
+        return new StudentAnnualSummary(
+                courseEnrollmentId,
+                studentId,
+                fullName,
+                subjects,
+                averageOfTotals(ofTrimester(allScores, 1)),
+                averageOfTotals(ofTrimester(allScores, 2)),
+                averageOfTotals(ofTrimester(allScores, 3)),
+                mean(areaAverages));
     }
 
     @Override
     @Transactional(readOnly = true)
     public StudentReportCard reportCard(UUID courseEnrollmentId) {
-        CourseStudent cs = enrollmentDomain.courseStudentById(courseEnrollmentId)
-            .orElseThrow(() -> new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId));
+        CourseStudent cs =
+                enrollmentDomain
+                        .courseStudentById(courseEnrollmentId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "CourseEnrollment", courseEnrollmentId));
         UUID courseId = enrollmentDomain.courseOfEnrollment(courseEnrollmentId);
         Course course = courseService.getById(courseId);
-        StudentAnnualSummary annual = buildAnnualSummary(courseEnrollmentId, cs.studentId(),
-            cs.fullName(), scoreDomain.findByCourseEnrollment(courseEnrollmentId));
+        StudentAnnualSummary annual =
+                buildAnnualSummary(
+                        courseEnrollmentId,
+                        cs.studentId(),
+                        cs.fullName(),
+                        scoreDomain.findByCourseEnrollment(courseEnrollmentId));
 
-        Map<UUID, ClassGroupField> fieldOfClassGroup = classGroupDomain
-            .knowledgeFieldsByCourse(courseId).stream()
-            .collect(Collectors.toMap(ClassGroupField::classGroupId, f -> f, (first, dup) -> first));
+        Map<UUID, ClassGroupField> fieldOfClassGroup =
+                classGroupDomain.knowledgeFieldsByCourse(courseId).stream()
+                        .collect(
+                                Collectors.toMap(
+                                        ClassGroupField::classGroupId,
+                                        f -> f,
+                                        (first, dup) -> first));
 
-        return new StudentReportCard(courseEnrollmentId, cs.studentId(), cs.rudeCode(),
-            cs.fullName(), course.gradeName(), course.parallelName(), course.year(),
-            fieldRows(annual.subjects(), fieldOfClassGroup),
-            annual.trimester1Average(), annual.trimester2Average(), annual.trimester3Average(),
-            annual.finalAverage(), GradeInWords.of(annual.finalAverage()),
-            outcomes(annual.subjects()));
+        return new StudentReportCard(
+                courseEnrollmentId,
+                cs.studentId(),
+                cs.rudeCode(),
+                cs.fullName(),
+                course.gradeName(),
+                course.parallelName(),
+                course.year(),
+                fieldRows(annual.subjects(), fieldOfClassGroup),
+                annual.trimester1Average(),
+                annual.trimester2Average(),
+                annual.trimester3Average(),
+                annual.finalAverage(),
+                GradeInWords.of(annual.finalAverage()),
+                outcomes(annual.subjects()));
     }
 
     /**
      * The student's areas under their field of knowledge, in the order the school's sheet reads.
      *
-     * <p>A field the student has no marked area in never appears: a heading over nothing reads as
-     * a subject whose marks went missing. An area whose class group is no longer active has no
-     * field to hang under, and is kept in a trailing row rather than dropped — those marks were
-     * given, and a libreta that quietly loses a subject is worse than one with an unnamed row.
+     * <p>A field the student has no marked area in never appears: a heading over nothing reads as a
+     * subject whose marks went missing. An area whose class group is no longer active has no field
+     * to hang under, and is kept in a trailing row rather than dropped — those marks were given,
+     * and a libreta that quietly loses a subject is worse than one with an unnamed row.
      *
      * <p>Grouped by the field's id and never by its {@code displayOrder}. Nothing holds the order
      * unique — the Director types it in by hand — and two fields sharing one would otherwise fold
-     * into a single row under whichever name arrived first, printing a heading over somebody
-     * else's areas and dropping a field off the document with nothing to show it had happened.
+     * into a single row under whichever name arrived first, printing a heading over somebody else's
+     * areas and dropping a field off the document with nothing to show it had happened.
      */
-    private static List<KnowledgeFieldRow> fieldRows(List<AnnualSubjectScore> subjects,
-                                                     Map<UUID, ClassGroupField> fieldOfClassGroup) {
+    private static List<KnowledgeFieldRow> fieldRows(
+            List<AnnualSubjectScore> subjects, Map<UUID, ClassGroupField> fieldOfClassGroup) {
         Map<Integer, List<AnnualSubjectScore>> areasOfField = new LinkedHashMap<>();
         Map<Integer, ClassGroupField> fieldById = new LinkedHashMap<>();
         for (AnnualSubjectScore subject : subjects) {
@@ -404,19 +518,24 @@ public class GradebookService implements IGradebookService {
             }
         }
         return areasOfField.entrySet().stream()
-            .map(e -> {
-                ClassGroupField field = fieldById.get(e.getKey());
-                return new KnowledgeFieldRow(field == null ? null : field.fieldName(),
-                    field == null ? null : field.displayOrder(), e.getValue());
-            })
-            // Two fields sharing an order keep their own rows; the tie is broken by name so the
-            // document at least reads the same way twice.
-            .sorted(Comparator
-                .comparing(KnowledgeFieldRow::displayOrder,
-                    Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(KnowledgeFieldRow::fieldName,
-                    Comparator.nullsLast(Comparator.naturalOrder())))
-            .toList();
+                .map(
+                        e -> {
+                            ClassGroupField field = fieldById.get(e.getKey());
+                            return new KnowledgeFieldRow(
+                                    field == null ? null : field.fieldName(),
+                                    field == null ? null : field.displayOrder(),
+                                    e.getValue());
+                        })
+                // Two fields sharing an order keep their own rows; the tie is broken by name so the
+                // document at least reads the same way twice.
+                .sorted(
+                        Comparator.comparing(
+                                        KnowledgeFieldRow::displayOrder,
+                                        Comparator.nullsLast(Comparator.naturalOrder()))
+                                .thenComparing(
+                                        KnowledgeFieldRow::fieldName,
+                                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     /** Always three, one per trimester, even before the year is over. */
@@ -451,14 +570,18 @@ public class GradebookService implements IGradebookService {
         };
     }
 
-    /** One area's year: its total per trimester, and the mean of the trimesters it was graded in. */
+    /**
+     * One area's year: its total per trimester, and the mean of the trimesters it was graded in.
+     */
     private static AnnualSubjectScore annualSubject(List<AcademicScore> rowsOfOneClassGroup) {
         AcademicScore any = rowsOfOneClassGroup.get(0);
-        return new AnnualSubjectScore(any.classGroupId(), any.subjectName(),
-            totalOfTrimester(rowsOfOneClassGroup, 1),
-            totalOfTrimester(rowsOfOneClassGroup, 2),
-            totalOfTrimester(rowsOfOneClassGroup, 3),
-            averageOfTotals(rowsOfOneClassGroup));
+        return new AnnualSubjectScore(
+                any.classGroupId(),
+                any.subjectName(),
+                totalOfTrimester(rowsOfOneClassGroup, 1),
+                totalOfTrimester(rowsOfOneClassGroup, 2),
+                totalOfTrimester(rowsOfOneClassGroup, 3),
+                averageOfTotals(rowsOfOneClassGroup));
     }
 
     private static List<AcademicScore> ofTrimester(List<AcademicScore> scores, Integer trimester) {
@@ -466,8 +589,8 @@ public class GradebookService implements IGradebookService {
     }
 
     /**
-     * That trimester's total for this area, or null when the area has no row there at all — an
-     * area that starts mid-year never had those trimesters, and a zero would say it failed them.
+     * That trimester's total for this area, or null when the area has no row there at all — an area
+     * that starts mid-year never had those trimesters, and a zero would say it failed them.
      *
      * <p>Returning the first match is safe rather than arbitrary: {@code academic_scores} carries
      * {@code uq_academic_score UNIQUE (id_course_enrollment, id_class_group, trimester)}, so a
@@ -492,9 +615,10 @@ public class GradebookService implements IGradebookService {
      * share this one method so they can never disagree about a student.
      */
     private static BigDecimal averageOfTotals(List<AcademicScore> rows) {
-        return mean(rows.stream()
-            .map(s -> s.totalScore() == null ? BigDecimal.ZERO : s.totalScore())
-            .toList());
+        return mean(
+                rows.stream()
+                        .map(s -> s.totalScore() == null ? BigDecimal.ZERO : s.totalScore())
+                        .toList());
     }
 
     private static BigDecimal mean(List<BigDecimal> values) {

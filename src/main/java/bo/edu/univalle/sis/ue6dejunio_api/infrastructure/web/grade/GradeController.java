@@ -59,10 +59,9 @@ public class GradeController {
     @GetMapping
     @Operation(summary = "Listar grados. offset=pagina (1-indexed), limit=cantidad")
     public ResponseEntity<PagedResponse<GradeResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
-        @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort
-    ) {
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
+            @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort) {
         SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
         PageQuery p = PageQuery.of(offset - 1, limit, new SortField("name", dir));
         return ResponseEntity.ok(PagedResponse.of(gradeService.list(p).map(GradeResponse::from)));
@@ -70,8 +69,8 @@ public class GradeController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar grado")
-    public ResponseEntity<GradeResponse> update(@PathVariable Integer id,
-                                                @Valid @RequestBody UpdateGradeRequest r) {
+    public ResponseEntity<GradeResponse> update(
+            @PathVariable Integer id, @Valid @RequestBody UpdateGradeRequest r) {
         Grade g = gradeService.update(id, new UpdateGradeCommand(r.name(), r.levelId()));
         return ResponseEntity.ok(GradeResponse.from(g));
     }

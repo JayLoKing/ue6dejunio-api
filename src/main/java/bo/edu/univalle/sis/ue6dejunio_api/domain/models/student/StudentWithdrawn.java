@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.student;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.event.DomainEvent;
-
 import java.util.UUID;
 
 /**
@@ -18,10 +17,5 @@ import java.util.UUID;
  * @param reason the category the withdrawal falls under
  * @param note the Director's own words, when the category did not say enough. May be {@code null}
  */
-public record StudentWithdrawn(
-    UUID studentId,
-    String studentName,
-    String reason,
-    String note
-) implements DomainEvent {
-}
+public record StudentWithdrawn(UUID studentId, String studentName, String reason, String note)
+        implements DomainEvent {}

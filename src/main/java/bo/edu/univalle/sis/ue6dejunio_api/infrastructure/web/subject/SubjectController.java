@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,8 +30,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.UUID;
 
 @RestController
 @Validated
@@ -48,7 +47,9 @@ public class SubjectController {
     @PostMapping
     @Operation(summary = "Crear materia")
     public ResponseEntity<SubjectResponse> create(@Valid @RequestBody CreateSubjectRequest r) {
-        Subject s = subjectService.create(new CreateSubjectCommand(r.name(), r.areaId(), r.technical()));
+        Subject s =
+                subjectService.create(
+                        new CreateSubjectCommand(r.name(), r.areaId(), r.technical()));
         return ResponseEntity.ok(SubjectResponse.from(s));
     }
 
@@ -61,20 +62,23 @@ public class SubjectController {
     @GetMapping
     @Operation(summary = "Listar materias activas. offset=pagina, limit=cantidad")
     public ResponseEntity<PagedResponse<SubjectResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
-        @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort
-    ) {
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
+            @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort) {
         SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
         PageQuery p = PageQuery.of(offset - 1, limit, new SortField("name", dir));
-        return ResponseEntity.ok(PagedResponse.of(subjectService.list(p).map(SubjectResponse::from)));
+        return ResponseEntity.ok(
+                PagedResponse.of(subjectService.list(p).map(SubjectResponse::from)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar materia")
-    public ResponseEntity<SubjectResponse> update(@PathVariable UUID id,
-                                                  @Valid @RequestBody UpdateSubjectRequest r) {
-        Subject s = subjectService.update(id, new UpdateSubjectCommand(r.name(), r.areaId(), r.technical(), r.active()));
+    public ResponseEntity<SubjectResponse> update(
+            @PathVariable UUID id, @Valid @RequestBody UpdateSubjectRequest r) {
+        Subject s =
+                subjectService.update(
+                        id,
+                        new UpdateSubjectCommand(r.name(), r.areaId(), r.technical(), r.active()));
         return ResponseEntity.ok(SubjectResponse.from(s));
     }
 

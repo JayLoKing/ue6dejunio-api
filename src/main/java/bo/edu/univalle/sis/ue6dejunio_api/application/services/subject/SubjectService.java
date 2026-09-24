@@ -1,18 +1,17 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.subject;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.UpdateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectService;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 public class SubjectService implements ISubjectService {
@@ -43,7 +42,7 @@ public class SubjectService implements ISubjectService {
         // same way. Guarding only delete left the rule open on the other path.
         if (Boolean.FALSE.equals(c.active()) && subjectDomain.hasScoresForSubject(id)) {
             throw new ConflictException(
-                "no se pudo desactivar la materia porque tiene calificaciones registradas");
+                    "no se pudo desactivar la materia porque tiene calificaciones registradas");
         }
         return subjectDomain.update(id, c.name(), c.areaId(), c.technical(), c.active());
     }
@@ -51,8 +50,9 @@ public class SubjectService implements ISubjectService {
     @Override
     @Transactional(readOnly = true)
     public Subject getById(UUID id) {
-        return subjectDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Subject", id));
+        return subjectDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Subject", id));
     }
 
     @Override
@@ -66,7 +66,8 @@ public class SubjectService implements ISubjectService {
     public void delete(UUID id) {
         getById(id);
         if (subjectDomain.hasScoresForSubject(id)) {
-            throw new ConflictException("no se pudo desactivar la materia porque tiene calificaciones registradas");
+            throw new ConflictException(
+                    "no se pudo desactivar la materia porque tiene calificaciones registradas");
         }
         subjectDomain.deactivate(id);
     }

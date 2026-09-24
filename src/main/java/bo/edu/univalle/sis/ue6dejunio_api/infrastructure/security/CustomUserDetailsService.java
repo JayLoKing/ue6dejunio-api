@@ -17,8 +17,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) {
-        return userDomain.findByEmail(email)
-            .map(SecurityUserAdapter::new)
-            .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + email));
+        return userDomain
+                .findByEmail(email)
+                .map(SecurityUserAdapter::new)
+                .orElseThrow(
+                        () -> new UsernameNotFoundException("Usuario no encontrado: " + email));
     }
 }

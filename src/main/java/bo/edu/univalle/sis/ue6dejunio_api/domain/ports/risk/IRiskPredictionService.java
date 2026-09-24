@@ -3,7 +3,6 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -18,7 +17,9 @@ public interface IRiskPredictionService {
      */
     RunSummary predictYear(int academicYear, int trimester);
 
-    /** Predicts one subject, for when a teacher wants an answer now rather than at the next sweep. */
+    /**
+     * Predicts one subject, for when a teacher wants an answer now rather than at the next sweep.
+     */
     RunSummary predictClassGroup(UUID classGroupId, int trimester);
 
     /**
@@ -30,7 +31,7 @@ public interface IRiskPredictionService {
      * would have taken them in one.
      *
      * @param classGroupIds the subjects to predict. Empty is a no-op, not an error: a sweep that
-     *                      found nothing has nothing to ask.
+     *     found nothing has nothing to ask.
      */
     RunSummary predictClassGroups(Collection<UUID> classGroupIds, int trimester);
 
@@ -56,11 +57,11 @@ public interface IRiskPredictionService {
      * opened it to find. The subject that comes with each student is their worst.
      *
      * @param academicYearId the gestión, required. Without it the course listing answers every year
-     *                       at once, and the list would rank a student of 2024 beside one of 2026.
-     * @param places         how many students the list holds. Taken from every course first and then
-     *                       once more from the merge, which is exact rather than an approximation: a
-     *                       student who is eleventh in their own classroom has ten worse ahead of
-     *                       them and cannot be in the school's worst ten.
+     *     at once, and the list would rank a student of 2024 beside one of 2026.
+     * @param places how many students the list holds. Taken from every course first and then once
+     *     more from the merge, which is exact rather than an approximation: a student who is
+     *     eleventh in their own classroom has ten worse ahead of them and cannot be in the school's
+     *     worst ten.
      */
     List<InstitutionRiskEntry> institutionRisk(Integer academicYearId, int trimester, int places);
 
@@ -72,10 +73,10 @@ public interface IRiskPredictionService {
      * What a run did, so the caller can tell "nothing to predict" from "nothing happened".
      *
      * @param considered students the run looked at
-     * @param skipped    students missing a mark in at least one of the four dimensions. The normal
-     *                   case early in a trimester, and not a failure.
-     * @param predicted  vectors actually sent to the model
-     * @param changed    predictions whose category moved, which is what anyone was told about
+     * @param skipped students missing a mark in at least one of the four dimensions. The normal
+     *     case early in a trimester, and not a failure.
+     * @param predicted vectors actually sent to the model
+     * @param changed predictions whose category moved, which is what anyone was told about
      */
     record RunSummary(int considered, int skipped, int predicted, int changed) {
 

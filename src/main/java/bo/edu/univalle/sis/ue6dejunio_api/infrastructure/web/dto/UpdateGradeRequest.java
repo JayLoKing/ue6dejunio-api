@@ -7,6 +7,5 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public record UpdateGradeRequest(
-    @NotBlank @Size(max = 50) String name,
-    @NotNull @Positive @JsonProperty("id_level") Integer levelId
-) {}
+        @NotBlank @Size(max = 50) String name,
+        @NotNull @Positive @JsonProperty("id_level") Integer levelId) {}

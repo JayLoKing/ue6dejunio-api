@@ -8,6 +8,4 @@ import jakarta.validation.constraints.Size;
  * @param displayOrder optional: absent, the area is placed after the ones already there
  */
 public record CreateKnowledgeAreaRequest(
-    @NotBlank @Size(max = 80) String name,
-    @Min(1) Integer displayOrder
-) {}
+        @NotBlank @Size(max = 80) String name, @Min(1) Integer displayOrder) {}

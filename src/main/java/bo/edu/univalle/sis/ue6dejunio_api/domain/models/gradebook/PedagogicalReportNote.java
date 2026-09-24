@@ -17,7 +17,4 @@ import java.util.UUID;
  * actions and not yet the source is in the middle of their work, not in error.
  */
 public record PedagogicalReportNote(
-    UUID courseEnrollmentId,
-    String actions,
-    String verificationSource
-) {}
+        UUID courseEnrollmentId, String actions, String verificationSource) {}

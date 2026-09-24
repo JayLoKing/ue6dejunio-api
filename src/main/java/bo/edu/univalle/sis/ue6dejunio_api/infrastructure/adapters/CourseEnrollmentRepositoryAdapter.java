@@ -1,8 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEnrollmentEntity;
@@ -10,10 +10,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseEnrollmentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,6 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -33,9 +32,10 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     private final JpaStudentRepository studentRepo;
     private final JpaCourseRepository courseRepo;
 
-    public CourseEnrollmentRepositoryAdapter(JpaCourseEnrollmentRepository enrollmentRepo,
-                                             JpaStudentRepository studentRepo,
-                                             JpaCourseRepository courseRepo) {
+    public CourseEnrollmentRepositoryAdapter(
+            JpaCourseEnrollmentRepository enrollmentRepo,
+            JpaStudentRepository studentRepo,
+            JpaCourseRepository courseRepo) {
         this.enrollmentRepo = enrollmentRepo;
         this.studentRepo = studentRepo;
         this.courseRepo = courseRepo;
@@ -79,14 +79,14 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
         // The date is restated because this is the day they came back, not the day they first
         // enrolled — the row is the same one only because the unique index leaves no other.
         enrollmentRepo.reactivateEnrollments(
-            courseId, studentIds, STATUS_EFFECTIVE, LocalDate.now());
+                courseId, studentIds, STATUS_EFFECTIVE, LocalDate.now());
     }
 
     @Override
     public PageResult<CourseStudent> studentsByCourse(UUID courseId, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            enrollmentRepo.findByCourse_Id(courseId, pageable).map(this::toCourseStudent));
+                enrollmentRepo.findByCourse_Id(courseId, pageable).map(this::toCourseStudent));
     }
 
     @Override
@@ -110,8 +110,9 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     public PageResult<CourseStudent> activeStudentsByCourse(UUID courseId, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            enrollmentRepo.findByCourse_IdAndStatus(courseId, STATUS_EFFECTIVE, pageable)
-                .map(this::toCourseStudent));
+                enrollmentRepo
+                        .findByCourse_IdAndStatus(courseId, STATUS_EFFECTIVE, pageable)
+                        .map(this::toCourseStudent));
     }
 
     @Override
@@ -123,7 +124,7 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     @Transactional
     public int withdrawActiveEnrollments(UUID studentId) {
         List<CourseEnrollmentEntity> active =
-            enrollmentRepo.findByStudent_IdAndStatus(studentId, STATUS_EFFECTIVE);
+                enrollmentRepo.findByStudent_IdAndStatus(studentId, STATUS_EFFECTIVE);
         for (CourseEnrollmentEntity e : active) {
             e.setStatus(STATUS_WITHDRAWN);
         }
@@ -133,15 +134,25 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
 
     @Override
     public UUID courseOfEnrollment(UUID courseEnrollmentId) {
-        return enrollmentRepo.findById(courseEnrollmentId)
-            .map(e -> e.getCourse().getId())
-            .orElseThrow(() -> new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId));
+        return enrollmentRepo
+                .findById(courseEnrollmentId)
+                .map(e -> e.getCourse().getId())
+                .orElseThrow(
+                        () ->
+                                new ResourceNotFoundException(
+                                        "CourseEnrollment", courseEnrollmentId));
     }
 
     private CourseStudent toCourseStudent(CourseEnrollmentEntity e) {
         StudentEntity s = e.getStudent();
         return new CourseStudent(
-            e.getId(), s.getId(), s.getRudeCode(), s.getIdentityCard(),
-            s.getNames(), s.getLastNames(), e.getStatus(), s.getGender());
+                e.getId(),
+                s.getId(),
+                s.getRudeCode(),
+                s.getIdentityCard(),
+                s.getNames(),
+                s.getLastNames(),
+                e.getStatus(),
+                s.getGender());
     }
 }

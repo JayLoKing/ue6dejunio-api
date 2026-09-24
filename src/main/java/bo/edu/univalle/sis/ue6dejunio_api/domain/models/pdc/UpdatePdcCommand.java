@@ -7,10 +7,9 @@ import java.time.LocalDate;
  * save one step at a time without carrying the steps the teacher has not reached yet.
  */
 public record UpdatePdcCommand(
-    Integer planNumber,
-    LocalDate periodStart,
-    LocalDate periodEnd,
-    String holisticObjective,
-    String finalProduct,
-    String bibliography
-) {}
+        Integer planNumber,
+        LocalDate periodStart,
+        LocalDate periodEnd,
+        String holisticObjective,
+        String finalProduct,
+        String bibliography) {}

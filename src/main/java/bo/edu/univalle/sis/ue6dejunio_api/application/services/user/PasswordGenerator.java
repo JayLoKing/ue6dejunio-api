@@ -1,8 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.user;
 
-import org.springframework.stereotype.Component;
-
 import java.security.SecureRandom;
+import org.springframework.stereotype.Component;
 
 @Component
 public class PasswordGenerator {
@@ -31,7 +30,9 @@ public class PasswordGenerator {
         char[] chars = s.toCharArray();
         for (int i = chars.length - 1; i > 0; i--) {
             int j = RAND.nextInt(i + 1);
-            char tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
+            char tmp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = tmp;
         }
         return new String(chars);
     }

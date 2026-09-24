@@ -1,5 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.gradebook;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook.GradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
@@ -13,23 +21,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDom
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * The annual centralizer, which is three of the school's sheets at once: the per-area matrix with
@@ -63,8 +62,13 @@ class GradebookServiceAnnualTest {
 
     @BeforeEach
     void setUp() {
-        service = new GradebookService(enrollmentDomain, scoreDomain, attendanceDomain,
-            courseService, classGroupDomain);
+        service =
+                new GradebookService(
+                        enrollmentDomain,
+                        scoreDomain,
+                        attendanceDomain,
+                        courseService,
+                        classGroupDomain);
         courseId = UUID.randomUUID();
         enrollmentA = UUID.randomUUID();
         enrollmentB = UUID.randomUUID();
@@ -82,12 +86,12 @@ class GradebookServiceAnnualTest {
         // The worked example from the school's own template: 10, 10 and 100 give the 40 their
         // PR column shows. Nothing is weighted — a trimester worth 100 does not outrank the others.
         batched(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 3, "100.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 3, "100.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
 
         StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
 
@@ -107,11 +111,11 @@ class GradebookServiceAnnualTest {
         // paper by a teacher, so a half that rounded down would show a mark nobody wrote and
         // would not add back up to the average printed beside it.
         batched(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 3, "11.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 2, "0.01"));
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 3, "11.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 2, "0.01"));
 
         StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
 
@@ -125,12 +129,12 @@ class GradebookServiceAnnualTest {
     void annualCentralizer_finalAverageIsTheMeanOfTheAreaAverages() {
         rosterOf(courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"));
         batched(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 3, "100.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 3, "100.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
 
         StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
 
@@ -141,16 +145,18 @@ class GradebookServiceAnnualTest {
     @Test
     void annualCentralizer_trimesterAveragesMatchWhatTheTrimesterSheetReturns() {
         rosterOf(courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"));
-        List<AcademicScore> scores = List.of(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 3, "100.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
+        List<AcademicScore> scores =
+                List.of(
+                        score(enrollmentA, classGroupLang, "Lenguaje", 1, "10.00"),
+                        score(enrollmentA, classGroupLang, "Lenguaje", 2, "10.00"),
+                        score(enrollmentA, classGroupLang, "Lenguaje", 3, "100.00"),
+                        score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
+                        score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
+                        score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(scores);
 
-        StudentAnnualSummary annual = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary annual =
+                service.annualCentralizer(courseId, pageQuery).content().get(0);
 
         assertThat(annual.trimester1Average()).isEqualByComparingTo("5.50");
         assertThat(annual.trimester2Average()).isEqualByComparingTo("10.00");
@@ -160,9 +166,9 @@ class GradebookServiceAnnualTest {
         // centralizer prints as the general average is what lands in this row's column.
         for (int trimester = 1; trimester <= 3; trimester++) {
             StudentTrimesterSummary perTrimester =
-                service.centralizer(courseId, trimester, pageQuery).content().get(0);
+                    service.centralizer(courseId, trimester, pageQuery).content().get(0);
             assertThat(annualColumn(annual, trimester))
-                .isEqualByComparingTo(perTrimester.generalAverage());
+                    .isEqualByComparingTo(perTrimester.generalAverage());
         }
     }
 
@@ -171,8 +177,7 @@ class GradebookServiceAnnualTest {
         rosterOf(courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"));
         // A subject that starts mid-year. Dividing by three regardless would invent two failed
         // trimesters for it and drag the student's year down for a course they never had.
-        batched(
-            score(enrollmentA, classGroupComputing, "Computacion", 3, "90.00"));
+        batched(score(enrollmentA, classGroupComputing, "Computacion", 3, "90.00"));
 
         StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
 
@@ -187,10 +192,10 @@ class GradebookServiceAnnualTest {
     void annualCentralizer_incompleteMatrix_finalAverageFollowsTheAreasNotTheTrimesters() {
         rosterOf(courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"));
         batched(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, "60.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 3, "60.00"),
-            score(enrollmentA, classGroupComputing, "Computacion", 3, "90.00"));
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, "60.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 3, "60.00"),
+                score(enrollmentA, classGroupComputing, "Computacion", 3, "90.00"));
 
         StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
 
@@ -209,11 +214,13 @@ class GradebookServiceAnnualTest {
         // The trimester sheet already counts that as a zero in the denominator, and the annual
         // view has to read the same, or one screen calls a student approved and the other does not.
         batched(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, null));
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, null));
 
         AnnualSubjectScore lang =
-            subject(service.annualCentralizer(courseId, pageQuery).content().get(0), "Lenguaje");
+                subject(
+                        service.annualCentralizer(courseId, pageQuery).content().get(0),
+                        "Lenguaje");
 
         assertThat(lang.trimester2()).isNull();
         assertThat(lang.average()).isEqualByComparingTo("30.00");
@@ -239,33 +246,36 @@ class GradebookServiceAnnualTest {
         // Deliberately not alphabetical, and not grouped: the order a batched query answers in is
         // not guaranteed, and a report whose columns move between two loads is unreadable.
         batched(
-            score(enrollmentA, classGroupMath, "Matematica", 1, "70.00"),
-            score(enrollmentA, classGroupComputing, "Computacion", 1, "80.00"),
-            score(enrollmentA, classGroupLang, "Lenguaje", 2, "90.00"),
-            score(enrollmentA, classGroupMath, "Matematica", 2, "60.00"));
+                score(enrollmentA, classGroupMath, "Matematica", 1, "70.00"),
+                score(enrollmentA, classGroupComputing, "Computacion", 1, "80.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, "90.00"),
+                score(enrollmentA, classGroupMath, "Matematica", 2, "60.00"));
 
         StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
 
-        assertThat(row.subjects()).extracting(AnnualSubjectScore::subjectName)
-            .containsExactly("Computacion", "Lenguaje", "Matematica");
+        assertThat(row.subjects())
+                .extracting(AnnualSubjectScore::subjectName)
+                .containsExactly("Computacion", "Lenguaje", "Matematica");
     }
 
     @Test
     void annualCentralizer_batchesTheWholePage_withNoCrossStudentBleed() {
         rosterOf(
-            courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"),
-            courseStudent(enrollmentB, studentB, "Joana", "Alvarez"));
+                courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"),
+                courseStudent(enrollmentB, studentB, "Joana", "Alvarez"));
         batched(
-            score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
-            score(enrollmentB, classGroupMath, "Matematica", 1, "80.00"));
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
+                score(enrollmentB, classGroupMath, "Matematica", 1, "80.00"));
 
         PageResult<StudentAnnualSummary> result = service.annualCentralizer(courseId, pageQuery);
 
         assertThat(result.content()).hasSize(2);
-        assertThat(result.content().get(0).subjects()).extracting(AnnualSubjectScore::subjectName)
-            .containsExactly("Lenguaje");
-        assertThat(result.content().get(1).subjects()).extracting(AnnualSubjectScore::subjectName)
-            .containsExactly("Matematica");
+        assertThat(result.content().get(0).subjects())
+                .extracting(AnnualSubjectScore::subjectName)
+                .containsExactly("Lenguaje");
+        assertThat(result.content().get(1).subjects())
+                .extracting(AnnualSubjectScore::subjectName)
+                .containsExactly("Matematica");
 
         verify(scoreDomain, times(1)).findByCourseEnrollmentIn(anyCollection());
         verify(scoreDomain, never()).findByCourseEnrollment(any());
@@ -292,7 +302,8 @@ class GradebookServiceAnnualTest {
     }
 
     private void rosterOf(CourseStudent... students) {
-        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of(students)));
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery))
+                .thenReturn(page(List.of(students)));
     }
 
     private void batched(AcademicScore... scores) {
@@ -305,9 +316,9 @@ class GradebookServiceAnnualTest {
 
     private static AnnualSubjectScore subject(StudentAnnualSummary row, String subjectName) {
         return row.subjects().stream()
-            .filter(s -> subjectName.equals(s.subjectName()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("no subject named " + subjectName));
+                .filter(s -> subjectName.equals(s.subjectName()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no subject named " + subjectName));
     }
 
     private static BigDecimal annualColumn(StudentAnnualSummary row, int trimester) {
@@ -318,16 +329,27 @@ class GradebookServiceAnnualTest {
         };
     }
 
-    private static CourseStudent courseStudent(UUID enrollmentId, UUID studentId,
-                                               String names, String lastNames) {
-        return new CourseStudent(enrollmentId, studentId, "RUDE", "ID", names, lastNames, "Effective", "F");
+    private static CourseStudent courseStudent(
+            UUID enrollmentId, UUID studentId, String names, String lastNames) {
+        return new CourseStudent(
+                enrollmentId, studentId, "RUDE", "ID", names, lastNames, "Effective", "F");
     }
 
-    private static AcademicScore score(UUID enrollmentId, UUID classGroupId, String subject,
-                                       Integer trimester, String total) {
-        return new AcademicScore(UUID.randomUUID(), enrollmentId, classGroupId, subject, trimester,
-            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            total == null ? null : new BigDecimal(total), null, null);
+    private static AcademicScore score(
+            UUID enrollmentId, UUID classGroupId, String subject, Integer trimester, String total) {
+        return new AcademicScore(
+                UUID.randomUUID(),
+                enrollmentId,
+                classGroupId,
+                subject,
+                trimester,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                total == null ? null : new BigDecimal(total),
+                null,
+                null);
     }
 
     /** One full page of these rows, the shape a domain port returns. */

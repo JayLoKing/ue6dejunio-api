@@ -8,13 +8,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.EvaluationCrit
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentEventRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaEvaluationCriterionRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -24,9 +23,10 @@ public class AssessmentEventRepositoryAdapter implements IAssessmentEventDomain 
     private final JpaEvaluationCriterionRepository criterionRepo;
     private final JpaAssessmentScoreRepository scoreRepo;
 
-    public AssessmentEventRepositoryAdapter(JpaAssessmentEventRepository eventRepo,
-                                            JpaEvaluationCriterionRepository criterionRepo,
-                                            JpaAssessmentScoreRepository scoreRepo) {
+    public AssessmentEventRepositoryAdapter(
+            JpaAssessmentEventRepository eventRepo,
+            JpaEvaluationCriterionRepository criterionRepo,
+            JpaAssessmentScoreRepository scoreRepo) {
         this.eventRepo = eventRepo;
         this.criterionRepo = criterionRepo;
         this.scoreRepo = scoreRepo;
@@ -45,8 +45,10 @@ public class AssessmentEventRepositoryAdapter implements IAssessmentEventDomain 
     @Override
     @Transactional
     public AssessmentEvent update(UUID id, String title) {
-        AssessmentEventEntity e = eventRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("AssessmentEvent", id));
+        AssessmentEventEntity e =
+                eventRepo
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("AssessmentEvent", id));
         if (title != null) {
             e.setTitle(title);
         }
@@ -60,7 +62,9 @@ public class AssessmentEventRepositoryAdapter implements IAssessmentEventDomain 
 
     @Override
     public List<AssessmentEvent> listByCriterion(UUID criterionId) {
-        return eventRepo.findByCriterion_IdOrderByCreatedAt(criterionId).stream().map(this::toDomain).toList();
+        return eventRepo.findByCriterion_IdOrderByCreatedAt(criterionId).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
@@ -87,8 +91,11 @@ public class AssessmentEventRepositoryAdapter implements IAssessmentEventDomain 
     private AssessmentEvent toDomain(AssessmentEventEntity e) {
         EvaluationCriterionEntity c = e.getCriterion();
         return new AssessmentEvent(
-            e.getId(), c.getId(),
-            c.getClassGroup() != null ? c.getClassGroup().getId() : null,
-            c.getTrimester(), c.getDimension(), e.getTitle());
+                e.getId(),
+                c.getId(),
+                c.getClassGroup() != null ? c.getClassGroup().getId() : null,
+                c.getTrimester(),
+                c.getDimension(),
+                e.getTitle());
     }
 }

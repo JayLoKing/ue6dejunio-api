@@ -1,23 +1,5 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.risk;
 
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskSweepService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SweepSummary;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SweepTarget;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService.RunSummary;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskSweepQueueDomain;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
-import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -26,6 +8,23 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskSweepService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SweepSummary;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SweepTarget;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService.RunSummary;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskSweepQueueDomain;
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class RiskSweepServiceTest {
 
@@ -66,10 +65,12 @@ class RiskSweepServiceTest {
     @Test
     @DisplayName("subjects of one trimester go to the model in a single call")
     void sweep_sameTrimester_sendsOneBatch() {
-        when(queue.pending(BATCH)).thenReturn(List.of(
-            new SweepTarget(groupA, 1, marked),
-            new SweepTarget(groupB, 1, marked),
-            new SweepTarget(groupC, 1, marked)));
+        when(queue.pending(BATCH))
+                .thenReturn(
+                        List.of(
+                                new SweepTarget(groupA, 1, marked),
+                                new SweepTarget(groupB, 1, marked),
+                                new SweepTarget(groupC, 1, marked)));
         when(predictions.predictClassGroups(any(), eq(1))).thenReturn(new RunSummary(30, 2, 28, 4));
 
         SweepSummary summary = service.sweep();
@@ -83,14 +84,19 @@ class RiskSweepServiceTest {
         assertThat(summary.transitions()).isEqualTo(4);
     }
 
-    /** The model is asked per trimester: a vector's trimester decides which marks it was built on. */
+    /**
+     * The model is asked per trimester: a vector's trimester decides which marks it was built on.
+     */
     @Test
     @DisplayName("subjects of different trimesters are split into one call each")
     void sweep_mixedTrimesters_oneCallPerTrimester() {
-        when(queue.pending(BATCH)).thenReturn(List.of(
-            new SweepTarget(groupA, 1, marked),
-            new SweepTarget(groupB, 2, marked)));
-        when(predictions.predictClassGroups(any(), anyInt())).thenReturn(new RunSummary(10, 0, 10, 1));
+        when(queue.pending(BATCH))
+                .thenReturn(
+                        List.of(
+                                new SweepTarget(groupA, 1, marked),
+                                new SweepTarget(groupB, 2, marked)));
+        when(predictions.predictClassGroups(any(), anyInt()))
+                .thenReturn(new RunSummary(10, 0, 10, 1));
 
         SweepSummary summary = service.sweep();
 
@@ -109,7 +115,7 @@ class RiskSweepServiceTest {
     void sweep_modelDown_keepsTheQueue() {
         when(queue.pending(BATCH)).thenReturn(List.of(new SweepTarget(groupA, 1, marked)));
         when(predictions.predictClassGroups(any(), eq(1)))
-            .thenThrow(new RiskModelUnavailableException("the model is down"));
+                .thenThrow(new RiskModelUnavailableException("the model is down"));
 
         SweepSummary summary = service.sweep();
 
@@ -128,9 +134,8 @@ class RiskSweepServiceTest {
     void sweep_clearsNoFurtherThanWhatItRead() {
         LocalDateTime older = marked;
         LocalDateTime newer = marked.plusMinutes(1);
-        List<SweepTarget> taken = List.of(
-            new SweepTarget(groupA, 1, older),
-            new SweepTarget(groupB, 1, newer));
+        List<SweepTarget> taken =
+                List.of(new SweepTarget(groupA, 1, older), new SweepTarget(groupB, 1, newer));
         when(queue.pending(BATCH)).thenReturn(taken);
         when(predictions.predictClassGroups(any(), eq(1))).thenReturn(new RunSummary(2, 0, 2, 0));
 
@@ -151,9 +156,9 @@ class RiskSweepServiceTest {
         SweepTarget succeeding = new SweepTarget(groupB, 2, marked);
         when(queue.pending(BATCH)).thenReturn(List.of(failing, succeeding));
         when(predictions.predictClassGroups(Set.of(groupA), 1))
-            .thenThrow(new RiskModelUnavailableException("rejected"));
+                .thenThrow(new RiskModelUnavailableException("rejected"));
         when(predictions.predictClassGroups(Set.of(groupB), 2))
-            .thenReturn(new RunSummary(5, 0, 5, 1));
+                .thenReturn(new RunSummary(5, 0, 5, 1));
 
         SweepSummary summary = service.sweep();
 

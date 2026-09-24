@@ -1,24 +1,38 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcSubject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,21 +42,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthorizationComponentTest {
@@ -60,16 +59,16 @@ class AuthorizationComponentTest {
     @InjectMocks private AuthorizationComponent authz;
 
     private JwtAuthenticationToken token(UUID userId, String role) {
-        List<GrantedAuthority> authorities = role == null
-            ? List.of()
-            : List.of(new SimpleGrantedAuthority("ROLE_" + role));
-        Jwt jwt = Jwt.withTokenValue("t")
-            .header("alg", "RS256")
-            .subject(userId.toString())
-            .claim("role", role)
-            .issuedAt(Instant.now())
-            .expiresAt(Instant.now().plusSeconds(60))
-            .build();
+        List<GrantedAuthority> authorities =
+                role == null ? List.of() : List.of(new SimpleGrantedAuthority("ROLE_" + role));
+        Jwt jwt =
+                Jwt.withTokenValue("t")
+                        .header("alg", "RS256")
+                        .subject(userId.toString())
+                        .claim("role", role)
+                        .issuedAt(Instant.now())
+                        .expiresAt(Instant.now().plusSeconds(60))
+                        .build();
         return new JwtAuthenticationToken(jwt, authorities, userId.toString());
     }
 
@@ -80,8 +79,16 @@ class AuthorizationComponentTest {
         UUID teacherA = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
-        when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
+        when(assessmentEventDomain.findById(eventId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentEvent(
+                                        eventId,
+                                        UUID.randomUUID(),
+                                        classGroupId,
+                                        1,
+                                        "Knowing",
+                                        "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScoreEvent(token(teacherA, "Teacher"), eventId)).isTrue();
@@ -93,8 +100,16 @@ class AuthorizationComponentTest {
         UUID teacherB = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
-        when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
+        when(assessmentEventDomain.findById(eventId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentEvent(
+                                        eventId,
+                                        UUID.randomUUID(),
+                                        classGroupId,
+                                        1,
+                                        "Knowing",
+                                        "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScoreEvent(token(teacherB, "Teacher"), eventId)).isFalse();
@@ -134,10 +149,27 @@ class AuthorizationComponentTest {
         UUID scoreId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
-        when(assessmentScoreDomain.findById(scoreId)).thenReturn(
-            Optional.of(new AssessmentScore(scoreId, UUID.randomUUID(), eventId, null, BigDecimal.TEN, null, null)));
-        when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
+        when(assessmentScoreDomain.findById(scoreId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentScore(
+                                        scoreId,
+                                        UUID.randomUUID(),
+                                        eventId,
+                                        null,
+                                        BigDecimal.TEN,
+                                        null,
+                                        null)));
+        when(assessmentEventDomain.findById(eventId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentEvent(
+                                        eventId,
+                                        UUID.randomUUID(),
+                                        classGroupId,
+                                        1,
+                                        "Knowing",
+                                        "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScore(token(teacherA, "Teacher"), scoreId)).isTrue();
@@ -165,7 +197,7 @@ class AuthorizationComponentTest {
         UUID criterionId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(criterionDomain.findById(criterionId))
-            .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+                .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScoreCriterion(token(teacherA, "Teacher"), criterionId)).isTrue();
@@ -178,7 +210,7 @@ class AuthorizationComponentTest {
         UUID criterionId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(criterionDomain.findById(criterionId))
-            .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+                .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
         assertThat(authz.canWriteScoreCriterion(token(teacherB, "Teacher"), criterionId)).isFalse();
@@ -197,8 +229,10 @@ class AuthorizationComponentTest {
     void canWriteScoreTarget_bothTargets_deniesEvenForDirector() {
         UUID director = UUID.randomUUID();
 
-        assertThat(authz.canWriteScoreTarget(
-            token(director, "Director"), UUID.randomUUID(), UUID.randomUUID())).isFalse();
+        assertThat(
+                        authz.canWriteScoreTarget(
+                                token(director, "Director"), UUID.randomUUID(), UUID.randomUUID()))
+                .isFalse();
     }
 
     @Test
@@ -214,10 +248,11 @@ class AuthorizationComponentTest {
         UUID criterionId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(criterionDomain.findById(criterionId))
-            .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+                .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(teacherA);
 
-        assertThat(authz.canWriteScoreTarget(token(teacherA, "Teacher"), null, criterionId)).isTrue();
+        assertThat(authz.canWriteScoreTarget(token(teacherA, "Teacher"), null, criterionId))
+                .isTrue();
     }
 
     // ---- canReadEnrollmentScope / canWriteDailyAttendance (homeroom) ----
@@ -228,8 +263,20 @@ class AuthorizationComponentTest {
         UUID ceId = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
         when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        homeroomTeacher,
+                                        "Ana",
+                                        true)));
 
         assertThat(authz.canReadEnrollmentScope(token(homeroomTeacher, "Teacher"), ceId)).isTrue();
     }
@@ -241,8 +288,20 @@ class AuthorizationComponentTest {
         UUID ceId = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
         when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        homeroomTeacher,
+                                        "Ana",
+                                        true)));
 
         assertThat(authz.canReadEnrollmentScope(token(otherTeacher, "Teacher"), ceId)).isFalse();
     }
@@ -260,7 +319,9 @@ class AuthorizationComponentTest {
         UUID teacherA = UUID.randomUUID();
         UUID ceId = UUID.randomUUID();
         when(courseEnrollmentDomain.courseOfEnrollment(ceId))
-            .thenThrow(new bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException("CourseEnrollment", ceId));
+                .thenThrow(
+                        new bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions
+                                .ResourceNotFoundException("CourseEnrollment", ceId));
 
         assertThat(authz.canWriteDailyAttendance(token(teacherA, "Teacher"), ceId)).isFalse();
     }
@@ -274,10 +335,12 @@ class AuthorizationComponentTest {
         UUID ce2 = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
         when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ce1, ce2)))
-            .thenReturn(Map.of(ce1, courseId, ce2, courseId));
-        when(courseDomain.isHomeroomTeacherOfAll(homeroomTeacher, Set.of(courseId))).thenReturn(true);
+                .thenReturn(Map.of(ce1, courseId, ce2, courseId));
+        when(courseDomain.isHomeroomTeacherOfAll(homeroomTeacher, Set.of(courseId)))
+                .thenReturn(true);
 
-        assertThat(authz.canWriteDailyBatch(token(homeroomTeacher, "Teacher"), List.of(ce1, ce2))).isTrue();
+        assertThat(authz.canWriteDailyBatch(token(homeroomTeacher, "Teacher"), List.of(ce1, ce2)))
+                .isTrue();
     }
 
     @Test
@@ -288,8 +351,9 @@ class AuthorizationComponentTest {
         UUID courseA = UUID.randomUUID();
         UUID courseB = UUID.randomUUID();
         when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ce1, ce2)))
-            .thenReturn(Map.of(ce1, courseA, ce2, courseB));
-        when(courseDomain.isHomeroomTeacherOfAll(teacher, Set.of(courseA, courseB))).thenReturn(true);
+                .thenReturn(Map.of(ce1, courseA, ce2, courseB));
+        when(courseDomain.isHomeroomTeacherOfAll(teacher, Set.of(courseA, courseB)))
+                .thenReturn(true);
 
         // The per-student endpoint accepts any course the caller is homeroom of, so the batch has
         // to agree: same actor, same rows, same answer.
@@ -302,9 +366,10 @@ class AuthorizationComponentTest {
         UUID known = UUID.randomUUID();
         UUID unknown = UUID.randomUUID();
         when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(known, unknown)))
-            .thenReturn(Map.of(known, UUID.randomUUID()));
+                .thenReturn(Map.of(known, UUID.randomUUID()));
 
-        assertThat(authz.canWriteDailyBatch(token(teacher, "Teacher"), List.of(known, unknown))).isFalse();
+        assertThat(authz.canWriteDailyBatch(token(teacher, "Teacher"), List.of(known, unknown)))
+                .isFalse();
     }
 
     @Test
@@ -315,11 +380,15 @@ class AuthorizationComponentTest {
         UUID courseA = UUID.randomUUID();
         UUID courseB = UUID.randomUUID();
         when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ceOwned, ceForeign)))
-            .thenReturn(Map.of(ceOwned, courseA, ceForeign, courseB));
+                .thenReturn(Map.of(ceOwned, courseA, ceForeign, courseB));
         // One course is the caller's, the other is not: owning part of the batch owns none of it.
-        when(courseDomain.isHomeroomTeacherOfAll(homeroomTeacherA, Set.of(courseA, courseB))).thenReturn(false);
+        when(courseDomain.isHomeroomTeacherOfAll(homeroomTeacherA, Set.of(courseA, courseB)))
+                .thenReturn(false);
 
-        assertThat(authz.canWriteDailyBatch(token(homeroomTeacherA, "Teacher"), List.of(ceOwned, ceForeign))).isFalse();
+        assertThat(
+                        authz.canWriteDailyBatch(
+                                token(homeroomTeacherA, "Teacher"), List.of(ceOwned, ceForeign)))
+                .isFalse();
     }
 
     @Test
@@ -328,7 +397,7 @@ class AuthorizationComponentTest {
         UUID ce = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
         when(courseEnrollmentDomain.courseIdsByEnrollment(List.of(ce)))
-            .thenReturn(Map.of(ce, courseId));
+                .thenReturn(Map.of(ce, courseId));
         when(courseDomain.isHomeroomTeacherOfAll(teacher, Set.of(courseId))).thenReturn(false);
 
         assertThat(authz.canWriteDailyBatch(token(teacher, "Teacher"), List.of(ce))).isFalse();
@@ -340,21 +409,46 @@ class AuthorizationComponentTest {
     void canReadCourseRoster_technicalTeacherOfTheCourse_true() {
         UUID technicalTeacher = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        UUID.randomUUID(),
+                                        "Ana",
+                                        true)));
         when(classGroupDomain.teachesInCourse(technicalTeacher, courseId)).thenReturn(true);
 
         // A technical teacher has no homeroom; gating the roster on homeroom alone would cut them
         // off from the students they take attendance for.
-        assertThat(authz.canReadCourseRoster(token(technicalTeacher, "Teacher"), courseId)).isTrue();
+        assertThat(authz.canReadCourseRoster(token(technicalTeacher, "Teacher"), courseId))
+                .isTrue();
     }
 
     @Test
     void canReadCourseRoster_homeroomTeacher_true() {
         UUID homeroomTeacher = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        homeroomTeacher,
+                                        "Ana",
+                                        true)));
 
         assertThat(authz.canReadCourseRoster(token(homeroomTeacher, "Teacher"), courseId)).isTrue();
     }
@@ -363,8 +457,20 @@ class AuthorizationComponentTest {
     void canReadCourseRoster_unrelatedTeacher_false() {
         UUID otherTeacher = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        UUID.randomUUID(),
+                                        "Ana",
+                                        true)));
         when(classGroupDomain.teachesInCourse(otherTeacher, courseId)).thenReturn(false);
 
         assertThat(authz.canReadCourseRoster(token(otherTeacher, "Teacher"), courseId)).isFalse();
@@ -372,8 +478,10 @@ class AuthorizationComponentTest {
 
     @Test
     void canReadCourseRoster_secretary_true() {
-        assertThat(authz.canReadCourseRoster(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(
+                        authz.canReadCourseRoster(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
@@ -443,8 +551,8 @@ class AuthorizationComponentTest {
 
     @Test
     void canReadStudent_director_bypassesWithoutLookup() {
-        assertThat(authz.canReadStudent(
-            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canReadStudent(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
     }
 
     // ---- canWriteStudent ----
@@ -476,14 +584,14 @@ class AuthorizationComponentTest {
 
     @Test
     void canWriteStudent_secretary_false() {
-        assertThat(authz.canWriteStudent(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
+        assertThat(authz.canWriteStudent(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isFalse();
     }
 
     @Test
     void canWriteStudent_director_bypassesWithoutLookup() {
-        assertThat(authz.canWriteStudent(
-            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canWriteStudent(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
@@ -504,15 +612,26 @@ class AuthorizationComponentTest {
     void canReadScoreEvent_secretary_true() {
         // SecurityConfig admits Secretary on GET /api/scores/**; the method guard has to agree or
         // the role rule is dead and the documented scope is a lie.
-        assertThat(authz.canReadScoreEvent(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(
+                        authz.canReadScoreEvent(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
     }
 
-    // ---- canReadClassGroup: the homeroom teacher reads the technical subjects of their own room ----
+    // ---- canReadClassGroup: the homeroom teacher reads the technical subjects of their own room
+    // ----
 
     private ClassGroup classGroup(UUID id, UUID courseId, UUID teacherId) {
-        return new ClassGroup(id, courseId, "Quinto", "B",
-            UUID.randomUUID(), "Educacion Musical", teacherId, "Tecnico", true);
+        return new ClassGroup(
+                id,
+                courseId,
+                "Quinto",
+                "B",
+                UUID.randomUUID(),
+                "Educacion Musical",
+                teacherId,
+                "Tecnico",
+                true);
     }
 
     private Course course(UUID id, UUID homeroomTeacherId) {
@@ -530,11 +649,12 @@ class AuthorizationComponentTest {
         UUID courseId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(classGroupDomain.findById(classGroupId))
-            .thenReturn(Optional.of(classGroup(classGroupId, courseId, technicalTeacher)));
+                .thenReturn(Optional.of(classGroup(classGroupId, courseId, technicalTeacher)));
         when(courseDomain.findById(courseId))
-            .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
+                .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
 
-        assertThat(authz.canReadClassGroup(token(homeroomTeacher, "Teacher"), classGroupId)).isTrue();
+        assertThat(authz.canReadClassGroup(token(homeroomTeacher, "Teacher"), classGroupId))
+                .isTrue();
     }
 
     @Test
@@ -547,7 +667,8 @@ class AuthorizationComponentTest {
         UUID classGroupId = UUID.randomUUID();
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(technicalTeacher);
 
-        assertThat(authz.canWriteClassGroup(token(homeroomTeacher, "Teacher"), classGroupId)).isFalse();
+        assertThat(authz.canWriteClassGroup(token(homeroomTeacher, "Teacher"), classGroupId))
+                .isFalse();
         verify(courseDomain, never()).findById(any());
     }
 
@@ -558,7 +679,7 @@ class AuthorizationComponentTest {
         UUID teacher = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(classGroupDomain.findById(classGroupId))
-            .thenReturn(Optional.of(classGroup(classGroupId, UUID.randomUUID(), teacher)));
+                .thenReturn(Optional.of(classGroup(classGroupId, UUID.randomUUID(), teacher)));
 
         assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), classGroupId)).isTrue();
         verify(courseDomain, never()).findById(any());
@@ -572,9 +693,9 @@ class AuthorizationComponentTest {
         UUID courseId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(classGroupDomain.findById(classGroupId))
-            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+                .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
         when(courseDomain.findById(courseId))
-            .thenReturn(Optional.of(course(courseId, UUID.randomUUID())));
+                .thenReturn(Optional.of(course(courseId, UUID.randomUUID())));
 
         assertThat(authz.canReadClassGroup(token(stranger, "Teacher"), classGroupId)).isFalse();
     }
@@ -596,7 +717,7 @@ class AuthorizationComponentTest {
         UUID courseId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         when(classGroupDomain.findById(classGroupId))
-            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+                .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
         when(courseDomain.findById(courseId)).thenReturn(Optional.of(course(courseId, null)));
 
         assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), classGroupId)).isFalse();
@@ -604,15 +725,17 @@ class AuthorizationComponentTest {
 
     @Test
     void canReadClassGroup_director_bypassesWithoutLookup() {
-        assertThat(authz.canReadClassGroup(
-            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canReadClassGroup(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
         verify(classGroupDomain, never()).findById(any());
     }
 
     @Test
     void canReadClassGroup_secretary_bypassesWithoutLookup() {
-        assertThat(authz.canReadClassGroup(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(
+                        authz.canReadClassGroup(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
         verify(classGroupDomain, never()).findById(any());
     }
 
@@ -624,14 +747,18 @@ class AuthorizationComponentTest {
         UUID courseId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         UUID criterionId = UUID.randomUUID();
-        when(criterionDomain.findById(criterionId)).thenReturn(Optional.of(
-            new EvaluationCriterion(criterionId, classGroupId, 1, "Knowing", "c", null, null)));
+        when(criterionDomain.findById(criterionId))
+                .thenReturn(
+                        Optional.of(
+                                new EvaluationCriterion(
+                                        criterionId, classGroupId, 1, "Knowing", "c", null, null)));
         when(classGroupDomain.findById(classGroupId))
-            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+                .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
         when(courseDomain.findById(courseId))
-            .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
+                .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
 
-        assertThat(authz.canReadScoreCriterion(token(homeroomTeacher, "Teacher"), criterionId)).isTrue();
+        assertThat(authz.canReadScoreCriterion(token(homeroomTeacher, "Teacher"), criterionId))
+                .isTrue();
     }
 
     @Test
@@ -639,8 +766,8 @@ class AuthorizationComponentTest {
         UUID criterionId = UUID.randomUUID();
         when(criterionDomain.findById(criterionId)).thenReturn(Optional.empty());
 
-        assertThat(authz.canReadScoreCriterion(
-            token(UUID.randomUUID(), "Teacher"), criterionId)).isFalse();
+        assertThat(authz.canReadScoreCriterion(token(UUID.randomUUID(), "Teacher"), criterionId))
+                .isFalse();
     }
 
     @Test
@@ -649,12 +776,20 @@ class AuthorizationComponentTest {
         UUID courseId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
-        when(assessmentEventDomain.findById(eventId)).thenReturn(Optional.of(
-            new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
+        when(assessmentEventDomain.findById(eventId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentEvent(
+                                        eventId,
+                                        UUID.randomUUID(),
+                                        classGroupId,
+                                        1,
+                                        "Knowing",
+                                        "t")));
         when(classGroupDomain.findById(classGroupId))
-            .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
+                .thenReturn(Optional.of(classGroup(classGroupId, courseId, UUID.randomUUID())));
         when(courseDomain.findById(courseId))
-            .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
+                .thenReturn(Optional.of(course(courseId, homeroomTeacher)));
 
         assertThat(authz.canReadScoreEvent(token(homeroomTeacher, "Teacher"), eventId)).isTrue();
     }
@@ -670,8 +805,11 @@ class AuthorizationComponentTest {
     @Test
     void canWriteDailyBatch_director_bypassesWithoutLookup() {
         UUID director = UUID.randomUUID();
-        assertThat(authz.canWriteDailyBatch(token(director, "Director"),
-            List.of(UUID.randomUUID(), UUID.randomUUID()))).isTrue();
+        assertThat(
+                        authz.canWriteDailyBatch(
+                                token(director, "Director"),
+                                List.of(UUID.randomUUID(), UUID.randomUUID())))
+                .isTrue();
     }
 
     // ---- canReadTeacherRoster ----
@@ -710,8 +848,20 @@ class AuthorizationComponentTest {
     void canReadCourse_homeroomTeacher_true() {
         UUID homeroomTeacher = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        homeroomTeacher,
+                                        "Ana",
+                                        true)));
 
         assertThat(authz.canReadCourse(token(homeroomTeacher, "Teacher"), courseId)).isTrue();
     }
@@ -721,8 +871,20 @@ class AuthorizationComponentTest {
         UUID homeroomTeacher = UUID.randomUUID();
         UUID otherTeacher = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacher, "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        homeroomTeacher,
+                                        "Ana",
+                                        true)));
 
         assertThat(authz.canReadCourse(token(otherTeacher, "Teacher"), courseId)).isFalse();
     }
@@ -742,14 +904,16 @@ class AuthorizationComponentTest {
     void canReadCourse_secretary_true_forAnyCourseItDoesNotOwn() {
         // No stub on courseDomain: the secretariat is school-wide, so the check must short-circuit
         // before any ownership lookup.
-        assertThat(authz.canReadCourse(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canReadCourse(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
     void canReadEnrollmentScope_secretary_true_forAnyEnrollment() {
-        assertThat(authz.canReadEnrollmentScope(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(
+                        authz.canReadEnrollmentScope(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
@@ -757,8 +921,10 @@ class AuthorizationComponentTest {
         UUID requested = UUID.randomUUID();
 
         // A teacher would be pinned to their own homeroom here; the secretariat is not.
-        assertThat(authz.effectiveDirectoryCourseId(
-            token(UUID.randomUUID(), "Secretary"), requested)).isEqualTo(requested);
+        assertThat(
+                        authz.effectiveDirectoryCourseId(
+                                token(UUID.randomUUID(), "Secretary"), requested))
+                .isEqualTo(requested);
     }
 
     @Test
@@ -766,13 +932,27 @@ class AuthorizationComponentTest {
         UUID courseId = UUID.randomUUID();
         UUID enrollmentId = UUID.randomUUID();
         when(courseEnrollmentDomain.courseOfEnrollment(enrollmentId)).thenReturn(courseId);
-        when(courseDomain.findById(courseId)).thenReturn(
-            Optional.of(new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(
+                        Optional.of(
+                                new Course(
+                                        courseId,
+                                        1,
+                                        "Primero",
+                                        1,
+                                        "A",
+                                        1,
+                                        2026,
+                                        UUID.randomUUID(),
+                                        "Ana",
+                                        true)));
 
         // Read access must never leak into the write predicates: they share ownsEnrollmentCourse,
         // which is exactly why the Secretary bypass lives at the read entry points instead.
-        assertThat(authz.canWriteDailyAttendance(
-            token(UUID.randomUUID(), "Secretary"), enrollmentId)).isFalse();
+        assertThat(
+                        authz.canWriteDailyAttendance(
+                                token(UUID.randomUUID(), "Secretary"), enrollmentId))
+                .isFalse();
     }
 
     @Test
@@ -780,29 +960,48 @@ class AuthorizationComponentTest {
         UUID classGroupId = UUID.randomUUID();
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
 
-        assertThat(authz.canWriteClassGroup(
-            token(UUID.randomUUID(), "Secretary"), classGroupId)).isFalse();
+        assertThat(authz.canWriteClassGroup(token(UUID.randomUUID(), "Secretary"), classGroupId))
+                .isFalse();
     }
 
     @Test
     void canWriteScoreEvent_secretary_false() {
         UUID eventId = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
-        when(assessmentEventDomain.findById(eventId)).thenReturn(
-            Optional.of(new AssessmentEvent(eventId, UUID.randomUUID(), classGroupId, 1, "Knowing", "t")));
+        when(assessmentEventDomain.findById(eventId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentEvent(
+                                        eventId,
+                                        UUID.randomUUID(),
+                                        classGroupId,
+                                        1,
+                                        "Knowing",
+                                        "t")));
         when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
 
-        assertThat(authz.canWriteScoreEvent(
-            token(UUID.randomUUID(), "Secretary"), eventId)).isFalse();
+        assertThat(authz.canWriteScoreEvent(token(UUID.randomUUID(), "Secretary"), eventId))
+                .isFalse();
     }
+
     // ---- canReadPdc / canWritePdc ----
 
     /** A plan of a course whose homeroom teacher is given, holding one block per teacher listed. */
     private Pdc pdc(UUID id, UUID homeroomTeacherId, UUID... blockTeacherIds) {
         List<PdcSubject> blocks = new java.util.ArrayList<>();
         for (UUID blockTeacherId : blockTeacherIds) {
-            blocks.add(new PdcSubject(UUID.randomUUID(), UUID.randomUUID(), null, null,
-                blockTeacherId, null, null, null, null, List.of()));
+            blocks.add(
+                    new PdcSubject(
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
+                            null,
+                            null,
+                            blockTeacherId,
+                            null,
+                            null,
+                            null,
+                            null,
+                            List.of()));
         }
         return Pdc.builder().id(id).homeroomTeacherId(homeroomTeacherId).subjects(blocks).build();
     }
@@ -848,13 +1047,17 @@ class AuthorizationComponentTest {
         UUID pdcId = UUID.randomUUID();
         UUID ownBlock = UUID.randomUUID();
         UUID otherBlock = UUID.randomUUID();
-        when(pdcDomain.subjectWriterIdsOf(pdcId, ownBlock)).thenReturn(Set.of(homeroom, specialist));
-        // The other block belongs to another teacher, so the specialist is simply not among its writers.
+        when(pdcDomain.subjectWriterIdsOf(pdcId, ownBlock))
+                .thenReturn(Set.of(homeroom, specialist));
+        // The other block belongs to another teacher, so the specialist is simply not among its
+        // writers.
         when(pdcDomain.subjectWriterIdsOf(pdcId, otherBlock))
-            .thenReturn(Set.of(homeroom, UUID.randomUUID()));
+                .thenReturn(Set.of(homeroom, UUID.randomUUID()));
 
-        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, ownBlock)).isTrue();
-        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, otherBlock)).isFalse();
+        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, ownBlock))
+                .isTrue();
+        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, otherBlock))
+                .isFalse();
     }
 
     @Test
@@ -863,7 +1066,7 @@ class AuthorizationComponentTest {
         UUID pdcId = UUID.randomUUID();
         UUID block = UUID.randomUUID();
         when(pdcDomain.subjectWriterIdsOf(pdcId, block))
-            .thenReturn(Set.of(homeroom, UUID.randomUUID()));
+                .thenReturn(Set.of(homeroom, UUID.randomUUID()));
 
         assertThat(authz.canWritePdcSubject(token(homeroom, "Teacher"), pdcId, block)).isTrue();
     }
@@ -877,8 +1080,8 @@ class AuthorizationComponentTest {
         UUID foreignBlock = UUID.randomUUID();
         when(pdcDomain.subjectWriterIdsOf(pdcId, foreignBlock)).thenReturn(Set.of());
 
-        assertThat(authz.canWritePdcSubject(
-            token(specialist, "Teacher"), pdcId, foreignBlock)).isFalse();
+        assertThat(authz.canWritePdcSubject(token(specialist, "Teacher"), pdcId, foreignBlock))
+                .isFalse();
     }
 
     // ---- canAdministerPdc ----
@@ -912,24 +1115,27 @@ class AuthorizationComponentTest {
     void canAdministerPdc_authorOfTheirOwnPlan_true() {
         UUID specialist = UUID.randomUUID();
         UUID pdcId = UUID.randomUUID();
-        when(pdcDomain.administratorIdsOf(pdcId))
-            .thenReturn(Set.of(specialist, UUID.randomUUID()));
+        when(pdcDomain.administratorIdsOf(pdcId)).thenReturn(Set.of(specialist, UUID.randomUUID()));
 
         assertThat(authz.canAdministerPdc(token(specialist, "Teacher"), pdcId)).isTrue();
     }
 
     @Test
     void canAdministerPdc_directorAndSecretary() {
-        assertThat(authz.canAdministerPdc(
-            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
-        assertThat(authz.canAdministerPdc(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
+        assertThat(authz.canAdministerPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
+        assertThat(authz.canAdministerPdc(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isFalse();
     }
 
     @Test
     void canWritePdcSubject_secretary_false() {
-        assertThat(authz.canWritePdcSubject(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID(), UUID.randomUUID())).isFalse();
+        assertThat(
+                        authz.canWritePdcSubject(
+                                token(UUID.randomUUID(), "Secretary"),
+                                UUID.randomUUID(),
+                                UUID.randomUUID()))
+                .isFalse();
     }
 
     @Test
@@ -944,7 +1150,8 @@ class AuthorizationComponentTest {
     @Test
     void canWritePdc_secretary_false() {
         // Read-only staff: reaches the record, writes nothing anywhere.
-        assertThat(authz.canWritePdc(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
+        assertThat(authz.canWritePdc(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isFalse();
     }
 
     // The plan is written by whoever delivers it. The Director reviews what comes back, and a
@@ -958,8 +1165,10 @@ class AuthorizationComponentTest {
 
     @Test
     void canWritePdcForCourse_director_false() {
-        assertThat(authz.canWritePdcForCourse(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
-            .isFalse();
+        assertThat(
+                        authz.canWritePdcForCourse(
+                                token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isFalse();
     }
 
     // ---- canWritePedagogicalReport ----
@@ -989,20 +1198,24 @@ class AuthorizationComponentTest {
 
     @Test
     void canWritePedagogicalReport_director_false() {
-        assertThat(authz.canWritePedagogicalReport(
-            token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isFalse();
+        assertThat(
+                        authz.canWritePedagogicalReport(
+                                token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isFalse();
     }
 
     @Test
     void canWritePedagogicalReport_secretary_false() {
-        assertThat(authz.canWritePedagogicalReport(
-            token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isFalse();
+        assertThat(
+                        authz.canWritePedagogicalReport(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isFalse();
     }
 
     @Test
     void canWritePedagogicalReport_noCourse_false() {
         assertThat(authz.canWritePedagogicalReport(token(UUID.randomUUID(), "Teacher"), null))
-            .isFalse();
+                .isFalse();
     }
 
     @Test
@@ -1012,16 +1225,21 @@ class AuthorizationComponentTest {
 
     @Test
     void canWritePdcSubject_director_false() {
-        assertThat(authz.canWritePdcSubject(
-            token(UUID.randomUUID(), "Director"), UUID.randomUUID(), UUID.randomUUID())).isFalse();
+        assertThat(
+                        authz.canWritePdcSubject(
+                                token(UUID.randomUUID(), "Director"),
+                                UUID.randomUUID(),
+                                UUID.randomUUID()))
+                .isFalse();
     }
 
-    // Publishing says a teacher's month is ready and the rotation hands their work to the parallels.
+    // Publishing says a teacher's month is ready and the rotation hands their work to the
+    // parallels.
     // A Director doing either would be reviewing a submission they made themselves.
     @Test
     void canAuthorPdc_director_false() {
         assertThat(authz.canAuthorPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
-            .isFalse();
+                .isFalse();
     }
 
     // What the Director keeps: a plan opened against the wrong course, or left by a teacher who has
@@ -1029,7 +1247,7 @@ class AuthorizationComponentTest {
     @Test
     void canAdministerPdc_director_true() {
         assertThat(authz.canAdministerPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
-            .isTrue();
+                .isTrue();
     }
 
     // An unauthenticated request is denied, not turned into a server error. Both guards branch on
@@ -1047,12 +1265,14 @@ class AuthorizationComponentTest {
     // Reading is the whole of their part in this, and the write guard no longer grants it.
     @Test
     void canReadPdc_director_true() {
-        assertThat(authz.canReadPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canReadPdc(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
     void canReadPdc_secretary_true() {
-        assertThat(authz.canReadPdc(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(authz.canReadPdc(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
@@ -1094,9 +1314,22 @@ class AuthorizationComponentTest {
         UUID teacher = UUID.randomUUID();
         UUID adaptationId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
-        when(adaptationDomain.findById(adaptationId)).thenReturn(Optional.of(
-            new Adaptation(adaptationId, planId, UUID.randomUUID(), "Ana Perez",
-                null, null, null, null, null, null, null, null)));
+        when(adaptationDomain.findById(adaptationId))
+                .thenReturn(
+                        Optional.of(
+                                new Adaptation(
+                                        adaptationId,
+                                        planId,
+                                        UUID.randomUUID(),
+                                        "Ana Perez",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)));
         when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(teacher));
 
         assertThat(authz.canWriteAdaptation(token(teacher, "Teacher"), adaptationId)).isTrue();
@@ -1108,9 +1341,22 @@ class AuthorizationComponentTest {
         UUID intruder = UUID.randomUUID();
         UUID adaptationId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
-        when(adaptationDomain.findById(adaptationId)).thenReturn(Optional.of(
-            new Adaptation(adaptationId, planId, UUID.randomUUID(), "Ana Perez",
-                null, null, null, null, null, null, null, null)));
+        when(adaptationDomain.findById(adaptationId))
+                .thenReturn(
+                        Optional.of(
+                                new Adaptation(
+                                        adaptationId,
+                                        planId,
+                                        UUID.randomUUID(),
+                                        "Ana Perez",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)));
         when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(owner));
 
         // The adaptation carries the student's full name, so reading it is disclosure.
@@ -1129,17 +1375,35 @@ class AuthorizationComponentTest {
 
     @Test
     void canReadAdaptation_secretary_true() {
-        assertThat(authz.canReadAdaptation(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID())).isTrue();
+        assertThat(
+                        authz.canReadAdaptation(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isTrue();
     }
+
     // ---- canActOnNotification ----
 
     @Test
     void canActOnNotification_theReceiver_true() {
         UUID receiver = UUID.randomUUID();
         UUID id = UUID.randomUUID();
-        when(notificationDomain.findById(id)).thenReturn(Optional.of(
-            new Notification(id, UUID.randomUUID(), null, receiver, null,
-                NotificationType.SUMMONS, null, "hola", null, null, null, null, null)));
+        when(notificationDomain.findById(id))
+                .thenReturn(
+                        Optional.of(
+                                new Notification(
+                                        id,
+                                        UUID.randomUUID(),
+                                        null,
+                                        receiver,
+                                        null,
+                                        NotificationType.SUMMONS,
+                                        null,
+                                        "hola",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)));
 
         assertThat(authz.canActOnNotification(token(receiver, "Teacher"), id)).isTrue();
     }
@@ -1149,9 +1413,23 @@ class AuthorizationComponentTest {
         UUID receiver = UUID.randomUUID();
         UUID intruder = UUID.randomUUID();
         UUID id = UUID.randomUUID();
-        when(notificationDomain.findById(id)).thenReturn(Optional.of(
-            new Notification(id, UUID.randomUUID(), null, receiver, null,
-                NotificationType.SUMMONS, null, "hola", null, null, null, null, null)));
+        when(notificationDomain.findById(id))
+                .thenReturn(
+                        Optional.of(
+                                new Notification(
+                                        id,
+                                        UUID.randomUUID(),
+                                        null,
+                                        receiver,
+                                        null,
+                                        NotificationType.SUMMONS,
+                                        null,
+                                        "hola",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)));
 
         assertThat(authz.canActOnNotification(token(intruder, "Teacher"), id)).isFalse();
     }
@@ -1161,9 +1439,23 @@ class AuthorizationComponentTest {
         UUID receiver = UUID.randomUUID();
         UUID director = UUID.randomUUID();
         UUID id = UUID.randomUUID();
-        when(notificationDomain.findById(id)).thenReturn(Optional.of(
-            new Notification(id, UUID.randomUUID(), null, receiver, null,
-                NotificationType.SUMMONS, null, "hola", null, null, null, null, null)));
+        when(notificationDomain.findById(id))
+                .thenReturn(
+                        Optional.of(
+                                new Notification(
+                                        id,
+                                        UUID.randomUUID(),
+                                        null,
+                                        receiver,
+                                        null,
+                                        NotificationType.SUMMONS,
+                                        null,
+                                        "hola",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)));
 
         // Acting on someone else's inbox is not an act of authority.
         assertThat(authz.canActOnNotification(token(director, "Director"), id)).isFalse();

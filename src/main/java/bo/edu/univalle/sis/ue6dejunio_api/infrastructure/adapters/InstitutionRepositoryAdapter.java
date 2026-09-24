@@ -23,13 +23,13 @@ public class InstitutionRepositoryAdapter implements IInstitutionDomain {
     private final String educationLevel;
 
     public InstitutionRepositoryAdapter(
-        JpaUserRepository userRepo,
-        @Value("${app.institution.district}") String district,
-        @Value("${app.institution.school}") String school,
-        @Value("${app.institution.department}") String department,
-        @Value("${app.institution.dependency}") String dependency,
-        @Value("${app.institution.shift}") String shift,
-        @Value("${app.institution.education-level}") String educationLevel) {
+            JpaUserRepository userRepo,
+            @Value("${app.institution.district}") String district,
+            @Value("${app.institution.school}") String school,
+            @Value("${app.institution.department}") String department,
+            @Value("${app.institution.dependency}") String dependency,
+            @Value("${app.institution.shift}") String shift,
+            @Value("${app.institution.education-level}") String educationLevel) {
         this.userRepo = userRepo;
         this.district = district;
         this.school = school;
@@ -44,12 +44,12 @@ public class InstitutionRepositoryAdapter implements IInstitutionDomain {
         // A school has one Director, but nothing in the schema enforces it and a handover can leave
         // two rows for a day. The first by surname is taken rather than failing: a document that
         // cannot be printed is worse than one naming either of two people in office.
-        String directorName = userRepo
-            .findFirstByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE)
-            .map(InstitutionRepositoryAdapter::fullName)
-            .orElse(null);
-        return new Institution(district, school, directorName,
-            department, dependency, shift, educationLevel);
+        String directorName =
+                userRepo.findFirstByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE)
+                        .map(InstitutionRepositoryAdapter::fullName)
+                        .orElse(null);
+        return new Institution(
+                district, school, directorName, department, dependency, shift, educationLevel);
     }
 
     private static String fullName(UserEntity u) {

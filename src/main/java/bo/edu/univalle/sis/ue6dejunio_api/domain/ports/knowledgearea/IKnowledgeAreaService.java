@@ -8,8 +8,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.knowledgearea.UpdateKnow
 
 public interface IKnowledgeAreaService {
     KnowledgeArea create(CreateKnowledgeAreaCommand command);
+
     KnowledgeArea update(Integer id, UpdateKnowledgeAreaCommand command);
+
     KnowledgeArea getById(Integer id);
+
     PageResult<KnowledgeArea> list(PageQuery pageQuery);
+
     void delete(Integer id);
 }

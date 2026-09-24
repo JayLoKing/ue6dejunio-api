@@ -12,13 +12,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGr
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -31,8 +30,11 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     private final JpaSubjectRepository subjectRepo;
     private final JpaUserRepository userRepo;
 
-    public ClassGroupRepositoryAdapter(JpaClassGroupRepository classGroupRepo, JpaCourseRepository courseRepo,
-                                       JpaSubjectRepository subjectRepo, JpaUserRepository userRepo) {
+    public ClassGroupRepositoryAdapter(
+            JpaClassGroupRepository classGroupRepo,
+            JpaCourseRepository courseRepo,
+            JpaSubjectRepository subjectRepo,
+            JpaUserRepository userRepo) {
         this.classGroupRepo = classGroupRepo;
         this.courseRepo = courseRepo;
         this.subjectRepo = subjectRepo;
@@ -52,22 +54,30 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Override
     public boolean userIsTeacher(UUID userId) {
         return userRepo.findById(userId)
-            .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()))
-            .orElse(false);
+                .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()))
+                .orElse(false);
     }
 
     @Override
     public boolean userIsTechnicalTeacher(UUID userId) {
         return userRepo.findById(userId)
-            .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()) && u.isTechnical())
-            .orElse(false);
+                .map(
+                        u ->
+                                u.getRole() != null
+                                        && TEACHER_ROLE.equals(u.getRole().getName())
+                                        && u.isTechnical())
+                .orElse(false);
     }
 
     @Override
     public boolean userIsNonTechnicalTeacher(UUID userId) {
         return userRepo.findById(userId)
-            .map(u -> u.getRole() != null && TEACHER_ROLE.equals(u.getRole().getName()) && !u.isTechnical())
-            .orElse(false);
+                .map(
+                        u ->
+                                u.getRole() != null
+                                        && TEACHER_ROLE.equals(u.getRole().getName())
+                                        && !u.isTechnical())
+                .orElse(false);
     }
 
     @Override
@@ -75,10 +85,11 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         if (userId == null || courseId == null) {
             return false;
         }
-        return courseRepo.findById(courseId)
-            .map(CourseEntity::getHomeroomTeacher)
-            .map(t -> userId.equals(t.getId()))
-            .orElse(false);
+        return courseRepo
+                .findById(courseId)
+                .map(CourseEntity::getHomeroomTeacher)
+                .map(t -> userId.equals(t.getId()))
+                .orElse(false);
     }
 
     @Override
@@ -108,10 +119,14 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Override
     @Transactional
     public ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId) {
-        CourseEntity course = courseRepo.findById(courseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Curso", courseId));
-        SubjectEntity subject = subjectRepo.findById(subjectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Materia", subjectId));
+        CourseEntity course =
+                courseRepo
+                        .findById(courseId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Curso", courseId));
+        SubjectEntity subject =
+                subjectRepo
+                        .findById(subjectId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Materia", subjectId));
         ClassGroupEntity e = new ClassGroupEntity();
         e.setCourse(course);
         e.setSubject(subject);
@@ -143,7 +158,9 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
 
     @Override
     public List<ClassGroup> byCourse(UUID courseId) {
-        return classGroupRepo.findByCourse_IdOrderBySubject_Name(courseId).stream().map(this::toDomain).toList();
+        return classGroupRepo.findByCourse_IdOrderBySubject_Name(courseId).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
@@ -152,37 +169,51 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         // query and not one per subject — every to-one on this entity is EAGER, and reaching the
         // area through a plain findAll would be the N+1 that graph exists to prevent.
         return classGroupRepo.findActiveOfCourseInPlanOrder(courseId).stream()
-            .map(cg -> new ClassGroupField(cg.getId(),
-                cg.getSubject().getArea().getId(),
-                cg.getSubject().getArea().getName(),
-                cg.getSubject().getArea().getDisplayOrder()))
-            .toList();
+                .map(
+                        cg ->
+                                new ClassGroupField(
+                                        cg.getId(),
+                                        cg.getSubject().getArea().getId(),
+                                        cg.getSubject().getArea().getName(),
+                                        cg.getSubject().getArea().getDisplayOrder()))
+                .toList();
     }
 
     @Override
     public List<ClassGroup> byTeacher(UUID teacherId) {
-        return classGroupRepo.findByTeacher_IdOrderBySubject_Name(teacherId).stream().map(this::toDomain).toList();
+        return classGroupRepo.findByTeacher_IdOrderBySubject_Name(teacherId).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
     public UUID courseIdOfClassGroup(UUID classGroupId) {
-        return classGroupRepo.findById(classGroupId)
-            .map(cg -> cg.getCourse().getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
+        return classGroupRepo
+                .findById(classGroupId)
+                .map(cg -> cg.getCourse().getId())
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Materia del curso", classGroupId));
     }
 
     @Override
     public UUID teacherIdOfClassGroup(UUID classGroupId) {
-        return classGroupRepo.findById(classGroupId)
-            .map(cg -> cg.getTeacher() != null ? cg.getTeacher().getId() : null)
-            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
+        return classGroupRepo
+                .findById(classGroupId)
+                .map(cg -> cg.getTeacher() != null ? cg.getTeacher().getId() : null)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Materia del curso", classGroupId));
     }
 
     @Override
     @Transactional
     public void setActive(UUID classGroupId, boolean active) {
-        ClassGroupEntity e = classGroupRepo.findById(classGroupId)
-            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
+        ClassGroupEntity e =
+                classGroupRepo
+                        .findById(classGroupId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Materia del curso", classGroupId));
         e.setActive(active);
         classGroupRepo.save(e);
     }
@@ -190,10 +221,16 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Override
     @Transactional
     public ClassGroup setTeacher(UUID classGroupId, UUID teacherId) {
-        ClassGroupEntity e = classGroupRepo.findById(classGroupId)
-            .orElseThrow(() -> new ResourceNotFoundException("Materia del curso", classGroupId));
-        UserEntity teacher = userRepo.findById(teacherId)
-            .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
+        ClassGroupEntity e =
+                classGroupRepo
+                        .findById(classGroupId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Materia del curso", classGroupId));
+        UserEntity teacher =
+                userRepo.findById(teacherId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
         e.setTeacher(teacher);
         return toDomain(classGroupRepo.save(e));
     }
@@ -202,13 +239,14 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         CourseEntity c = e.getCourse();
         UserEntity t = e.getTeacher();
         return new ClassGroup(
-            e.getId(),
-            c != null ? c.getId() : null,
-            c != null && c.getGrade() != null ? c.getGrade().getName() : null,
-            c != null && c.getParallel() != null ? c.getParallel().getName() : null,
-            e.getSubject().getId(), e.getSubject().getName(),
-            t != null ? t.getId() : null,
-            t != null ? t.getNames() + " " + t.getLastNames() : null,
-            e.isActive());
+                e.getId(),
+                c != null ? c.getId() : null,
+                c != null && c.getGrade() != null ? c.getGrade().getName() : null,
+                c != null && c.getParallel() != null ? c.getParallel().getName() : null,
+                e.getSubject().getId(),
+                e.getSubject().getName(),
+                t != null ? t.getId() : null,
+                t != null ? t.getNames() + " " + t.getLastNames() : null,
+                e.isActive());
     }
 }

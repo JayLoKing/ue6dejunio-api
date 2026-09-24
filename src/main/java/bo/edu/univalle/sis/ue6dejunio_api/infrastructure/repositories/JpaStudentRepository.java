@@ -1,10 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
-import java.util.Collection;
-import java.util.List;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -12,10 +15,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
 
 public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID> {
 
@@ -45,18 +44,20 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
      * entity itself.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
+    @Query(
+            """
         UPDATE StudentEntity s
         SET s.status = :status, s.statusReason = :reason, s.statusNote = :note,
             s.statusChangedAt = :changedAt, s.statusChangedBy = :changedBy
         WHERE s.id IN :ids
         """)
-    int updateStatusIn(@Param("ids") Collection<UUID> ids,
-                       @Param("status") String status,
-                       @Param("reason") String reason,
-                       @Param("note") String note,
-                       @Param("changedAt") LocalDateTime changedAt,
-                       @Param("changedBy") UserEntity changedBy);
+    int updateStatusIn(
+            @Param("ids") Collection<UUID> ids,
+            @Param("status") String status,
+            @Param("reason") String reason,
+            @Param("note") String note,
+            @Param("changedAt") LocalDateTime changedAt,
+            @Param("changedBy") UserEntity changedBy);
 
     /*
      * The two directory queries below repeat their FROM and their filters on purpose: the only
@@ -85,7 +86,9 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
      * year the directory means.
      */
 
-    @Query(value = """
+    @Query(
+            value =
+                    """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
             s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
             g.name, p.name, l.name, s.status, y.year)
@@ -102,7 +105,8 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
               AND (:parallelId IS NULL OR p.id = :parallelId)
               AND (:academicYearId IS NULL OR y.id = :academicYearId OR y.id IS NULL)
         """,
-        countQuery = """
+            countQuery =
+                    """
         SELECT COUNT(DISTINCT s) FROM StudentEntity s
         LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
@@ -115,14 +119,17 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
               AND (:parallelId IS NULL OR p.id = :parallelId)
               AND (:academicYearId IS NULL OR y.id = :academicYearId OR y.id IS NULL)
         """)
-    Page<StudentDirectoryItem> listDirectory(@Param("courseId") UUID courseId,
-                                             @Param("gradeId") Integer gradeId,
-                                             @Param("parallelId") Integer parallelId,
-                                             @Param("academicYearId") Integer academicYearId,
-                                             @Param("status") String status,
-                                             Pageable pageable);
+    Page<StudentDirectoryItem> listDirectory(
+            @Param("courseId") UUID courseId,
+            @Param("gradeId") Integer gradeId,
+            @Param("parallelId") Integer parallelId,
+            @Param("academicYearId") Integer academicYearId,
+            @Param("status") String status,
+            Pageable pageable);
 
-    @Query(value = """
+    @Query(
+            value =
+                    """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
             s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
             g.name, p.name, l.name, s.status, y.year)
@@ -143,7 +150,8 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
                    OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.identityCard) LIKE LOWER(CONCAT('%', :q, '%')))
         """,
-        countQuery = """
+            countQuery =
+                    """
         SELECT COUNT(DISTINCT s) FROM StudentEntity s
         LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
@@ -160,11 +168,12 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
                    OR LOWER(s.rudeCode) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(s.identityCard) LIKE LOWER(CONCAT('%', :q, '%')))
         """)
-    Page<StudentDirectoryItem> searchDirectory(@Param("q") String q,
-                                               @Param("courseId") UUID courseId,
-                                               @Param("gradeId") Integer gradeId,
-                                               @Param("parallelId") Integer parallelId,
-                                               @Param("academicYearId") Integer academicYearId,
-                                               @Param("status") String status,
-                                               Pageable pageable);
+    Page<StudentDirectoryItem> searchDirectory(
+            @Param("q") String q,
+            @Param("courseId") UUID courseId,
+            @Param("gradeId") Integer gradeId,
+            @Param("parallelId") Integer parallelId,
+            @Param("academicYearId") Integer academicYearId,
+            @Param("status") String status,
+            Pageable pageable);
 }

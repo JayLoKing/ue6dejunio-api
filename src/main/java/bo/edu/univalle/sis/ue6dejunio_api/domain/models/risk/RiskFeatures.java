@@ -15,24 +15,22 @@ import java.util.UUID;
  * <p>Each list is in the scale of its own dimension, the same one the gradebook uses: Being out of
  * 10, Knowing out of 45, Doing out of 40, Deciding out of 5.
  *
- * @param attendancePct   attendance so far, not attendance at the close of the trimester. Waiting
- *                        for the trimester to end produces a warning about a student whose marks
- *                        are already final.
+ * @param attendancePct attendance so far, not attendance at the close of the trimester. Waiting for
+ *     the trimester to end produces a warning about a student whose marks are already final.
  * @param plannedCriteria how many criteria the teacher planned for this subject and trimester. It
- *                        is the denominator of progress: three marks out of three and three out of
- *                        seven are the same count and mean opposite things.
+ *     is the denominator of progress: three marks out of three and three out of seven are the same
+ *     count and mean opposite things.
  */
 public record RiskFeatures(
-    UUID studentId,
-    UUID classGroupId,
-    int trimester,
-    List<BigDecimal> being,
-    List<BigDecimal> knowing,
-    List<BigDecimal> doing,
-    List<BigDecimal> deciding,
-    BigDecimal attendancePct,
-    int plannedCriteria
-) {
+        UUID studentId,
+        UUID classGroupId,
+        int trimester,
+        List<BigDecimal> being,
+        List<BigDecimal> knowing,
+        List<BigDecimal> doing,
+        List<BigDecimal> deciding,
+        BigDecimal attendancePct,
+        int plannedCriteria) {
 
     public RiskFeatures {
         Objects.requireNonNull(studentId, "studentId");
@@ -69,6 +67,9 @@ public record RiskFeatures(
      */
     public boolean isComplete() {
         return plannedCriteria > 0
-            && !being.isEmpty() && !knowing.isEmpty() && !doing.isEmpty() && !deciding.isEmpty();
+                && !being.isEmpty()
+                && !knowing.isEmpty()
+                && !doing.isEmpty()
+                && !deciding.isEmpty();
     }
 }

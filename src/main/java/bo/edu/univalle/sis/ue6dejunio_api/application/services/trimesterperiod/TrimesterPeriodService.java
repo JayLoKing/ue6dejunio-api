@@ -9,12 +9,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.Trimeste
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.UpdateTrimesterPeriodCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TrimesterPeriodService implements ITrimesterPeriodService {
@@ -32,13 +31,16 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
             throw new ResourceNotFoundException("AcademicYear", c.academicYearId());
         }
         validateDateRange(c.startDate(), c.endDate());
-        if (trimesterPeriodDomain.existsByAcademicYearAndTrimester(c.academicYearId(), c.trimester())) {
-            throw new DuplicateResourceException("id_academic_year+trimester",
-                c.academicYearId() + "-" + c.trimester());
+        if (trimesterPeriodDomain.existsByAcademicYearAndTrimester(
+                c.academicYearId(), c.trimester())) {
+            throw new DuplicateResourceException(
+                    "id_academic_year+trimester", c.academicYearId() + "-" + c.trimester());
         }
-        List<TrimesterPeriod> existing = trimesterPeriodDomain.findByAcademicYear(c.academicYearId());
+        List<TrimesterPeriod> existing =
+                trimesterPeriodDomain.findByAcademicYear(c.academicYearId());
         requireNoOverlap(existing, c.startDate(), c.endDate(), null);
-        return trimesterPeriodDomain.save(c.academicYearId(), c.trimester(), c.startDate(), c.endDate());
+        return trimesterPeriodDomain.save(
+                c.academicYearId(), c.trimester(), c.startDate(), c.endDate());
     }
 
     @Override
@@ -46,7 +48,8 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
     public TrimesterPeriod update(UUID id, UpdateTrimesterPeriodCommand c) {
         TrimesterPeriod current = getById(id);
         validateDateRange(c.startDate(), c.endDate());
-        List<TrimesterPeriod> existing = trimesterPeriodDomain.findByAcademicYear(current.academicYearId());
+        List<TrimesterPeriod> existing =
+                trimesterPeriodDomain.findByAcademicYear(current.academicYearId());
         requireNoOverlap(existing, c.startDate(), c.endDate(), id);
         return trimesterPeriodDomain.update(id, c.startDate(), c.endDate());
     }
@@ -54,8 +57,9 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
     @Override
     @Transactional(readOnly = true)
     public TrimesterPeriod getById(UUID id) {
-        return trimesterPeriodDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("TrimesterPeriod", id));
+        return trimesterPeriodDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("TrimesterPeriod", id));
     }
 
     @Override
@@ -78,16 +82,24 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
     }
 
     /** Overlap check between the (up to 3) periods of a single academic year. */
-    private static void requireNoOverlap(List<TrimesterPeriod> existing, LocalDate startDate,
-                                         LocalDate endDate, UUID excludeId) {
+    private static void requireNoOverlap(
+            List<TrimesterPeriod> existing,
+            LocalDate startDate,
+            LocalDate endDate,
+            UUID excludeId) {
         for (TrimesterPeriod p : existing) {
             if (excludeId != null && p.id().equals(excludeId)) {
                 continue;
             }
             if (p.overlaps(startDate, endDate)) {
                 throw new ConflictException(
-                    "El rango de fechas se superpone con el trimestre " + p.trimester()
-                        + " (" + p.startDate() + " a " + p.endDate() + ")");
+                        "El rango de fechas se superpone con el trimestre "
+                                + p.trimester()
+                                + " ("
+                                + p.startDate()
+                                + " a "
+                                + p.endDate()
+                                + ")");
             }
         }
     }

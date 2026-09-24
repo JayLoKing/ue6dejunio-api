@@ -15,11 +15,10 @@ import java.util.UUID;
  * @param updatedAt when the teacher last saved, which is the only thing that dates this document.
  */
 public record PedagogicalReport(
-    UUID id,
-    UUID courseId,
-    Integer trimester,
-    String achievements,
-    String difficulties,
-    List<PedagogicalReportNote> notes,
-    LocalDateTime updatedAt
-) {}
+        UUID id,
+        UUID courseId,
+        Integer trimester,
+        String achievements,
+        String difficulties,
+        List<PedagogicalReportNote> notes,
+        LocalDateTime updatedAt) {}

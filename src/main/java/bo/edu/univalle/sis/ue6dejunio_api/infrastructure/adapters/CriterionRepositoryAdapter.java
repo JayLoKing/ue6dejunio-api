@@ -9,13 +9,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessm
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGroupRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaEvaluationCriterionRepository;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -27,11 +26,12 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     private final JpaAssessmentScoreRepository assessmentScoreRepo;
     private final CriterionMapper mapper;
 
-    public CriterionRepositoryAdapter(JpaEvaluationCriterionRepository criterionRepo,
-                                      JpaClassGroupRepository classGroupRepo,
-                                      JpaCurriculumPlanRepository planRepo,
-                                      JpaAssessmentScoreRepository assessmentScoreRepo,
-                                      CriterionMapper mapper) {
+    public CriterionRepositoryAdapter(
+            JpaEvaluationCriterionRepository criterionRepo,
+            JpaClassGroupRepository classGroupRepo,
+            JpaCurriculumPlanRepository planRepo,
+            JpaAssessmentScoreRepository assessmentScoreRepo,
+            CriterionMapper mapper) {
         this.criterionRepo = criterionRepo;
         this.classGroupRepo = classGroupRepo;
         this.planRepo = planRepo;
@@ -51,8 +51,13 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
 
     @Override
     @Transactional
-    public EvaluationCriterion create(UUID classGroupId, Integer trimester, String dimension,
-                                      String name, String activityName, UUID curriculumPlanId) {
+    public EvaluationCriterion create(
+            UUID classGroupId,
+            Integer trimester,
+            String dimension,
+            String name,
+            String activityName,
+            UUID curriculumPlanId) {
         EvaluationCriterionEntity e = new EvaluationCriterionEntity();
         e.setClassGroup(classGroupRepo.getReferenceById(classGroupId));
         e.setTrimester(trimester);
@@ -69,8 +74,10 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     @Override
     @Transactional
     public EvaluationCriterion update(UUID id, String name) {
-        EvaluationCriterionEntity e = criterionRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Criterion", id));
+        EvaluationCriterionEntity e =
+                criterionRepo
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Criterion", id));
         if (name != null) e.setName(name);
         return mapper.toDomain(criterionRepo.save(e));
     }
@@ -82,7 +89,9 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
 
     @Override
     public List<EvaluationCriterion> list(UUID classGroupId, Integer trimester, String dimension) {
-        return criterionRepo.search(classGroupId, trimester, dimension).stream().map(mapper::toDomain).toList();
+        return criterionRepo.search(classGroupId, trimester, dimension).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
@@ -95,5 +104,4 @@ public class CriterionRepositoryAdapter implements ICriterionDomain {
     public boolean hasScoresForCriterion(UUID id) {
         return assessmentScoreRepo.existsByCriterion(id);
     }
-
 }

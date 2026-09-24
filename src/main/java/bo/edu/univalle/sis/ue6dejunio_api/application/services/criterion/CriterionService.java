@@ -12,15 +12,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEve
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.criterion.ICriterionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CriterionService implements ICriterionService {
@@ -29,8 +28,10 @@ public class CriterionService implements ICriterionService {
     private final IAssessmentEventDomain eventDomain;
     private final IDomainEventPublisher events;
 
-    public CriterionService(ICriterionDomain criterionDomain, IAssessmentEventDomain eventDomain,
-                            IDomainEventPublisher events) {
+    public CriterionService(
+            ICriterionDomain criterionDomain,
+            IAssessmentEventDomain eventDomain,
+            IDomainEventPublisher events) {
         this.criterionDomain = criterionDomain;
         this.eventDomain = eventDomain;
         this.events = events;
@@ -52,7 +53,8 @@ public class CriterionService implements ICriterionService {
         }
         // The adapter links the plan through getReferenceById, which never reads: an id that
         // matches nothing would only fail at flush, as a foreign key violation reported as 500.
-        if (c.curriculumPlanId() != null && !criterionDomain.curriculumPlanExists(c.curriculumPlanId())) {
+        if (c.curriculumPlanId() != null
+                && !criterionDomain.curriculumPlanExists(c.curriculumPlanId())) {
             throw new ResourceNotFoundException("CurriculumPlan", c.curriculumPlanId());
         }
 
@@ -61,16 +63,20 @@ public class CriterionService implements ICriterionService {
 
         if (activityName == null && !items.isEmpty()) {
             throw new ValidationException(
-                "Los criterios de actividad requieren el nombre de la actividad");
+                    "Los criterios de actividad requieren el nombre de la actividad");
         }
         if (activityName != null && items.isEmpty()) {
-            throw new ValidationException(
-                "Una actividad debe declarar al menos un criterio");
+            throw new ValidationException("Una actividad debe declarar al menos un criterio");
         }
 
-        EvaluationCriterion created = criterionDomain.create(
-            c.classGroupId(), c.trimester(), c.dimension(), c.name(), activityName,
-            c.curriculumPlanId());
+        EvaluationCriterion created =
+                criterionDomain.create(
+                        c.classGroupId(),
+                        c.trimester(),
+                        c.dimension(),
+                        c.name(),
+                        activityName,
+                        c.curriculumPlanId());
 
         for (String item : items) {
             eventDomain.create(created.id(), item);
@@ -88,7 +94,7 @@ public class CriterionService implements ICriterionService {
         getById(id);
         if (criterionDomain.hasScoresForCriterion(id)) {
             throw new ConflictException(
-                "El criterio no puede modificarse porque ya cuenta con calificaciones registradas");
+                    "El criterio no puede modificarse porque ya cuenta con calificaciones registradas");
         }
         return criterionDomain.update(id, c.name());
     }
@@ -96,8 +102,9 @@ public class CriterionService implements ICriterionService {
     @Override
     @Transactional(readOnly = true)
     public EvaluationCriterion getById(UUID id) {
-        return criterionDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Criterion", id));
+        return criterionDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Criterion", id));
     }
 
     @Override
@@ -117,7 +124,7 @@ public class CriterionService implements ICriterionService {
         EvaluationCriterion deleted = getById(id);
         if (criterionDomain.hasScoresForCriterion(id)) {
             throw new ConflictException(
-                "El criterio no puede eliminarse porque ya cuenta con calificaciones registradas");
+                    "El criterio no puede eliminarse porque ya cuenta con calificaciones registradas");
         }
         criterionDomain.deleteById(id);
         events.publish(new RiskInputsChanged(deleted.classGroupId(), deleted.trimester()));
@@ -125,8 +132,8 @@ public class CriterionService implements ICriterionService {
 
     /**
      * Blank entries are dropped and repeats rejected: two items sharing a name would give the
-     * teacher two indistinguishable boxes, and the criterion's average would silently count one
-     * of them twice.
+     * teacher two indistinguishable boxes, and the criterion's average would silently count one of
+     * them twice.
      */
     private List<String> normalizedItems(List<String> raw) {
         if (raw == null) {

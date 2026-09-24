@@ -8,11 +8,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.LevelEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.LevelMapper;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaLevelRepository;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -22,8 +21,8 @@ public class LevelRepositoryAdapter implements ILevelDomain {
     private final JpaGradeRepository gradeRepo;
     private final LevelMapper mapper;
 
-    public LevelRepositoryAdapter(JpaLevelRepository levelRepo, JpaGradeRepository gradeRepo,
-                                  LevelMapper mapper) {
+    public LevelRepositoryAdapter(
+            JpaLevelRepository levelRepo, JpaGradeRepository gradeRepo, LevelMapper mapper) {
         this.levelRepo = levelRepo;
         this.gradeRepo = gradeRepo;
         this.mapper = mapper;
@@ -32,9 +31,10 @@ public class LevelRepositoryAdapter implements ILevelDomain {
     @Override
     @Transactional
     public Level save(Level level) {
-        LevelEntity e = level.id() == null
-            ? new LevelEntity()
-            : levelRepo.findById(level.id()).orElseGet(LevelEntity::new);
+        LevelEntity e =
+                level.id() == null
+                        ? new LevelEntity()
+                        : levelRepo.findById(level.id()).orElseGet(LevelEntity::new);
         e.setName(level.name());
         if (level.id() != null) e.setId(level.id());
         return mapper.toDomain(levelRepo.save(e));

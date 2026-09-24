@@ -1,5 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.gradebook;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook.GradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
@@ -14,24 +22,15 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDom
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * The cuadro de honor: the podium of a course, and the podium of the whole school.
@@ -63,8 +62,13 @@ class GradebookServiceHonorRollTest {
 
     @BeforeEach
     void setUp() {
-        service = new GradebookService(enrollmentDomain, scoreDomain, attendanceDomain,
-            courseService, classGroupDomain);
+        service =
+                new GradebookService(
+                        enrollmentDomain,
+                        scoreDomain,
+                        attendanceDomain,
+                        courseService,
+                        classGroupDomain);
         courseId = UUID.randomUUID();
     }
 
@@ -77,16 +81,17 @@ class GradebookServiceHonorRollTest {
         CourseStudent fourth = student("Dario", "Soto");
         rosterOf(first, second, third, fourth);
         batched(
-            oneAreaWorth(first, "95.00"),
-            oneAreaWorth(second, "80.00"),
-            oneAreaWorth(third, "88.00"),
-            oneAreaWorth(fourth, "70.00"));
+                oneAreaWorth(first, "95.00"),
+                oneAreaWorth(second, "80.00"),
+                oneAreaWorth(third, "88.00"),
+                oneAreaWorth(fourth, "70.00"));
 
         List<HonorRollEntry> podium = service.honorRoll(courseId, 3);
 
         assertThat(podium).hasSize(3);
-        assertThat(podium).extracting(HonorRollEntry::fullName)
-            .containsExactly(first.fullName(), third.fullName(), second.fullName());
+        assertThat(podium)
+                .extracting(HonorRollEntry::fullName)
+                .containsExactly(first.fullName(), third.fullName(), second.fullName());
         assertThat(podium).extracting(HonorRollEntry::position).containsExactly(1, 2, 3);
         assertThat(podium.get(0).finalAverage()).isEqualByComparingTo("95.00");
     }
@@ -105,13 +110,12 @@ class GradebookServiceHonorRollTest {
 
         List<HonorRollEntry> podium = service.honorRoll(courseId, 3);
 
-        assertThat(podium).extracting(HonorRollEntry::fullName)
-            .containsExactly(graded.fullName());
+        assertThat(podium).extracting(HonorRollEntry::fullName).containsExactly(graded.fullName());
     }
 
     /**
-     * Two students on the same average still have to come out in the same order on two readings,
-     * or the school prints two different podiums from one year. The name the podium itself shows
+     * Two students on the same average still have to come out in the same order on two readings, or
+     * the school prints two different podiums from one year. The name the podium itself shows
      * breaks the tie, so what decides the order is something the reader can see.
      */
     @Test
@@ -124,8 +128,9 @@ class GradebookServiceHonorRollTest {
 
         List<HonorRollEntry> podium = service.honorRoll(courseId, 2);
 
-        assertThat(podium).extracting(HonorRollEntry::fullName)
-            .containsExactly(ana.fullName(), beto.fullName());
+        assertThat(podium)
+                .extracting(HonorRollEntry::fullName)
+                .containsExactly(ana.fullName(), beto.fullName());
     }
 
     /**
@@ -139,14 +144,15 @@ class GradebookServiceHonorRollTest {
         CourseStudent onSecondPage = student("Beto", "Quispe");
         // Two pages: the totals say there is more to read than the first page carried.
         when(enrollmentDomain.studentsByCourse(eq(courseId), any(PageQuery.class)))
-            .thenReturn(new PageResult<>(List.of(onFirstPage), 0, 200, 2L))
-            .thenReturn(new PageResult<>(List.of(onSecondPage), 1, 200, 2L));
+                .thenReturn(new PageResult<>(List.of(onFirstPage), 0, 200, 2L))
+                .thenReturn(new PageResult<>(List.of(onSecondPage), 1, 200, 2L));
         batched(oneAreaWorth(onFirstPage, "70.00"), oneAreaWorth(onSecondPage, "99.00"));
 
         List<HonorRollEntry> podium = service.honorRoll(courseId, 3);
 
-        assertThat(podium).extracting(HonorRollEntry::fullName)
-            .containsExactly(onSecondPage.fullName(), onFirstPage.fullName());
+        assertThat(podium)
+                .extracting(HonorRollEntry::fullName)
+                .containsExactly(onSecondPage.fullName(), onFirstPage.fullName());
     }
 
     /**
@@ -167,8 +173,9 @@ class GradebookServiceHonorRollTest {
 
         ArgumentCaptor<PageQuery> asked = ArgumentCaptor.forClass(PageQuery.class);
         verify(enrollmentDomain).studentsByCourse(eq(courseId), asked.capture());
-        assertThat(asked.getValue().sort()).extracting(SortField::property)
-            .containsExactly("student.lastNames", "student.names", "id");
+        assertThat(asked.getValue().sort())
+                .extracting(SortField::property)
+                .containsExactly("student.lastNames", "student.names", "id");
     }
 
     /**
@@ -178,7 +185,7 @@ class GradebookServiceHonorRollTest {
     @Test
     void institutionHonorRoll_refusesToBuildAPodiumWithoutAGestion() {
         assertThatThrownBy(() -> service.institutionHonorRoll(null, 10))
-            .isInstanceOf(ValidationException.class);
+                .isInstanceOf(ValidationException.class);
     }
 
     @Test
@@ -210,15 +217,16 @@ class GradebookServiceHonorRollTest {
         rosterOfCourse(courseId, bestOfQuinto, restOfQuinto);
         rosterOfCourse(otherCourseId, bestOfSexto, restOfSexto);
         batched(
-            oneAreaWorth(bestOfQuinto, "91.00"),
-            oneAreaWorth(restOfQuinto, "60.00"),
-            oneAreaWorth(bestOfSexto, "97.00"),
-            oneAreaWorth(restOfSexto, "55.00"));
+                oneAreaWorth(bestOfQuinto, "91.00"),
+                oneAreaWorth(restOfQuinto, "60.00"),
+                oneAreaWorth(bestOfSexto, "97.00"),
+                oneAreaWorth(restOfSexto, "55.00"));
 
-        List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID,2);
+        List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID, 2);
 
-        assertThat(podium).extracting(HonorRollEntry::fullName)
-            .containsExactly(bestOfSexto.fullName(), bestOfQuinto.fullName());
+        assertThat(podium)
+                .extracting(HonorRollEntry::fullName)
+                .containsExactly(bestOfSexto.fullName(), bestOfQuinto.fullName());
         assertThat(podium).extracting(HonorRollEntry::position).containsExactly(1, 2);
     }
 
@@ -246,13 +254,17 @@ class GradebookServiceHonorRollTest {
 
         List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID, 10);
 
-        assertThat(podium).singleElement().satisfies(entry -> {
-            assertThat(entry.studentId()).isEqualTo(movedStudent);
-            // The better of the two years they were graded in, and the classroom that earned it.
-            assertThat(entry.finalAverage()).isEqualByComparingTo("91.00");
-            assertThat(entry.parallelName()).isEqualTo("A");
-            assertThat(entry.position()).isEqualTo(1);
-        });
+        assertThat(podium)
+                .singleElement()
+                .satisfies(
+                        entry -> {
+                            assertThat(entry.studentId()).isEqualTo(movedStudent);
+                            // The better of the two years they were graded in, and the classroom
+                            // that earned it.
+                            assertThat(entry.finalAverage()).isEqualByComparingTo("91.00");
+                            assertThat(entry.parallelName()).isEqualTo("A");
+                            assertThat(entry.position()).isEqualTo(1);
+                        });
     }
 
     /**
@@ -276,10 +288,13 @@ class GradebookServiceHonorRollTest {
         List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID, 10);
 
         // "Quinto B" before "Sexto A": the classroom as the podium prints it, compared as a name.
-        assertThat(podium).singleElement().satisfies(entry -> {
-            assertThat(entry.gradeName()).isEqualTo("Quinto");
-            assertThat(entry.parallelName()).isEqualTo("B");
-        });
+        assertThat(podium)
+                .singleElement()
+                .satisfies(
+                        entry -> {
+                            assertThat(entry.gradeName()).isEqualTo("Quinto");
+                            assertThat(entry.parallelName()).isEqualTo("B");
+                        });
     }
 
     /** A school-wide podium that does not say which classroom a student came from is unreadable. */
@@ -291,13 +306,16 @@ class GradebookServiceHonorRollTest {
         rosterOfCourse(courseId, ana);
         batched(oneAreaWorth(ana, "91.00"));
 
-        List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID,10);
+        List<HonorRollEntry> podium = service.institutionHonorRoll(ACADEMIC_YEAR_ID, 10);
 
-        assertThat(podium).singleElement().satisfies(entry -> {
-            assertThat(entry.courseId()).isEqualTo(courseId);
-            assertThat(entry.gradeName()).isEqualTo("Quinto");
-            assertThat(entry.parallelName()).isEqualTo("B");
-        });
+        assertThat(podium)
+                .singleElement()
+                .satisfies(
+                        entry -> {
+                            assertThat(entry.courseId()).isEqualTo(courseId);
+                            assertThat(entry.gradeName()).isEqualTo("Quinto");
+                            assertThat(entry.parallelName()).isEqualTo("B");
+                        });
     }
 
     // ---------------------------------------------------------------- fixtures
@@ -316,7 +334,7 @@ class GradebookServiceHonorRollTest {
 
     private void rosterOfCourse(UUID id, CourseStudent... students) {
         when(enrollmentDomain.studentsByCourse(eq(id), any(PageQuery.class)))
-            .thenReturn(new PageResult<>(List.of(students), 0, 200, students.length));
+                .thenReturn(new PageResult<>(List.of(students), 0, 200, students.length));
     }
 
     /**
@@ -343,19 +361,29 @@ class GradebookServiceHonorRollTest {
      * between parallels leaves behind.
      */
     private static CourseStudent studentOf(UUID studentId, String names, String lastNames) {
-        return new CourseStudent(UUID.randomUUID(), studentId, "RUDE", "ID",
-            names, lastNames, "Effective", "F");
+        return new CourseStudent(
+                UUID.randomUUID(), studentId, "RUDE", "ID", names, lastNames, "Effective", "F");
     }
 
     private static Course course(UUID id, String gradeName, String parallelName) {
-        return new Course(id, 5, gradeName, 2, parallelName, 1, 2026,
-            UUID.randomUUID(), "Ana Perez", true);
+        return new Course(
+                id, 5, gradeName, 2, parallelName, 1, 2026, UUID.randomUUID(), "Ana Perez", true);
     }
 
-    private static AcademicScore score(UUID enrollmentId, UUID classGroupId, String subject,
-                                       Integer trimester, String total) {
-        return new AcademicScore(UUID.randomUUID(), enrollmentId, classGroupId, subject, trimester,
-            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            total == null ? null : new BigDecimal(total), null, null);
+    private static AcademicScore score(
+            UUID enrollmentId, UUID classGroupId, String subject, Integer trimester, String total) {
+        return new AcademicScore(
+                UUID.randomUUID(),
+                enrollmentId,
+                classGroupId,
+                subject,
+                trimester,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                total == null ? null : new BigDecimal(total),
+                null,
+                null);
     }
 }

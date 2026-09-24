@@ -59,19 +59,19 @@ public class ParallelController {
     @GetMapping
     @Operation(summary = "Listar paralelos. offset=pagina (1-indexed), limit=cantidad")
     public ResponseEntity<PagedResponse<ParallelResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
-        @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort
-    ) {
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
+            @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort) {
         SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
         PageQuery p = PageQuery.of(offset - 1, limit, new SortField("name", dir));
-        return ResponseEntity.ok(PagedResponse.of(parallelService.list(p).map(ParallelResponse::from)));
+        return ResponseEntity.ok(
+                PagedResponse.of(parallelService.list(p).map(ParallelResponse::from)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar paralelo")
-    public ResponseEntity<ParallelResponse> update(@PathVariable Integer id,
-                                                   @Valid @RequestBody UpdateParallelRequest r) {
+    public ResponseEntity<ParallelResponse> update(
+            @PathVariable Integer id, @Valid @RequestBody UpdateParallelRequest r) {
         Parallel p = parallelService.update(id, new UpdateParallelCommand(r.name()));
         return ResponseEntity.ok(ParallelResponse.from(p));
     }

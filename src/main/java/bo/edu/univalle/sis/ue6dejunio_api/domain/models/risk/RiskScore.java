@@ -10,9 +10,9 @@ import java.util.Objects;
  * same four class probabilities: is this student about to fail, and is this student about to stand
  * out. A single "probability score" would name neither.
  *
- * @param pFail        P(RiesgoCritico), which is the probability of failing: that category holds
- *                     the averages at or below 50, and the pass mark is 51. {@code EnRiesgo} passes
- *                     narrowly and is deliberately not added in.
+ * @param pFail P(RiesgoCritico), which is the probability of failing: that category holds the
+ *     averages at or below 50, and the pass mark is 51. {@code EnRiesgo} passes narrowly and is
+ *     deliberately not added in.
  * @param pOutstanding P(Sobresaliente).
  */
 public record RiskScore(RiskLevel level, BigDecimal pFail, BigDecimal pOutstanding) {

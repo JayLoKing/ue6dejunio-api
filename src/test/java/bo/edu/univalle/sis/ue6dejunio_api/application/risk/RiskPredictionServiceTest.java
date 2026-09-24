@@ -1,5 +1,18 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.risk;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskPredictionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -18,13 +31,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain.UpsertResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService.RunSummary;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,19 +40,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * What a run does with what it is given.
@@ -79,8 +78,14 @@ class RiskPredictionServiceTest {
 
     @BeforeEach
     void buildService() {
-        service = new RiskPredictionService(featureDomain, modelClient, predictionDomain,
-            notifications, classGroupDomain, courseService);
+        service =
+                new RiskPredictionService(
+                        featureDomain,
+                        modelClient,
+                        predictionDomain,
+                        notifications,
+                        classGroupDomain,
+                        courseService);
     }
 
     // ---------------------------------------------------------------- fixtures
@@ -92,10 +97,10 @@ class RiskPredictionServiceTest {
     /** One mark in each of the four dimensions: the least the model will accept. */
     private List<CriterionScoreRow> completeMarks(UUID student, UUID group) {
         return List.of(
-            score(student, group, "Being", "8"),
-            score(student, group, "Knowing", "30"),
-            score(student, group, "Doing", "25"),
-            score(student, group, "Deciding", "4"));
+                score(student, group, "Being", "8"),
+                score(student, group, "Knowing", "30"),
+                score(student, group, "Doing", "25"),
+                score(student, group, "Deciding", "4"));
     }
 
     private void givenMarks(List<CriterionScoreRow> marks, UUID... groups) {
@@ -109,14 +114,30 @@ class RiskPredictionServiceTest {
     }
 
     private RiskPrediction stored(UUID student, UUID group, RiskLevel level) {
-        return new RiskPrediction(UUID.randomUUID(), student, group, TRIMESTER, level,
-            new BigDecimal("0.7000"), new BigDecimal("0.0100"), false, "{}",
-            LocalDateTime.of(2026, 4, 1, 9, 0));
+        return new RiskPrediction(
+                UUID.randomUUID(),
+                student,
+                group,
+                TRIMESTER,
+                level,
+                new BigDecimal("0.7000"),
+                new BigDecimal("0.0100"),
+                false,
+                "{}",
+                LocalDateTime.of(2026, 4, 1, 9, 0));
     }
 
     private ClassGroup classGroup(UUID id, UUID teacherId) {
-        return new ClassGroup(id, UUID.randomUUID(), "3ro", "A", UUID.randomUUID(),
-            "Matematicas", teacherId, "Prof. Quispe", true);
+        return new ClassGroup(
+                id,
+                UUID.randomUUID(),
+                "3ro",
+                "A",
+                UUID.randomUUID(),
+                "Matematicas",
+                teacherId,
+                "Prof. Quispe",
+                true);
     }
 
     /**
@@ -135,7 +156,7 @@ class RiskPredictionServiceTest {
     /** Every prediction offered is claimable: nothing was announced earlier today. */
     private void grantTheDailyClaim() {
         when(predictionDomain.claimForNotification(anyCollection(), any(), any()))
-            .thenAnswer(call -> Set.copyOf(call.getArgument(0, Collection.class)));
+                .thenAnswer(call -> Set.copyOf(call.getArgument(0, Collection.class)));
     }
 
     // ---------------------------------------------------------------- nothing to do
@@ -157,9 +178,11 @@ class RiskPredictionServiceTest {
      */
     @Test
     void predictClassGroup_studentMissingADimension_isSkippedBeforeTheModelIsAsked() {
-        givenMarks(List.of(
-            score(ana, mathGroup, "Being", "8"),
-            score(ana, mathGroup, "Knowing", "30")), mathGroup);
+        givenMarks(
+                List.of(
+                        score(ana, mathGroup, "Being", "8"),
+                        score(ana, mathGroup, "Knowing", "30")),
+                mathGroup);
 
         RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -174,10 +197,19 @@ class RiskPredictionServiceTest {
         List<CriterionScoreRow> marks = new ArrayList<>(completeMarks(ana, mathGroup));
         marks.add(score(bruno, mathGroup, "Being", "7"));
         givenMarks(marks, mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(
-            List.of(new RiskScore(RiskLevel.SIN_RIESGO, new BigDecimal("0.02"), new BigDecimal("0.1"))));
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(
-            new UpsertResult(stored(ana, mathGroup, RiskLevel.SIN_RIESGO), RiskLevel.SIN_RIESGO)));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.SIN_RIESGO,
+                                        new BigDecimal("0.02"),
+                                        new BigDecimal("0.1"))));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(
+                                        stored(ana, mathGroup, RiskLevel.SIN_RIESGO),
+                                        RiskLevel.SIN_RIESGO)));
 
         RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -191,10 +223,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_writesTheModelsAnswerAgainstTheStudentItWasComputedFor() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.8123"), new BigDecimal("0.0044"))));
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(
-            new UpsertResult(stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO), RiskLevel.RIESGO_CRITICO)));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.8123"),
+                                        new BigDecimal("0.0044"))));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(
+                                        stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO),
+                                        RiskLevel.RIESGO_CRITICO)));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -208,22 +249,31 @@ class RiskPredictionServiceTest {
     }
 
     /**
-     * The column is {@code NOT NULL} and its default only applies when the column is left out of the
-     * statement — which JPA never does. A null here is not a timestamp the database fills in later,
-     * it is a write that fails.
+     * The column is {@code NOT NULL} and its default only applies when the column is left out of
+     * the statement — which JPA never does. A null here is not a timestamp the database fills in
+     * later, it is a write that fails.
      */
     @Test
     void predictClassGroup_stampsEveryRowWithWhenTheRunHappened() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.SIN_RIESGO, new BigDecimal("0.02"), new BigDecimal("0.10"))));
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(
-            new UpsertResult(stored(ana, mathGroup, RiskLevel.SIN_RIESGO), RiskLevel.SIN_RIESGO)));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.SIN_RIESGO,
+                                        new BigDecimal("0.02"),
+                                        new BigDecimal("0.10"))));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(
+                                        stored(ana, mathGroup, RiskLevel.SIN_RIESGO),
+                                        RiskLevel.SIN_RIESGO)));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
-        assertThat(captureWrite()).allSatisfy(prediction ->
-            assertThat(prediction.predictedAt()).isNotNull());
+        assertThat(captureWrite())
+                .allSatisfy(prediction -> assertThat(prediction.predictedAt()).isNotNull());
     }
 
     /**
@@ -234,19 +284,31 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_handsTheVectorItScoredToTheWriteSide() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.SIN_RIESGO, new BigDecimal("0.02"), new BigDecimal("0.10"))));
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(
-            new UpsertResult(stored(ana, mathGroup, RiskLevel.SIN_RIESGO), RiskLevel.SIN_RIESGO)));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.SIN_RIESGO,
+                                        new BigDecimal("0.02"),
+                                        new BigDecimal("0.10"))));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(
+                                        stored(ana, mathGroup, RiskLevel.SIN_RIESGO),
+                                        RiskLevel.SIN_RIESGO)));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
-        assertThat(captureWrite().get(0).features()).satisfies(vector -> {
-            assertThat(vector.studentId()).isEqualTo(ana);
-            assertThat(vector.knowing()).singleElement()
-                .satisfies(mark -> assertThat(mark).isEqualByComparingTo("30"));
-            assertThat(vector.plannedCriteria()).isEqualTo(8);
-        });
+        assertThat(captureWrite().get(0).features())
+                .satisfies(
+                        vector -> {
+                            assertThat(vector.studentId()).isEqualTo(ana);
+                            assertThat(vector.knowing())
+                                    .singleElement()
+                                    .satisfies(mark -> assertThat(mark).isEqualByComparingTo("30"));
+                            assertThat(vector.plannedCriteria()).isEqualTo(8);
+                        });
     }
 
     /**
@@ -259,12 +321,17 @@ class RiskPredictionServiceTest {
         List<CriterionScoreRow> marks = new ArrayList<>(completeMarks(ana, mathGroup));
         marks.addAll(completeMarks(bruno, mathGroup));
         givenMarks(marks, mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.SIN_RIESGO, new BigDecimal("0.02"), new BigDecimal("0.10"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.SIN_RIESGO,
+                                        new BigDecimal("0.02"),
+                                        new BigDecimal("0.10"))));
 
         assertThatThrownBy(() -> service.predictClassGroup(mathGroup, TRIMESTER))
-            .isInstanceOf(RiskModelUnavailableException.class)
-            .hasMessageContaining("1 scores for 2 vectors");
+                .isInstanceOf(RiskModelUnavailableException.class)
+                .hasMessageContaining("1 scores for 2 vectors");
 
         verify(predictionDomain, never()).upsertAll(anyList());
     }
@@ -278,7 +345,7 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_noCriteriaPlanned_countsTheStudentsItCouldNotPredict() {
         when(featureDomain.criterionScores(any(), anyInt()))
-            .thenReturn(completeMarks(ana, mathGroup));
+                .thenReturn(completeMarks(ana, mathGroup));
         when(featureDomain.plannedCriteriaCount(any(), anyInt())).thenReturn(Map.of());
         when(featureDomain.attendanceRates(any(), anyInt())).thenReturn(List.of());
 
@@ -301,14 +368,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_aStudentAlreadyAnnouncedToday_isNotAnnouncedAgain() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         when(predictionDomain.upsertAll(anyList()))
-            .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
+                .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
         // Nothing left to claim: this prediction already spoke today.
         when(predictionDomain.claimForNotification(anyCollection(), any(), any()))
-            .thenReturn(Set.of());
+                .thenReturn(Set.of());
 
         RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -318,15 +390,22 @@ class RiskPredictionServiceTest {
         verifyNoInteractions(notifications);
     }
 
-    /** The claim is asked for once, with today's start, and only about the demanding transitions. */
+    /**
+     * The claim is asked for once, with today's start, and only about the demanding transitions.
+     */
     @Test
     void predictClassGroup_asksToClaimOnlyTheTransitionsItWouldAnnounce() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.SIN_RIESGO, new BigDecimal("0.10"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.SIN_RIESGO,
+                                        new BigDecimal("0.10"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction row = stored(ana, mathGroup, RiskLevel.SIN_RIESGO);
         when(predictionDomain.upsertAll(anyList()))
-            .thenReturn(List.of(new UpsertResult(row, RiskLevel.RIESGO_CRITICO)));
+                .thenReturn(List.of(new UpsertResult(row, RiskLevel.RIESGO_CRITICO)));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -339,13 +418,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_aStudentEnteringTheFailingBand_tellsTheirTeacherByName() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         when(predictionDomain.upsertAll(anyList()))
-            .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
-        givenAnnouncementLookups(classGroup(mathGroup, teacher),
-            new StudentRisk(row, "Ana", "Alvarez", "Matematicas"));
+                .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
+        givenAnnouncementLookups(
+                classGroup(mathGroup, teacher),
+                new StudentRisk(row, "Ana", "Alvarez", "Matematicas"));
 
         RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -362,13 +447,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_theWarningIsWrittenInNeutralSpanish() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         when(predictionDomain.upsertAll(anyList()))
-            .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
-        givenAnnouncementLookups(classGroup(mathGroup, teacher),
-            new StudentRisk(row, "Ana", "Alvarez", "Matematicas"));
+                .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
+        givenAnnouncementLookups(
+                classGroup(mathGroup, teacher),
+                new StudentRisk(row, "Ana", "Alvarez", "Matematicas"));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -384,10 +475,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_aStudentStillFailing_isNotAnnouncedAgain() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.90"), new BigDecimal("0.00"))));
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(new UpsertResult(
-            stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO), RiskLevel.RIESGO_CRITICO)));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.90"),
+                                        new BigDecimal("0.00"))));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(
+                                        stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO),
+                                        RiskLevel.RIESGO_CRITICO)));
 
         RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -399,10 +499,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_aStudentMerelyScrapingAPass_isNotAnnounced() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.EN_RIESGO, new BigDecimal("0.30"), new BigDecimal("0.02"))));
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(new UpsertResult(
-            stored(ana, mathGroup, RiskLevel.EN_RIESGO), RiskLevel.SIN_RIESGO)));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.EN_RIESGO,
+                                        new BigDecimal("0.30"),
+                                        new BigDecimal("0.02"))));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(
+                                        stored(ana, mathGroup, RiskLevel.EN_RIESGO),
+                                        RiskLevel.SIN_RIESGO)));
 
         RunSummary summary = service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -418,13 +527,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_aFirstPredictionThatIsAlreadyFailing_isAnnounced() {
         givenMarks(completeMarks(ana, mathGroup), mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.88"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.88"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         when(predictionDomain.upsertAll(anyList()))
-            .thenReturn(List.of(new UpsertResult(row, null)));
-        givenAnnouncementLookups(classGroup(mathGroup, teacher),
-            new StudentRisk(row, "Ana", "Alvarez", "Matematicas"));
+                .thenReturn(List.of(new UpsertResult(row, null)));
+        givenAnnouncementLookups(
+                classGroup(mathGroup, teacher),
+                new StudentRisk(row, "Ana", "Alvarez", "Matematicas"));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
@@ -437,25 +552,34 @@ class RiskPredictionServiceTest {
         List<CriterionScoreRow> marks = new ArrayList<>(completeMarks(ana, mathGroup));
         marks.addAll(completeMarks(bruno, mathGroup));
         givenMarks(marks, mathGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00")),
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.77"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00")),
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.77"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction anaRow = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         RiskPrediction brunoRow = stored(bruno, mathGroup, RiskLevel.RIESGO_CRITICO);
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(
-            new UpsertResult(anaRow, RiskLevel.EN_RIESGO),
-            new UpsertResult(brunoRow, RiskLevel.SIN_RIESGO)));
-        givenAnnouncementLookups(classGroup(mathGroup, teacher),
-            new StudentRisk(anaRow, "Ana", "Alvarez", "Matematicas"),
-            new StudentRisk(brunoRow, "Bruno", "Bermudez", "Matematicas"));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(anaRow, RiskLevel.EN_RIESGO),
+                                new UpsertResult(brunoRow, RiskLevel.SIN_RIESGO)));
+        givenAnnouncementLookups(
+                classGroup(mathGroup, teacher),
+                new StudentRisk(anaRow, "Ana", "Alvarez", "Matematicas"),
+                new StudentRisk(brunoRow, "Bruno", "Bermudez", "Matematicas"));
 
         service.predictClassGroup(mathGroup, TRIMESTER);
 
         ArgumentCaptor<SendNotificationCommand> captor = ArgumentCaptor.captor();
         verify(notifications).send(captor.capture());
-        assertThat(captor.getValue().message())
-            .contains("Alvarez Ana")
-            .contains("Bermudez Bruno");
+        assertThat(captor.getValue().message()).contains("Alvarez Ana").contains("Bermudez Bruno");
     }
 
     /**
@@ -464,24 +588,38 @@ class RiskPredictionServiceTest {
      */
     @Test
     void predictYear_manySubjectsAtOnce_resolvesTheirTeachersAndNamesInOneReadEach() {
-        when(featureDomain.activeClassGroupIds(YEAR))
-            .thenReturn(List.of(mathGroup, languageGroup));
+        when(featureDomain.activeClassGroupIds(YEAR)).thenReturn(List.of(mathGroup, languageGroup));
         List<CriterionScoreRow> marks = new ArrayList<>(completeMarks(ana, mathGroup));
         marks.addAll(completeMarks(bruno, languageGroup));
         givenMarks(marks, mathGroup, languageGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00")),
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.77"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00")),
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.77"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction anaRow = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         RiskPrediction brunoRow = stored(bruno, languageGroup, RiskLevel.RIESGO_CRITICO);
-        when(predictionDomain.upsertAll(anyList())).thenReturn(List.of(
-            new UpsertResult(anaRow, RiskLevel.EN_RIESGO),
-            new UpsertResult(brunoRow, RiskLevel.EN_RIESGO)));
-        when(classGroupDomain.findByIdIn(anyCollection())).thenReturn(List.of(
-            classGroup(mathGroup, teacher), classGroup(languageGroup, teacher)));
-        when(predictionDomain.byIds(anyCollection())).thenReturn(List.of(
-            new StudentRisk(anaRow, "Ana", "Alvarez", "Matematicas"),
-            new StudentRisk(brunoRow, "Bruno", "Bermudez", "Lenguaje")));
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(
+                        List.of(
+                                new UpsertResult(anaRow, RiskLevel.EN_RIESGO),
+                                new UpsertResult(brunoRow, RiskLevel.EN_RIESGO)));
+        when(classGroupDomain.findByIdIn(anyCollection()))
+                .thenReturn(
+                        List.of(
+                                classGroup(mathGroup, teacher),
+                                classGroup(languageGroup, teacher)));
+        when(predictionDomain.byIds(anyCollection()))
+                .thenReturn(
+                        List.of(
+                                new StudentRisk(anaRow, "Ana", "Alvarez", "Matematicas"),
+                                new StudentRisk(brunoRow, "Bruno", "Bermudez", "Lenguaje")));
         grantTheDailyClaim();
 
         service.predictYear(YEAR, TRIMESTER);
@@ -500,13 +638,19 @@ class RiskPredictionServiceTest {
     @Test
     void predictClassGroup_aSubjectWithNoTeacher_stillWritesThePredictionAndSendsNothing() {
         givenMarks(completeMarks(ana, languageGroup), languageGroup);
-        when(modelClient.predictBatch(anyList())).thenReturn(List.of(
-            new RiskScore(RiskLevel.RIESGO_CRITICO, new BigDecimal("0.81"), new BigDecimal("0.00"))));
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00"))));
         RiskPrediction row = stored(ana, languageGroup, RiskLevel.RIESGO_CRITICO);
         when(predictionDomain.upsertAll(anyList()))
-            .thenReturn(List.of(new UpsertResult(row, RiskLevel.SIN_RIESGO)));
-        givenAnnouncementLookups(classGroup(languageGroup, null),
-            new StudentRisk(row, "Ana", "Alvarez", "Lenguaje"));
+                .thenReturn(List.of(new UpsertResult(row, RiskLevel.SIN_RIESGO)));
+        givenAnnouncementLookups(
+                classGroup(languageGroup, null),
+                new StudentRisk(row, "Ana", "Alvarez", "Lenguaje"));
 
         RunSummary summary = service.predictClassGroup(languageGroup, TRIMESTER);
 
@@ -517,19 +661,24 @@ class RiskPredictionServiceTest {
 
     // ---------------------------------------------------------------- reads
 
-    /** The names come through, because a panel handed bare uuids has to resolve every one of them. */
+    /**
+     * The names come through, because a panel handed bare uuids has to resolve every one of them.
+     */
     @Test
     void byClassGroup_handsBackTheNamesTheRepositoryAlreadySelected() {
         RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
         when(predictionDomain.byClassGroupAndTrimester(mathGroup, TRIMESTER))
-            .thenReturn(List.of(new StudentRisk(row, "Ana", "Alvarez", "Matematicas")));
+                .thenReturn(List.of(new StudentRisk(row, "Ana", "Alvarez", "Matematicas")));
 
         List<StudentRisk> risks = service.byClassGroup(mathGroup, TRIMESTER);
 
-        assertThat(risks).singleElement().satisfies(risk -> {
-            assertThat(risk.studentFullName()).isEqualTo("Alvarez Ana");
-            assertThat(risk.subjectName()).isEqualTo("Matematicas");
-        });
+        assertThat(risks)
+                .singleElement()
+                .satisfies(
+                        risk -> {
+                            assertThat(risk.studentFullName()).isEqualTo("Alvarez Ana");
+                            assertThat(risk.subjectName()).isEqualTo("Matematicas");
+                        });
     }
 
     @Test

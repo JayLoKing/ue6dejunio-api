@@ -1,11 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.CreateAdaptationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.UpdateAdaptationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CurriculumAdaptationEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
@@ -14,13 +14,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurricu
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCurriculumPlanRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
@@ -32,11 +31,12 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
     private final JpaUserRepository userRepo;
     private final AdaptationMapper mapper;
 
-    public AdaptationRepositoryAdapter(JpaCurriculumAdaptationRepository adaptationRepo,
-                                       JpaCurriculumPlanRepository planRepo,
-                                       JpaStudentRepository studentRepo,
-                                       JpaUserRepository userRepo,
-                                       AdaptationMapper mapper) {
+    public AdaptationRepositoryAdapter(
+            JpaCurriculumAdaptationRepository adaptationRepo,
+            JpaCurriculumPlanRepository planRepo,
+            JpaStudentRepository studentRepo,
+            JpaUserRepository userRepo,
+            AdaptationMapper mapper) {
         this.adaptationRepo = adaptationRepo;
         this.planRepo = planRepo;
         this.studentRepo = studentRepo;
@@ -86,8 +86,10 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
     @Override
     @Transactional
     public Adaptation update(UUID id, UpdateAdaptationCommand c) {
-        CurriculumAdaptationEntity e = adaptationRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Adaptacion", id));
+        CurriculumAdaptationEntity e =
+                adaptationRepo
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Adaptacion", id));
         if (c.conditionType() != null) e.setConditionType(c.conditionType());
         if (c.adaptedContents() != null) e.setAdaptedContents(c.adaptedContents());
         if (c.adaptedMethodology() != null) e.setAdaptedMethodology(c.adaptedMethodology());
@@ -108,7 +110,7 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
     public PageResult<Adaptation> listByPlan(UUID planId, PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         return SpringPaging.toPageResult(
-            adaptationRepo.findByCurriculumPlan_Id(planId, pageable).map(mapper::toDomain));
+                adaptationRepo.findByCurriculumPlan_Id(planId, pageable).map(mapper::toDomain));
     }
 
     @Override
@@ -116,5 +118,4 @@ public class AdaptationRepositoryAdapter implements IAdaptationDomain {
     public void deleteById(UUID id) {
         adaptationRepo.deleteById(id);
     }
-
 }

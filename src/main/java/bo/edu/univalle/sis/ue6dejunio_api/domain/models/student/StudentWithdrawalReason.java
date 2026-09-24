@@ -27,14 +27,18 @@ public enum StudentWithdrawalReason {
         return this == OTRO;
     }
 
-    /** Accepts either the Spanish label ("Retiro Voluntario") or the enum constant name, case-insensitive. */
+    /**
+     * Accepts either the Spanish label ("Retiro Voluntario") or the enum constant name,
+     * case-insensitive.
+     */
     public static Optional<StudentWithdrawalReason> fromRequestValue(String value) {
         if (value == null || value.isBlank()) {
             return Optional.empty();
         }
         String normalized = value.trim();
         for (StudentWithdrawalReason reason : values()) {
-            if (reason.label.equalsIgnoreCase(normalized) || reason.name().equalsIgnoreCase(normalized)) {
+            if (reason.label.equalsIgnoreCase(normalized)
+                    || reason.name().equalsIgnoreCase(normalized)) {
                 return Optional.of(reason);
             }
         }

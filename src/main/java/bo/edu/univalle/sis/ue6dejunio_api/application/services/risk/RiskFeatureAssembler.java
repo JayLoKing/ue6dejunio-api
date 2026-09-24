@@ -3,15 +3,14 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.risk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain.AttendanceRateRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain.CriterionScoreRow;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Turns rows into vectors.
@@ -30,17 +29,15 @@ class RiskFeatureAssembler {
 
     /**
      * @param plannedCriteria a subject absent from this map yields vectors carrying zero, which no
-     *                        vector can be predicted on: progress with nothing to divide by is not
-     *                        a figure, it is a question the data cannot answer yet. Zero rather
-     *                        than omission so those students are still counted as skipped instead
-     *                        of vanishing from the run summary altogether.
+     *     vector can be predicted on: progress with nothing to divide by is not a figure, it is a
+     *     question the data cannot answer yet. Zero rather than omission so those students are
+     *     still counted as skipped instead of vanishing from the run summary altogether.
      */
     static List<RiskFeatures> assemble(
-        int trimester,
-        List<CriterionScoreRow> scores,
-        Map<UUID, Integer> plannedCriteria,
-        List<AttendanceRateRow> attendanceRates
-    ) {
+            int trimester,
+            List<CriterionScoreRow> scores,
+            Map<UUID, Integer> plannedCriteria,
+            List<AttendanceRateRow> attendanceRates) {
         // Insertion-ordered so a run built from the same rows sends the same batch in the same
         // order. A HashMap here would reshuffle the vectors between two identical runs, which turns
         // the boundary between one chunked request and the next into a coin toss and makes a
@@ -99,19 +96,27 @@ class RiskFeatureAssembler {
                 case "Knowing" -> knowing.add(score);
                 case "Doing" -> doing.add(score);
                 case "Deciding" -> deciding.add(score);
-                default -> log.warn(
-                    "Criterion dimension '{}' is not one the model knows, so the mark is left out "
-                        + "of the vector for student {} in class group {}",
-                    dimension, studentId, classGroupId);
+                default ->
+                        log.warn(
+                                "Criterion dimension '{}' is not one the model knows, so the mark is left out "
+                                        + "of the vector for student {} in class group {}",
+                                dimension,
+                                studentId,
+                                classGroupId);
             }
         }
 
         RiskFeatures build(int trimester, int planned) {
             return new RiskFeatures(
-                studentId, classGroupId, trimester,
-                being, knowing, doing, deciding,
-                attendancePct, planned
-            );
+                    studentId,
+                    classGroupId,
+                    trimester,
+                    being,
+                    knowing,
+                    doing,
+                    deciding,
+                    attendancePct,
+                    planned);
         }
     }
 }

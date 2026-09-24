@@ -10,30 +10,32 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatusChanged;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpdatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.UpsertPdcSubjectCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.pdc.IPdcService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PdcService implements IPdcService {
 
-    private static final Set<String> EDITABLE = Set.of(PdcStatus.DRAFT, PdcStatus.WITH_OBSERVATIONS);
-    private static final Set<String> REVIEWABLE = Set.of(PdcStatus.PUBLISHED, PdcStatus.UNDER_REVIEW);
+    private static final Set<String> EDITABLE =
+            Set.of(PdcStatus.DRAFT, PdcStatus.WITH_OBSERVATIONS);
+    private static final Set<String> REVIEWABLE =
+            Set.of(PdcStatus.PUBLISHED, PdcStatus.UNDER_REVIEW);
+
     /**
      * What may be handed to the other parallels. A draft is still being written, and a plan sent
      * back with observations is one the Director refused — spreading either would put work nobody
      * stands behind into two more courses.
      */
     private static final Set<String> COPYABLE =
-        Set.of(PdcStatus.PUBLISHED, PdcStatus.UNDER_REVIEW, PdcStatus.APPROVED);
+            Set.of(PdcStatus.PUBLISHED, PdcStatus.UNDER_REVIEW, PdcStatus.APPROVED);
 
     private final IPdcDomain pdcDomain;
     private final IDomainEventPublisher events;
@@ -52,8 +54,9 @@ public class PdcService implements IPdcService {
         // The plan is monthly, so what may not repeat is the numbered plan of a course — not the
         // trimester, which legitimately holds three or four of them.
         if (pdcDomain.existsByCoursePlanNumber(c.courseId(), c.trimester(), c.planNumber())) {
-            throw new DuplicateResourceException("PDC (curso + trimestre + numero)",
-                c.courseId() + "/T" + c.trimester() + "/N" + c.planNumber());
+            throw new DuplicateResourceException(
+                    "PDC (curso + trimestre + numero)",
+                    c.courseId() + "/T" + c.trimester() + "/N" + c.planNumber());
         }
         if (c.periodStart() == null || c.periodEnd() == null) {
             throw new ValidationException("El PDC necesita el periodo que cubre");
@@ -64,19 +67,21 @@ public class PdcService implements IPdcService {
 
         List<UUID> classGroupIds = resolveClassGroups(c, currentUserId);
 
-        Pdc created = pdcDomain.save(Pdc.builder()
-            .courseId(c.courseId())
-            .planNumber(c.planNumber())
-            .trimester(c.trimester())
-            .periodStart(c.periodStart())
-            .periodEnd(c.periodEnd())
-            .status(PdcStatus.DRAFT)
-            .holisticObjective(c.holisticObjective())
-            .finalProduct(c.finalProduct())
-            .bibliography(c.bibliography())
-            .createdById(currentUserId)
-            .updatedById(currentUserId)
-            .build());
+        Pdc created =
+                pdcDomain.save(
+                        Pdc.builder()
+                                .courseId(c.courseId())
+                                .planNumber(c.planNumber())
+                                .trimester(c.trimester())
+                                .periodStart(c.periodStart())
+                                .periodEnd(c.periodEnd())
+                                .status(PdcStatus.DRAFT)
+                                .holisticObjective(c.holisticObjective())
+                                .finalProduct(c.finalProduct())
+                                .bibliography(c.bibliography())
+                                .createdById(currentUserId)
+                                .updatedById(currentUserId)
+                                .build());
 
         // Opening the blocks with the plan is what lets the form walk subject by subject: the
         // teacher fills blocks that already exist rather than inventing the plan's shape.
@@ -112,7 +117,7 @@ public class PdcService implements IPdcService {
         List<UUID> asked = c.classGroupIds().stream().distinct().toList();
         if (!allowed.containsAll(asked)) {
             throw new ValidationException(
-                "Alguna materia indicada no pertenece al curso o no la dictas");
+                    "Alguna materia indicada no pertenece al curso o no la dictas");
         }
         return asked;
     }
@@ -127,9 +132,10 @@ public class PdcService implements IPdcService {
             // Renumbering onto a month the course already planned would hit the unique index and
             // surface as a 500 instead of the conflict it is.
             if (pdcDomain.existsByCoursePlanNumber(
-                pdc.getCourseId(), pdc.getTrimester(), c.planNumber())) {
-                throw new DuplicateResourceException("PDC (curso + trimestre + numero)",
-                    pdc.getCourseId() + "/T" + pdc.getTrimester() + "/N" + c.planNumber());
+                    pdc.getCourseId(), pdc.getTrimester(), c.planNumber())) {
+                throw new DuplicateResourceException(
+                        "PDC (curso + trimestre + numero)",
+                        pdc.getCourseId() + "/T" + pdc.getTrimester() + "/N" + c.planNumber());
             }
             pdc.setPlanNumber(c.planNumber());
         }
@@ -158,19 +164,22 @@ public class PdcService implements IPdcService {
 
     @Override
     @Transactional
-    public Pdc writeSubject(UUID id, UUID planSubjectId, UpsertPdcSubjectCommand c, UUID currentUserId) {
+    public Pdc writeSubject(
+            UUID id, UUID planSubjectId, UpsertPdcSubjectCommand c, UUID currentUserId) {
         // Only the status is read here. The adapter loads the plan whole to write the block, and
         // reading the document a second time just to check one string doubled every subject write.
-        String status = pdcDomain.statusOf(id)
-            .orElseThrow(() -> new ResourceNotFoundException("PDC", id));
+        String status =
+                pdcDomain.statusOf(id).orElseThrow(() -> new ResourceNotFoundException("PDC", id));
         requireEditable(status, "editar");
         if (c.entries() != null) {
             for (UpsertPdcSubjectCommand.PdcEntryCommand row : c.entries()) {
                 if (row.weekLabel() == null || row.weekLabel().isBlank()) {
-                    throw new ValidationException("Cada fila del plan necesita decir a que semana corresponde");
+                    throw new ValidationException(
+                            "Cada fila del plan necesita decir a que semana corresponde");
                 }
                 if (row.periods() != null && row.periods() < 0) {
-                    throw new ValidationException("Los periodos de una fila no pueden ser negativos");
+                    throw new ValidationException(
+                            "Los periodos de una fila no pueden ser negativos");
                 }
             }
         }
@@ -180,14 +189,13 @@ public class PdcService implements IPdcService {
     @Override
     @Transactional(readOnly = true)
     public Pdc getById(UUID id) {
-        return pdcDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("PDC", id));
+        return pdcDomain.findById(id).orElseThrow(() -> new ResourceNotFoundException("PDC", id));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<Pdc> list(UUID courseId, Integer trimester, String status, UUID teacherId,
-                                PageQuery pageQuery) {
+    public PageResult<Pdc> list(
+            UUID courseId, Integer trimester, String status, UUID teacherId, PageQuery pageQuery) {
         // A draft is a teacher's unfinished month. A listing that spans the school is somebody
         // reading other people's work — the Director, the secretariat — and what they have to see
         // is what was handed in. A teacher's own listing is scoped to them, so their drafts stay.
@@ -201,17 +209,19 @@ public class PdcService implements IPdcService {
         Pdc source = getById(id);
         if (!COPYABLE.contains(source.getStatus())) {
             throw new ConflictException(
-                "Solo se copia un PDC publicado, en revision o aprobado. Actual: " + source.getStatus());
+                    "Solo se copia un PDC publicado, en revision o aprobado. Actual: "
+                            + source.getStatus());
         }
         // A course that already holds that month's plan keeps it: the rotation must not overwrite
         // work a teacher already did on their own copy. Asked once for all the parallels.
         List<UUID> siblings = pdcDomain.siblingCourseIdsOf(source.getCourseId());
-        Set<UUID> alreadyPlanned = siblings.isEmpty()
-            ? Set.of()
-            : pdcDomain.courseIdsWithPlan(siblings, source.getTrimester(), source.getPlanNumber());
-        List<UUID> targets = siblings.stream()
-            .filter(siblingId -> !alreadyPlanned.contains(siblingId))
-            .toList();
+        Set<UUID> alreadyPlanned =
+                siblings.isEmpty()
+                        ? Set.of()
+                        : pdcDomain.courseIdsWithPlan(
+                                siblings, source.getTrimester(), source.getPlanNumber());
+        List<UUID> targets =
+                siblings.stream().filter(siblingId -> !alreadyPlanned.contains(siblingId)).toList();
         return targets.isEmpty() ? List.of() : pdcDomain.copyTo(id, targets, currentUserId);
     }
 
@@ -256,9 +266,14 @@ public class PdcService implements IPdcService {
      * listener runs after this transaction commits, so a change that is refused announces nothing.
      */
     private Pdc announce(Pdc saved) {
-        events.publish(new PdcStatusChanged(
-            saved.getId(), saved.getCreatedById(), saved.getStatus(),
-            saved.getPlanNumber(), saved.getTrimester(), saved.getReviewObservations()));
+        events.publish(
+                new PdcStatusChanged(
+                        saved.getId(),
+                        saved.getCreatedById(),
+                        saved.getStatus(),
+                        saved.getPlanNumber(),
+                        saved.getTrimester(),
+                        saved.getReviewObservations()));
         return saved;
     }
 
@@ -267,13 +282,14 @@ public class PdcService implements IPdcService {
     public void delete(UUID id) {
         Pdc pdc = getById(id);
         if (!PdcStatus.DRAFT.equals(pdc.getStatus())) {
-            throw new ConflictException("Solo se puede eliminar un PDC en Draft. Actual: " + pdc.getStatus());
+            throw new ConflictException(
+                    "Solo se puede eliminar un PDC en Draft. Actual: " + pdc.getStatus());
         }
         // Deleting an original leaves its copies pointing at nothing, and the rotation loses the
         // record of who wrote the month.
         if (pdcDomain.hasCopies(id)) {
             throw new ConflictException(
-                "Este PDC ya fue copiado a los paralelos. Elimina primero las copias.");
+                    "Este PDC ya fue copiado a los paralelos. Elimina primero las copias.");
         }
         // Adaptations need no guard of their own: both of their foreign keys into the plan, the one
         // to the plan and the one V11 added to the subject block, are ON DELETE CASCADE. They go
@@ -287,15 +303,21 @@ public class PdcService implements IPdcService {
 
     private void requireEditable(String status, String action) {
         if (!EDITABLE.contains(status)) {
-            throw new ConflictException("Solo se puede " + action
-                + " en estado Draft o With Observations. Actual: " + status);
+            throw new ConflictException(
+                    "Solo se puede "
+                            + action
+                            + " en estado Draft o With Observations. Actual: "
+                            + status);
         }
     }
 
     private Pdc requireReviewable(Pdc pdc, String action) {
         if (!REVIEWABLE.contains(pdc.getStatus())) {
-            throw new ConflictException("Solo se puede " + action
-                + " un PDC Published o Under Review. Actual: " + pdc.getStatus());
+            throw new ConflictException(
+                    "Solo se puede "
+                            + action
+                            + " un PDC Published o Under Review. Actual: "
+                            + pdc.getStatus());
         }
         return pdc;
     }

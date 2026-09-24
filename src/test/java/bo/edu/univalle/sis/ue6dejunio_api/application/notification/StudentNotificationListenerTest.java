@@ -1,21 +1,5 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.notification;
 
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.NotificationDispatcher;
-import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.StudentNotificationListener;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -23,6 +7,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.NotificationDispatcher;
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.StudentNotificationListener;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class StudentNotificationListenerTest {
@@ -42,7 +41,7 @@ class StudentNotificationListenerTest {
         UUID homeroom = UUID.randomUUID();
         UUID technical = UUID.randomUUID();
         when(notificationDomain.teacherIdsResponsibleForStudent(student))
-            .thenReturn(List.of(homeroom, technical));
+                .thenReturn(List.of(homeroom, technical));
 
         listener.onStudentWithdrawn(withdrawn(student, null));
 
@@ -55,12 +54,12 @@ class StudentNotificationListenerTest {
         UUID student = UUID.randomUUID();
         UUID teacher = UUID.randomUUID();
         when(notificationDomain.teacherIdsResponsibleForStudent(student))
-            .thenReturn(List.of(teacher));
+                .thenReturn(List.of(teacher));
 
         listener.onStudentWithdrawn(withdrawn(student, null));
 
         ArgumentCaptor<SendNotificationCommand> sent =
-            ArgumentCaptor.forClass(SendNotificationCommand.class);
+                ArgumentCaptor.forClass(SendNotificationCommand.class);
         verify(dispatcher).deliver(sent.capture());
         SendNotificationCommand command = sent.getValue();
 
@@ -78,12 +77,12 @@ class StudentNotificationListenerTest {
     void onStudentWithdrawn_carriesTheNoteWhenThereIsOne() {
         UUID student = UUID.randomUUID();
         when(notificationDomain.teacherIdsResponsibleForStudent(student))
-            .thenReturn(List.of(UUID.randomUUID()));
+                .thenReturn(List.of(UUID.randomUUID()));
 
         listener.onStudentWithdrawn(withdrawn(student, "Se mudó a Santa Cruz."));
 
         ArgumentCaptor<SendNotificationCommand> sent =
-            ArgumentCaptor.forClass(SendNotificationCommand.class);
+                ArgumentCaptor.forClass(SendNotificationCommand.class);
         verify(dispatcher).deliver(sent.capture());
         assertThat(sent.getValue().message()).contains("Se mudó a Santa Cruz.");
     }
@@ -107,9 +106,10 @@ class StudentNotificationListenerTest {
     void onStudentWithdrawn_aFailedSendDoesNotStopTheRest() {
         UUID student = UUID.randomUUID();
         when(notificationDomain.teacherIdsResponsibleForStudent(student))
-            .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
+                .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
         doThrow(new RuntimeException("boom"))
-            .when(dispatcher).deliver(any(SendNotificationCommand.class));
+                .when(dispatcher)
+                .deliver(any(SendNotificationCommand.class));
 
         listener.onStudentWithdrawn(withdrawn(student, null));
 

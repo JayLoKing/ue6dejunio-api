@@ -1,10 +1,10 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.student;
 
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
@@ -17,10 +17,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseE
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 public class StudentService implements IStudentService {
@@ -32,10 +31,11 @@ public class StudentService implements IStudentService {
     private final IDomainEventPublisher events;
     private final IAcademicYearDomain academicYearDomain;
 
-    public StudentService(IStudentDomain studentDomain,
-                          ICourseEnrollmentDomain courseEnrollmentDomain,
-                          IDomainEventPublisher events,
-                          IAcademicYearDomain academicYearDomain) {
+    public StudentService(
+            IStudentDomain studentDomain,
+            ICourseEnrollmentDomain courseEnrollmentDomain,
+            IDomainEventPublisher events,
+            IAcademicYearDomain academicYearDomain) {
         this.studentDomain = studentDomain;
         this.courseEnrollmentDomain = courseEnrollmentDomain;
         this.events = events;
@@ -45,14 +45,15 @@ public class StudentService implements IStudentService {
     @Override
     @Transactional(readOnly = true)
     public Student getById(UUID id) {
-        return studentDomain.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Estudiante", id));
+        return studentDomain
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Estudiante", id));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<StudentDirectoryItem> search(StudentDirectoryQuery query,
-                                                   PageQuery pageQuery) {
+    public PageResult<StudentDirectoryItem> search(
+            StudentDirectoryQuery query, PageQuery pageQuery) {
         return studentDomain.searchDirectory(inSomeGestion(query), pageQuery);
     }
 
@@ -86,24 +87,30 @@ public class StudentService implements IStudentService {
         // The open category is the one that has to say what it means. Stored alone it puts the
         // word "Otro" in front of a teacher and answers nothing.
         if (reason.needsItsOwnWords() && note == null) {
-            throw new ValidationException(
-                "Una baja por otro motivo exige decir cual es");
+            throw new ValidationException("Una baja por otro motivo exige decir cual es");
         }
 
-        Student student = studentDomain.findById(command.studentId())
-            .orElseThrow(() -> new ResourceNotFoundException("Estudiante", command.studentId()));
+        Student student =
+                studentDomain
+                        .findById(command.studentId())
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Estudiante", command.studentId()));
         if (STATUS_WITHDRAWN.equals(student.getStatus())) {
             throw new ConflictException("El estudiante ya se encuentra dado de baja");
         }
 
-        studentDomain.updateStatus(command.studentId(), new StudentStatusChange(
-            STATUS_WITHDRAWN, reason.label(), note, command.actorId()));
+        studentDomain.updateStatus(
+                command.studentId(),
+                new StudentStatusChange(STATUS_WITHDRAWN, reason.label(), note, command.actorId()));
         courseEnrollmentDomain.withdrawActiveEnrollments(command.studentId());
 
         // Only the fact leaves here. Which teachers have to hear about it is a question about the
         // school, not about a student record, and it is answered on the notification side.
-        events.publish(new StudentWithdrawn(
-            command.studentId(), student.fullName(), reason.label(), note));
+        events.publish(
+                new StudentWithdrawn(
+                        command.studentId(), student.fullName(), reason.label(), note));
     }
 
     /** Whitespace is not a note. Kept as absent, so nobody is shown an empty line. */

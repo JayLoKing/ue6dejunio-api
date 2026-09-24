@@ -1,10 +1,15 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.error;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ErrorResponse;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.sql.SQLException;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,12 +23,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
-import java.sql.SQLException;
-import java.time.Duration;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-
 class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler("always", "always");
@@ -33,7 +32,7 @@ class GlobalExceptionHandlerTest {
 
     private ch.qos.logback.classic.Logger handlerLogger() {
         return ((LoggerContext) LoggerFactory.getILoggerFactory())
-            .getLogger(GlobalExceptionHandler.class);
+                .getLogger(GlobalExceptionHandler.class);
     }
 
     @BeforeEach
@@ -65,8 +64,8 @@ class GlobalExceptionHandlerTest {
      */
     /** What a unique violation looks like once Hibernate has wrapped it: SQL state 23505. */
     private static DataIntegrityViolationException duplicateThroughJpa() {
-        return new DataIntegrityViolationException("could not execute statement",
-            new SQLException("duplicate key", "23505"));
+        return new DataIntegrityViolationException(
+                "could not execute statement", new SQLException("duplicate key", "23505"));
     }
 
     /**
@@ -82,8 +81,8 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void aRowTheDatabaseRefusesAsDuplicateAnswers409() {
-        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
-            duplicateThroughJpa(), requestTo("/api/adaptations"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleDataIntegrity(duplicateThroughJpa(), requestTo("/api/adaptations"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody()).isNotNull();
@@ -92,8 +91,9 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void aDuplicateTranslatedByJdbcTemplateAnswers409Too() {
-        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
-            duplicateThroughJdbcTemplate(), requestTo("/api/adaptations"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleDataIntegrity(
+                        duplicateThroughJdbcTemplate(), requestTo("/api/adaptations"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
@@ -104,8 +104,9 @@ class GlobalExceptionHandlerTest {
     void aLostRaceIsRecordedWithoutBeingCalledAnOutage() {
         handler.handleDataIntegrity(duplicateThroughJpa(), requestTo("/api/adaptations"));
 
-        assertThat(logged.list).singleElement()
-            .satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
+        assertThat(logged.list)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
     /**
@@ -118,14 +119,17 @@ class GlobalExceptionHandlerTest {
      */
     @Test
     void anIntegrityFailureThatIsNotADuplicateStaysAServerFailure() {
-        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
-            new DataIntegrityViolationException("not-null constraint",
-                new SQLException("null value in column \"names\"", "23502")),
-            requestTo("/api/students"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleDataIntegrity(
+                        new DataIntegrityViolationException(
+                                "not-null constraint",
+                                new SQLException("null value in column \"names\"", "23502")),
+                        requestTo("/api/students"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(logged.list).singleElement()
-            .satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.ERROR));
+        assertThat(logged.list)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.ERROR));
     }
 
     /**
@@ -140,12 +144,17 @@ class GlobalExceptionHandlerTest {
         first.initCause(second);
         second.initCause(first);
 
-        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
-            ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
-                new DataIntegrityViolationException("cycle", first), requestTo("/api/students"));
+        assertTimeoutPreemptively(
+                Duration.ofSeconds(5),
+                () -> {
+                    ResponseEntity<ErrorResponse> response =
+                            handler.handleDataIntegrity(
+                                    new DataIntegrityViolationException("cycle", first),
+                                    requestTo("/api/students"));
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        });
+                    assertThat(response.getStatusCode())
+                            .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+                });
     }
 
     // The duplicate line carries no exception on purpose: Postgres spells a unique violation out
@@ -153,23 +162,29 @@ class GlobalExceptionHandlerTest {
     @Test
     void doesNotWriteTheCollidingValuesIntoTheLog() {
         handler.handleDataIntegrity(
-            new DataIntegrityViolationException("could not execute statement",
-                new SQLException("Key (email)=(ana@example.com) already exists", "23505")),
-            requestTo("/api/users"));
+                new DataIntegrityViolationException(
+                        "could not execute statement",
+                        new SQLException("Key (email)=(ana@example.com) already exists", "23505")),
+                requestTo("/api/users"));
 
-        assertThat(logged.list).singleElement().satisfies(event -> {
-            assertThat(event.getFormattedMessage()).doesNotContain("ana@example.com");
-            assertThat(event.getThrowableProxy()).isNull();
-        });
+        assertThat(logged.list)
+                .singleElement()
+                .satisfies(
+                        event -> {
+                            assertThat(event.getFormattedMessage())
+                                    .doesNotContain("ana@example.com");
+                            assertThat(event.getThrowableProxy()).isNull();
+                        });
     }
 
     // An integrity failure with no SQL state to read is not evidence of a conflict. Guessing 409
     // would hand a server bug back as the caller's problem, which is the failure worth avoiding.
     @Test
     void anIntegrityFailureThatNamesNoSqlStateStaysAServerFailure() {
-        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
-            new DataIntegrityViolationException("something went wrong"),
-            requestTo("/api/students"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleDataIntegrity(
+                        new DataIntegrityViolationException("something went wrong"),
+                        requestTo("/api/students"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -187,11 +202,14 @@ class GlobalExceptionHandlerTest {
     void anUnexpectedFailureIsLoggedWithItsPathAndItsCause() {
         handler.handleGeneric(new IllegalStateException("boom"), requestTo("/api/pdc"));
 
-        assertThat(logged.list).singleElement().satisfies(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
-            assertThat(event.getFormattedMessage()).contains("/api/pdc");
-            assertThat(event.getThrowableProxy()).isNotNull();
-        });
+        assertThat(logged.list)
+                .singleElement()
+                .satisfies(
+                        event -> {
+                            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                            assertThat(event.getFormattedMessage()).contains("/api/pdc");
+                            assertThat(event.getThrowableProxy()).isNotNull();
+                        });
     }
 
     /**
@@ -201,9 +219,11 @@ class GlobalExceptionHandlerTest {
      */
     @Test
     void aRouteWithNoHandlerIsAnsweredNotLogged() {
-        ResponseEntity<ErrorResponse> response = handler.handleGeneric(
-            new NoHandlerFoundException("GET", "/api/does-not-exist", new HttpHeaders()),
-            requestTo("/api/does-not-exist"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleGeneric(
+                        new NoHandlerFoundException(
+                                "GET", "/api/does-not-exist", new HttpHeaders()),
+                        requestTo("/api/does-not-exist"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(logged.list).isEmpty();
@@ -214,27 +234,31 @@ class GlobalExceptionHandlerTest {
      *
      * <p>The branch that trusts Spring's own status covers 404 and 405, but also carries server
      * failures: a request that times out waiting on an async result answers 503. Those are the
-     * server breaking under load, and they used to return through that branch without a line in
-     * the log — the same silence this handler was just taught to break, one branch over.
+     * server breaking under load, and they used to return through that branch without a line in the
+     * log — the same silence this handler was just taught to break, one branch over.
      */
     @Test
     void aServerFailureSpringAlreadyNamedIsLoggedToo() {
-        ResponseEntity<ErrorResponse> response = handler.handleGeneric(
-            new AsyncRequestTimeoutException(), requestTo("/api/pdc"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleGeneric(new AsyncRequestTimeoutException(), requestTo("/api/pdc"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-        assertThat(logged.list).singleElement().satisfies(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
-            assertThat(event.getFormattedMessage()).contains("/api/pdc");
-        });
+        assertThat(logged.list)
+                .singleElement()
+                .satisfies(
+                        event -> {
+                            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                            assertThat(event.getFormattedMessage()).contains("/api/pdc");
+                        });
     }
 
     // The message names the constraint, and a constraint name is a schema detail: it tells the
     // caller nothing they can act on and tells an attacker the shape of the tables.
     @Test
     void doesNotHandTheConstraintNameBackToTheCaller() {
-        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrity(
-            duplicateThroughJdbcTemplate(), requestTo("/api/adaptations"));
+        ResponseEntity<ErrorResponse> response =
+                handler.handleDataIntegrity(
+                        duplicateThroughJdbcTemplate(), requestTo("/api/adaptations"));
 
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message()).doesNotContain("uq_adaptation_plan_student");

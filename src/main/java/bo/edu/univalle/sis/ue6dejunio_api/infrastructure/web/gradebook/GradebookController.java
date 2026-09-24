@@ -14,6 +14,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,14 +26,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
-
 @RestController
 @Validated
 @RequestMapping("/api/gradebook")
-@Tag(name = "Gradebook", description = "Consolidados: resumen estudiante, centralizador, asistencia")
+@Tag(
+        name = "Gradebook",
+        description = "Consolidados: resumen estudiante, centralizador, asistencia")
 @SecurityRequirement(name = "bearerAuth")
 public class GradebookController {
 
@@ -42,109 +43,150 @@ public class GradebookController {
 
     @GetMapping("/student-summary")
     @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
-    @Operation(summary = "Resumen del estudiante: total por materia + promedio general del trimestre")
+    @Operation(
+            summary = "Resumen del estudiante: total por materia + promedio general del trimestre")
     public ResponseEntity<StudentSummaryResponse> studentSummary(
-        @RequestParam("id_course_enrollment") UUID courseEnrollmentId,
-        @RequestParam @Min(1) @Max(3) Integer trimester
-    ) {
-        return ResponseEntity.ok(StudentSummaryResponse.from(
-            gradebookService.studentSummary(courseEnrollmentId, trimester)));
+            @RequestParam("id_course_enrollment") UUID courseEnrollmentId,
+            @RequestParam @Min(1) @Max(3) Integer trimester) {
+        return ResponseEntity.ok(
+                StudentSummaryResponse.from(
+                        gradebookService.studentSummary(courseEnrollmentId, trimester)));
     }
 
     @GetMapping("/centralizer")
     @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
-    @Operation(summary = "Centralizador del curso: todos los estudiantes con totales + promedio general")
+    @Operation(
+            summary =
+                    "Centralizador del curso: todos los estudiantes con totales + promedio general")
     public ResponseEntity<PagedResponse<StudentSummaryResponse>> centralizer(
-        @RequestParam("id_course") UUID courseId,
-        @RequestParam @Min(1) @Max(3) Integer trimester,
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
-    ) {
-        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
-        return ResponseEntity.ok(PagedResponse.of(
-            gradebookService.centralizer(courseId, trimester, p).map(StudentSummaryResponse::from)));
+            @RequestParam("id_course") UUID courseId,
+            @RequestParam @Min(1) @Max(3) Integer trimester,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                PagedResponse.of(
+                        gradebookService
+                                .centralizer(courseId, trimester, p)
+                                .map(StudentSummaryResponse::from)));
     }
 
     @GetMapping("/report-card")
     @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
-    @Operation(summary = "Libreta del estudiante: areas agrupadas por campo de saberes, promedio "
-        + "anual en numeral y literal, y areas aprobadas y reprobadas por trimestre")
+    @Operation(
+            summary =
+                    "Libreta del estudiante: areas agrupadas por campo de saberes, promedio "
+                            + "anual en numeral y literal, y areas aprobadas y reprobadas por trimestre")
     public ResponseEntity<StudentReportCardResponse> reportCard(
-        @RequestParam("id_course_enrollment") UUID courseEnrollmentId
-    ) {
-        return ResponseEntity.ok(StudentReportCardResponse.from(
-            gradebookService.reportCard(courseEnrollmentId)));
+            @RequestParam("id_course_enrollment") UUID courseEnrollmentId) {
+        return ResponseEntity.ok(
+                StudentReportCardResponse.from(gradebookService.reportCard(courseEnrollmentId)));
     }
 
     @GetMapping("/annual-centralizer")
     @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
-    @Operation(summary = "Centralizador anual del curso: por area los tres trimestres y su "
-        + "promedio, mas los promedios trimestrales y el promedio final")
+    @Operation(
+            summary =
+                    "Centralizador anual del curso: por area los tres trimestres y su "
+                            + "promedio, mas los promedios trimestrales y el promedio final")
     public ResponseEntity<PagedResponse<StudentAnnualSummaryResponse>> annualCentralizer(
-        @RequestParam("id_course") UUID courseId,
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
-    ) {
+            @RequestParam("id_course") UUID courseId,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
         // No trimester and no gestión: the course already names its academic year, and the sheet
         // is the whole year by definition.
-        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
-        return ResponseEntity.ok(PagedResponse.of(
-            gradebookService.annualCentralizer(courseId, p).map(StudentAnnualSummaryResponse::from)));
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                PagedResponse.of(
+                        gradebookService
+                                .annualCentralizer(courseId, p)
+                                .map(StudentAnnualSummaryResponse::from)));
     }
 
     @GetMapping("/honor-roll")
     @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
-    @Operation(summary = "Cuadro de honor del curso: los mejores promedios finales, el mejor primero")
+    @Operation(
+            summary = "Cuadro de honor del curso: los mejores promedios finales, el mejor primero")
     public ResponseEntity<List<HonorRollEntryResponse>> honorRoll(
-        @RequestParam("id_course") UUID courseId,
-        @RequestParam(defaultValue = "3") @Min(1) @Max(50) int places
-    ) {
-        return ResponseEntity.ok(gradebookService.honorRoll(courseId, places).stream()
-            .map(HonorRollEntryResponse::from).toList());
+            @RequestParam("id_course") UUID courseId,
+            @RequestParam(defaultValue = "3") @Min(1) @Max(50) int places) {
+        return ResponseEntity.ok(
+                gradebookService.honorRoll(courseId, places).stream()
+                        .map(HonorRollEntryResponse::from)
+                        .toList());
     }
 
     @GetMapping("/honor-roll/institution")
     @PreAuthorize("hasRole('Director')")
-    @Operation(summary = "Cuadro de honor de toda la unidad educativa en una gestion: los mejores "
-        + "promedios finales del colegio, el mejor primero")
+    @Operation(
+            summary =
+                    "Cuadro de honor de toda la unidad educativa en una gestion: los mejores "
+                            + "promedios finales del colegio, el mejor primero")
     public ResponseEntity<List<HonorRollEntryResponse>> institutionHonorRoll(
-        // Required, unlike the course listing: a podium of every gestión at once would rank a
-        // student of one year against a student of another, which the school never does.
-        @RequestParam("id_academic_year") Integer academicYearId,
-        @RequestParam(defaultValue = "10") @Min(1) @Max(50) int places
-    ) {
+            // Required, unlike the course listing: a podium of every gestión at once would rank a
+            // student of one year against a student of another, which the school never does.
+            @RequestParam("id_academic_year") Integer academicYearId,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int places) {
         return ResponseEntity.ok(
-            gradebookService.institutionHonorRoll(academicYearId, places).stream()
-                .map(HonorRollEntryResponse::from).toList());
+                gradebookService.institutionHonorRoll(academicYearId, places).stream()
+                        .map(HonorRollEntryResponse::from)
+                        .toList());
     }
 
     @GetMapping("/attendance")
     @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
     @Operation(summary = "Asistencia diaria del curso. date opcional filtra una fecha")
     public ResponseEntity<PagedResponse<CourseAttendanceResponse>> attendance(
-        @RequestParam("id_course") UUID courseId,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
-    ) {
-        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
-        return ResponseEntity.ok(PagedResponse.of(
-            gradebookService.courseAttendance(courseId, date, p).map(CourseAttendanceResponse::from)));
+            @RequestParam("id_course") UUID courseId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate date,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                PagedResponse.of(
+                        gradebookService
+                                .courseAttendance(courseId, date, p)
+                                .map(CourseAttendanceResponse::from)));
     }
 
     @GetMapping("/attendance/session")
     @PreAuthorize("@authz.canReadClassGroup(authentication, #classGroupId)")
-    @Operation(summary = "Asistencia de una materia. Lista de estudiantes del curso con las "
-        + "sesiones de esa materia. date opcional filtra una fecha")
+    @Operation(
+            summary =
+                    "Asistencia de una materia. Lista de estudiantes del curso con las "
+                            + "sesiones de esa materia. date opcional filtra una fecha")
     public ResponseEntity<PagedResponse<CourseAttendanceResponse>> classGroupAttendance(
-        @RequestParam("id_class_group") UUID classGroupId,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-        @RequestParam(defaultValue = "1") @Min(1) int offset,
-        @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit
-    ) {
-        PageQuery p = PageQuery.of(offset - 1, limit, SortField.asc("student.lastNames"), SortField.asc("student.names"));
-        return ResponseEntity.ok(PagedResponse.of(
-            gradebookService.classGroupAttendance(classGroupId, date, p)
-                .map(CourseAttendanceResponse::from)));
+            @RequestParam("id_class_group") UUID classGroupId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate date,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                PagedResponse.of(
+                        gradebookService
+                                .classGroupAttendance(classGroupId, date, p)
+                                .map(CourseAttendanceResponse::from)));
     }
 }

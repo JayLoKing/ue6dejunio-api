@@ -6,12 +6,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record PlanProgress(
-    UUID id,
-    UUID planId,
-    LocalDate progressDate,
-    String advancedContent,
-    BigDecimal percentage,
-    String observations,
-    UUID createdBy,
-    LocalDateTime createdAt
-) {}
+        UUID id,
+        UUID planId,
+        LocalDate progressDate,
+        String advancedContent,
+        BigDecimal percentage,
+        String observations,
+        UUID createdBy,
+        LocalDateTime createdAt) {}

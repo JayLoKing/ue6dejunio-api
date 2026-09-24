@@ -17,23 +17,23 @@ import org.junit.jupiter.api.Test;
 class InMemoryBucketStoreTest {
 
     private static final Bandwidth TWO_PER_MINUTE =
-        Bandwidth.builder().capacity(2).refillGreedy(2, Duration.ofMinutes(1)).build();
+            Bandwidth.builder().capacity(2).refillGreedy(2, Duration.ofMinutes(1)).build();
 
     @Test
     void exhaustedBucket_refillsAfterWindowElapses_onVirtualClock() {
         AtomicLong virtualNanos = new AtomicLong(0L);
         TimeMeter virtualClock =
-            new TimeMeter() {
-                @Override
-                public long currentTimeNanos() {
-                    return virtualNanos.get();
-                }
+                new TimeMeter() {
+                    @Override
+                    public long currentTimeNanos() {
+                        return virtualNanos.get();
+                    }
 
-                @Override
-                public boolean isWallClockBased() {
-                    return false;
-                }
-            };
+                    @Override
+                    public boolean isWallClockBased() {
+                        return false;
+                    }
+                };
         InMemoryBucketStore store = new InMemoryBucketStore(virtualClock);
         String key = "login:1.2.3.4:user@example.com";
 

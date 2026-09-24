@@ -4,14 +4,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notificatio
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
+import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Turns a student leaving into the teachers who need to hear about it.
@@ -31,8 +30,8 @@ public class StudentNotificationListener {
     private final NotificationDispatcher dispatcher;
     private final INotificationDomain notificationDomain;
 
-    public StudentNotificationListener(NotificationDispatcher dispatcher,
-                                       INotificationDomain notificationDomain) {
+    public StudentNotificationListener(
+            NotificationDispatcher dispatcher, INotificationDomain notificationDomain) {
         this.dispatcher = dispatcher;
         this.notificationDomain = notificationDomain;
     }
@@ -51,8 +50,9 @@ public class StudentNotificationListener {
         List<UUID> teachers = notificationDomain.teacherIdsResponsibleForStudent(event.studentId());
         if (teachers.isEmpty()) {
             // A student nobody was teaching. Worth knowing, not worth an error.
-            log.info("The student {} was withdrawn and no active teacher answered for them",
-                event.studentId());
+            log.info(
+                    "The student {} was withdrawn and no active teacher answered for them",
+                    event.studentId());
             return;
         }
         String message = messageFor(event);
@@ -66,8 +66,9 @@ public class StudentNotificationListener {
      * in their words. Everything the notice is for, without opening anything.
      */
     private static String messageFor(StudentWithdrawn event) {
-        String base = "%s fue dado de baja de tu curso. Motivo: %s."
-            .formatted(event.studentName(), event.reason());
+        String base =
+                "%s fue dado de baja de tu curso. Motivo: %s."
+                        .formatted(event.studentName(), event.reason());
         return event.note() == null ? base : base + " " + event.note();
     }
 
@@ -82,12 +83,21 @@ public class StudentNotificationListener {
         try {
             // No sender: the withdrawal wrote this, and putting a name on it would credit a person
             // for a line nobody typed.
-            dispatcher.deliver(new SendNotificationCommand(
-                null, teacher, NotificationType.STUDENT_WITHDRAWN, null, message,
-                STUDENT_RESOURCE, event.studentId()));
+            dispatcher.deliver(
+                    new SendNotificationCommand(
+                            null,
+                            teacher,
+                            NotificationType.STUDENT_WITHDRAWN,
+                            null,
+                            message,
+                            STUDENT_RESOURCE,
+                            event.studentId()));
         } catch (RuntimeException ex) {
-            log.error("The student {} was withdrawn and {} could not be told",
-                event.studentId(), teacher, ex);
+            log.error(
+                    "The student {} was withdrawn and {} could not be told",
+                    event.studentId(),
+                    teacher,
+                    ex);
         }
     }
 }

@@ -14,9 +14,9 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
- * Pure unit tests for {@link RateLimitingFilter}: no Spring context, no DB, no Docker — drives
- * the filter directly with {@link MockHttpServletRequest}/{@link MockHttpServletResponse}. Covers
- * the spec's throttling, enumeration-safety, filter-ordering, and fail-safe requirements.
+ * Pure unit tests for {@link RateLimitingFilter}: no Spring context, no DB, no Docker — drives the
+ * filter directly with {@link MockHttpServletRequest}/{@link MockHttpServletResponse}. Covers the
+ * spec's throttling, enumeration-safety, filter-ordering, and fail-safe requirements.
  */
 class RateLimitingFilterTest {
 
@@ -50,18 +50,18 @@ class RateLimitingFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
         request.setContentType(MediaType.APPLICATION_JSON_VALUE);
         request.setContent(
-            ("{\"email\":\"" + email + "\",\"password\":\"secret123\"}")
-                .getBytes(StandardCharsets.UTF_8));
+                ("{\"email\":\"" + email + "\",\"password\":\"secret123\"}")
+                        .getBytes(StandardCharsets.UTF_8));
         return request;
     }
 
     private static MockHttpServletRequest changePasswordRequest(String subject) {
         MockHttpServletRequest request =
-            new MockHttpServletRequest("POST", "/api/auth/change-password");
+                new MockHttpServletRequest("POST", "/api/auth/change-password");
         request.setContentType(MediaType.APPLICATION_JSON_VALUE);
         request.setContent(
-            "{\"currentPassword\":\"old12345\",\"newPassword\":\"new12345\"}"
-                .getBytes(StandardCharsets.UTF_8));
+                "{\"currentPassword\":\"old12345\",\"newPassword\":\"new12345\"}"
+                        .getBytes(StandardCharsets.UTF_8));
         request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + fakeJwt(subject));
         return request;
     }
@@ -69,10 +69,11 @@ class RateLimitingFilterTest {
     /** Builds a syntactically valid (but unsigned) JWT — the filter never verifies signatures. */
     private static String fakeJwt(String subject) {
         Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
-        String header = encoder.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
+        String header =
+                encoder.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
         String payload =
-            encoder.encodeToString(
-                ("{\"sub\":\"" + subject + "\"}").getBytes(StandardCharsets.UTF_8));
+                encoder.encodeToString(
+                        ("{\"sub\":\"" + subject + "\"}").getBytes(StandardCharsets.UTF_8));
         return header + "." + payload + ".";
     }
 
@@ -109,22 +110,27 @@ class RateLimitingFilterTest {
 
         // Exhaust the key for the existing email.
         for (int i = 0; i < 5; i++) {
-            filter.doFilter(loginRequest("existing@example.com"), new MockHttpServletResponse(), chain);
+            filter.doFilter(
+                    loginRequest("existing@example.com"), new MockHttpServletResponse(), chain);
         }
         MockHttpServletResponse existingResponse = new MockHttpServletResponse();
         filter.doFilter(loginRequest("existing@example.com"), existingResponse, chain);
 
         // A brand-new key for a non-existing email, exhausted the same way.
         for (int i = 0; i < 5; i++) {
-            filter.doFilter(loginRequest("nonexisting@example.com"), new MockHttpServletResponse(), chain);
+            filter.doFilter(
+                    loginRequest("nonexisting@example.com"), new MockHttpServletResponse(), chain);
         }
         MockHttpServletResponse nonExistingResponse = new MockHttpServletResponse();
         filter.doFilter(loginRequest("nonexisting@example.com"), nonExistingResponse, chain);
 
-        assertThat(existingResponse.getStatus()).isEqualTo(nonExistingResponse.getStatus()).isEqualTo(429);
+        assertThat(existingResponse.getStatus())
+                .isEqualTo(nonExistingResponse.getStatus())
+                .isEqualTo(429);
         assertThat(existingResponse.getContentAsString())
-            .isEqualTo(nonExistingResponse.getContentAsString());
-        assertThat(existingResponse.getContentType()).isEqualTo(nonExistingResponse.getContentType());
+                .isEqualTo(nonExistingResponse.getContentAsString());
+        assertThat(existingResponse.getContentType())
+                .isEqualTo(nonExistingResponse.getContentType());
     }
 
     @Test
@@ -158,15 +164,15 @@ class RateLimitingFilterTest {
 
         for (int i = 0; i < 2; i++) {
             filter.doFilter(
-                changePasswordRequest("11111111-1111-1111-1111-111111111111"),
-                new MockHttpServletResponse(),
-                chain);
+                    changePasswordRequest("11111111-1111-1111-1111-111111111111"),
+                    new MockHttpServletResponse(),
+                    chain);
         }
         MockHttpServletResponse thirdResponse = new MockHttpServletResponse();
         filter.doFilter(
-            changePasswordRequest("11111111-1111-1111-1111-111111111111"),
-            thirdResponse,
-            chain);
+                changePasswordRequest("11111111-1111-1111-1111-111111111111"),
+                thirdResponse,
+                chain);
 
         assertThat(thirdResponse.getStatus()).isEqualTo(429);
         assertThat(thirdResponse.getHeader(HttpHeaders.RETRY_AFTER)).isNotNull();
@@ -175,9 +181,9 @@ class RateLimitingFilterTest {
     @Test
     void ipResolverThrows_filterFailsSafe_doesNotCrashRequest() throws Exception {
         ClientIpResolver throwingResolver =
-            request -> {
-                throw new IllegalStateException("boom");
-            };
+                request -> {
+                    throw new IllegalStateException("boom");
+                };
         RateLimitingFilter filter = filter(throwingResolver);
         AtomicInteger downstreamInvocations = new AtomicInteger();
         FilterChain chain = countingChain(downstreamInvocations);
@@ -195,11 +201,11 @@ class RateLimitingFilterTest {
         AtomicInteger downstreamInvocations = new AtomicInteger();
         String[] capturedBody = new String[1];
         FilterChain chain =
-            (req, res) -> {
-                downstreamInvocations.incrementAndGet();
-                capturedBody[0] =
-                    new String(req.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            };
+                (req, res) -> {
+                    downstreamInvocations.incrementAndGet();
+                    capturedBody[0] =
+                            new String(req.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                };
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         filter.doFilter(loginRequest("director@ue6.bo"), response, chain);

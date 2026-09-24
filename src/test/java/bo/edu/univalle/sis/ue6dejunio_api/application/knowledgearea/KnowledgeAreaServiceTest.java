@@ -1,5 +1,12 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.knowledgearea;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.knowledgearea.KnowledgeAreaService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
@@ -8,21 +15,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.knowledgearea.CreateKnow
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.knowledgearea.KnowledgeArea;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.knowledgearea.UpdateKnowledgeAreaCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.knowledgearea.IKnowledgeAreaDomain;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * The areas of knowledge the curriculum groups subjects under.
@@ -76,7 +75,7 @@ class KnowledgeAreaServiceTest {
         when(areaDomain.save(any())).thenAnswer(i -> i.getArgument(0));
 
         assertThat(service.create(new CreateKnowledgeAreaCommand(NAME, null)).displayOrder())
-            .isEqualTo(1);
+                .isEqualTo(1);
     }
 
     @Test
@@ -84,7 +83,7 @@ class KnowledgeAreaServiceTest {
         when(areaDomain.existsByName(NAME)).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(new CreateKnowledgeAreaCommand(NAME, 1)))
-            .isInstanceOf(DuplicateResourceException.class);
+                .isInstanceOf(DuplicateResourceException.class);
         verify(areaDomain, never()).save(any());
     }
 
@@ -119,9 +118,12 @@ class KnowledgeAreaServiceTest {
         when(areaDomain.findById(1)).thenReturn(Optional.of(area(1, NAME, 1)));
         when(areaDomain.existsByName("Comunidad y Sociedad")).thenReturn(true);
 
-        assertThatThrownBy(() ->
-            service.update(1, new UpdateKnowledgeAreaCommand("Comunidad y Sociedad", 1)))
-            .isInstanceOf(DuplicateResourceException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.update(
+                                        1,
+                                        new UpdateKnowledgeAreaCommand("Comunidad y Sociedad", 1)))
+                .isInstanceOf(DuplicateResourceException.class);
         verify(areaDomain, never()).save(any());
     }
 
@@ -143,7 +145,7 @@ class KnowledgeAreaServiceTest {
         when(areaDomain.findById(9)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(9, new UpdateKnowledgeAreaCommand(NAME, 1)))
-            .isInstanceOf(ResourceNotFoundException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     /**
@@ -156,8 +158,7 @@ class KnowledgeAreaServiceTest {
         when(areaDomain.findById(1)).thenReturn(Optional.of(area(1, NAME, 1)));
         when(areaDomain.hasSubjects(1)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.delete(1))
-            .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.delete(1)).isInstanceOf(ConflictException.class);
         verify(areaDomain, never()).deleteById(any());
     }
 
@@ -175,7 +176,6 @@ class KnowledgeAreaServiceTest {
     void delete_unknownArea_notFound() {
         when(areaDomain.findById(9)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(9))
-            .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.delete(9)).isInstanceOf(ResourceNotFoundException.class);
     }
 }
