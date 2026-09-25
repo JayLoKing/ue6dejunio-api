@@ -64,6 +64,28 @@ class InstitutionIT extends AbstractIntegrationTest {
         assertThat(heading.educationLevel()).isNotBlank();
     }
 
+    /**
+     * The accents survive the properties file.
+     *
+     * <p>{@code .properties} are read as ISO-8859-1, one byte per character, while the file itself
+     * is saved as UTF-8 — so a literal {@code ó} written there arrives as the two characters its
+     * UTF-8 bytes spell in Latin-1, and the informe pedagógico printed "EducaciÃ³n Primaria" on the
+     * school's official form. The values that carry an accent are therefore written as Unicode
+     * escapes, which the loader decodes the same way whatever charset it read the file with.
+     *
+     * <p>Asserting the mojibake is absent and not only that the accent is present: a value
+     * half-corrupted would still contain the letter somewhere.
+     */
+    @Test
+    void keepsTheAccentsInTheFieldsThatCarryThem() {
+        Institution heading = institutionService.current();
+
+        assertThat(heading.educationLevel()).isEqualTo("Educación Primaria Comunitaria Vocacional");
+        assertThat(heading.shift()).isEqualTo("Mañana");
+        assertThat(heading.educationLevel()).doesNotContain("Ã");
+        assertThat(heading.shift()).doesNotContain("Ã");
+    }
+
     private String fullNameOf(UUID userId) {
         return jdbc.queryForObject(
                 "SELECT names || ' ' || last_names FROM users WHERE id_user = ?",
