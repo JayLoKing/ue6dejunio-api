@@ -372,6 +372,12 @@ public class AuthorizationComponent {
      * Who may read a course's roster. Wider than {@link #canReadCourse} on purpose: that one is
      * homeroom-only, and a technical teacher has no homeroom — gating the roster on it would cut
      * them off from the very students they take attendance for.
+     *
+     * <p>The attendance meant here is the <em>session</em> kind, one row per class group, which is
+     * what a technical teacher fills in for their own subject. The daily kind (a null class group,
+     * standing for the student's whole school day) stays homeroom-only in {@link
+     * #canWriteDailyAttendance}. Two write paths, not one widened rule — so this predicate does not
+     * contradict that one.
      */
     public boolean canReadCourseRoster(Authentication authentication, UUID courseId) {
         if (authentication == null || courseId == null) {
