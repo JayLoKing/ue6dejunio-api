@@ -32,7 +32,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomai
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain.UpsertResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService.RunSummary;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -67,6 +70,14 @@ class RiskPredictionServiceTest {
 
     private RiskPredictionService service;
 
+    /**
+     * Deliberately an instant on which UTC and the school disagree about the date: 01:30 UTC on the
+     * tenth is 21:30 on the ninth in La Paz. A boundary computed on the machine's zone and one
+     * computed on the school's fall on different days here, which is the whole point.
+     */
+    private static final Clock SCHOOL_CLOCK =
+            Clock.fixed(Instant.parse("2026-04-10T01:30:00Z"), ZoneId.of("America/La_Paz"));
+
     private static final int TRIMESTER = 1;
     private static final int YEAR = 2026;
 
@@ -85,7 +96,8 @@ class RiskPredictionServiceTest {
                         predictionDomain,
                         notifications,
                         classGroupDomain,
-                        courseService);
+                        courseService,
+                        SCHOOL_CLOCK);
     }
 
     // ---------------------------------------------------------------- fixtures
@@ -252,6 +264,11 @@ class RiskPredictionServiceTest {
      * The column is {@code NOT NULL} and its default only applies when the column is left out of
      * the statement — which JPA never does. A null here is not a timestamp the database fills in
      * later, it is a write that fails.
+     *
+     * <p>And it carries the school's wall clock, for the same reason {@code marked_at} does. Read
+     * off the machine instead, {@code predicted_at} and {@code last_notified_at} sit in one row on
+     * two different clocks, four hours apart in a container running UTC, with nothing in either
+     * column recording which one wrote it.
      */
     @Test
     void predictClassGroup_stampsEveryRowWithWhenTheRunHappened() {
@@ -273,7 +290,10 @@ class RiskPredictionServiceTest {
         service.predictClassGroup(mathGroup, TRIMESTER);
 
         assertThat(captureWrite())
-                .allSatisfy(prediction -> assertThat(prediction.predictedAt()).isNotNull());
+                .allSatisfy(
+                        prediction ->
+                                assertThat(prediction.predictedAt())
+                                        .isEqualTo(LocalDateTime.of(2026, 4, 9, 21, 30)));
     }
 
     /**
@@ -413,6 +433,42 @@ class RiskPredictionServiceTest {
         // about — so nothing is claimed, and no row is stamped as having spoken today.
         verify(predictionDomain, never()).claimForNotification(anyCollection(), any(), any());
         verifyNoInteractions(notifications);
+    }
+
+    /**
+     * Whose midnight the "once a day" bound is measured from.
+     *
+     * <p>It has to be the school's, and the school is in La Paz. Read off the machine's default
+     * zone instead, a container running in UTC rolls the day over at 20:00 local — so a teacher
+     * already written to about a student that evening is written to again about the same student,
+     * on the same evening, which is precisely what the daily bound exists to stop. The rest of this
+     * application already takes the La Paz {@link Clock} as a bean; this run has to take the same
+     * one, or the bound it enforces is not the one anybody agreed to.
+     */
+    @Test
+    void predictClassGroup_boundsTheDailyClaimOnTheSchoolsMidnightAndNotTheMachines() {
+        givenMarks(completeMarks(ana, mathGroup), mathGroup);
+        when(modelClient.predictBatch(anyList()))
+                .thenReturn(
+                        List.of(
+                                new RiskScore(
+                                        RiskLevel.RIESGO_CRITICO,
+                                        new BigDecimal("0.81"),
+                                        new BigDecimal("0.00"))));
+        RiskPrediction row = stored(ana, mathGroup, RiskLevel.RIESGO_CRITICO);
+        when(predictionDomain.upsertAll(anyList()))
+                .thenReturn(List.of(new UpsertResult(row, RiskLevel.EN_RIESGO)));
+        when(predictionDomain.claimForNotification(anyCollection(), any(), any()))
+                .thenReturn(Set.of());
+
+        service.predictClassGroup(mathGroup, TRIMESTER);
+
+        ArgumentCaptor<LocalDateTime> stampedAt = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> notBefore = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(predictionDomain)
+                .claimForNotification(anyCollection(), stampedAt.capture(), notBefore.capture());
+        assertThat(stampedAt.getValue()).isEqualTo(LocalDateTime.of(2026, 4, 9, 21, 30));
+        assertThat(notBefore.getValue()).isEqualTo(LocalDateTime.of(2026, 4, 9, 0, 0));
     }
 
     @Test

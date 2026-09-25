@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseStudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskAssessed;
@@ -21,6 +22,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain.UpsertResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -62,19 +64,27 @@ public class RiskPredictionService implements IRiskPredictionService {
     private final IClassGroupDomain classGroupDomain;
     private final ICourseService courseService;
 
+    /**
+     * The school's clock, in La Paz. Taken as a bean and not read off the machine, because the
+     * daily notification bound is a date, and a date is only a fact once somebody says whose.
+     */
+    private final Clock clock;
+
     public RiskPredictionService(
             IRiskFeatureDomain featureDomain,
             IRiskModelClient modelClient,
             IRiskPredictionDomain predictionDomain,
             INotificationService notifications,
             IClassGroupDomain classGroupDomain,
-            ICourseService courseService) {
+            ICourseService courseService,
+            Clock clock) {
         this.featureDomain = featureDomain;
         this.modelClient = modelClient;
         this.predictionDomain = predictionDomain;
         this.notifications = notifications;
         this.classGroupDomain = classGroupDomain;
         this.courseService = courseService;
+        this.clock = clock;
     }
 
     @Override
@@ -116,19 +126,57 @@ public class RiskPredictionService implements IRiskPredictionService {
          * The worst of each course first, then the worst of those. Taking `places` from a course
          * before merging is exact and not an approximation: a student who is eleventh in their own
          * classroom already has ten worse children ahead of them there, so they cannot be in the
-         * school's worst ten on that row. It is also what keeps this bounded — the whole school
-         * never lands in memory at once, only a few rows per course.
+         * school's worst ten on that row.
+         *
+         * What that ranking does NOT do any more is bound the reading. It used to: one query per
+         * course meant only a few rows per classroom were ever held. Now the gestión is read in a
+         * single query and every prediction in it is materialized before the first `places` is
+         * taken, which is the trade — one round trip instead of one per classroom, paid for with a
+         * working set that grows with the school rather than with `places`. Worst case here is
+         * students × subjects for one gestión, a few thousand rows for a school this size, and the
+         * Director is the only reader. If this school ever stops being one building, the honest
+         * fix is a window function that takes the per-course top `places` in SQL, not a return to
+         * a query per classroom.
          *
          * The collapse to one row per student then runs twice, and the second pass is not
          * redundant. `course_enrollments` is unique on student and course, not on student and
          * gestión: a child moved between parallels mid-year keeps an enrolment in both, and the
          * predictions filed against their old classroom do not disappear with the move.
+         *
+         * `places` needs no guard here: the only caller is the endpoint, and it declares
+         * @Min(1) @Max(50) on the parameter, so a value that would break `limit` never arrives.
          */
+        List<Course> courses = courseService.allOfYear(academicYearId);
+        if (courses.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, List<StudentRisk>> byCourse = risksByCourse(academicYearId, trimester);
         List<InstitutionRiskEntry> worst = new ArrayList<>();
-        for (Course course : courseService.allOfYear(academicYearId)) {
-            worst.addAll(worstOf(course, trimester, places));
+        for (Course course : courses) {
+            worst.addAll(worstOf(course, byCourse.getOrDefault(course.id(), List.of()), places));
         }
         return ranked(collapsedByStudent(worst), places);
+    }
+
+    /**
+     * Every prediction of the gestión, grouped by the classroom it was filed against.
+     *
+     * <p>One query for the building. Reading it a course at a time cost a round trip per classroom
+     * inside a single request, and a school of thirty courses paid thirty of them to answer a list
+     * of ten. What is *not* collapsed is the ranking above: the worst {@code places} are still
+     * taken per course before merging, because that is what makes the list exact rather than an
+     * approximation.
+     *
+     * <p>The cost of that is stated where the ranking is: everything the gestión holds is in this
+     * map before any of it is trimmed.
+     */
+    private Map<UUID, List<StudentRisk>> risksByCourse(Integer academicYearId, int trimester) {
+        Map<UUID, List<StudentRisk>> byCourse = new LinkedHashMap<>();
+        for (CourseStudentRisk row :
+                predictionDomain.byAcademicYearAndTrimester(academicYearId, trimester)) {
+            byCourse.computeIfAbsent(row.courseId(), courseId -> new ArrayList<>()).add(row.risk());
+        }
+        return byCourse;
     }
 
     /** One row per student, keeping the worst of whatever rows they hold. */
@@ -141,10 +189,11 @@ public class RiskPredictionService implements IRiskPredictionService {
         return List.copyOf(byStudent.values());
     }
 
-    /** One course's worst students, one row each, read from every subject of the course. */
-    private List<InstitutionRiskEntry> worstOf(Course course, int trimester, int places) {
+    /** One course's worst students, one row each, out of every subject of the course. */
+    private static List<InstitutionRiskEntry> worstOf(
+            Course course, List<StudentRisk> risks, int places) {
         List<InstitutionRiskEntry> rows = new ArrayList<>();
-        for (StudentRisk risk : predictionDomain.byCourseAndTrimester(course.id(), trimester)) {
+        for (StudentRisk risk : risks) {
             // A prediction the model never scored cannot be placed against ones it did. Sorting it
             // as a zero would say the model looked at the child and found them safe.
             if (risk.prediction().pFail() == null) {
@@ -299,7 +348,7 @@ public class RiskPredictionService implements IRiskPredictionService {
 
         // One clock reading for the whole run: every row of a sweep is the same statement about the
         // same moment, and staggering them by microseconds would invite a reader to sort by it.
-        LocalDateTime predictedAt = LocalDateTime.now();
+        LocalDateTime predictedAt = LocalDateTime.now(clock);
 
         List<NewRiskPrediction> predictions = new ArrayList<>(vectors.size());
         for (int i = 0; i < vectors.size(); i++) {
@@ -367,7 +416,7 @@ public class RiskPredictionService implements IRiskPredictionService {
          * Claiming and filtering in one call, not "ask then record": two runs that both asked
          * before either recorded would both announce, which is the duplicate this is preventing.
          */
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         Set<UUID> announceable =
                 predictionDomain.claimForNotification(
                         demanding.stream().map(RiskAssessed::predictionId).toList(),

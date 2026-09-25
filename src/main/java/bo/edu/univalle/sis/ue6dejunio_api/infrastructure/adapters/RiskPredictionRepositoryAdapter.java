@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseStudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
@@ -168,6 +169,25 @@ public class RiskPredictionRepositoryAdapter implements IRiskPredictionDomain {
     @Transactional(readOnly = true)
     public List<StudentRisk> byCourseAndTrimester(UUID courseId, int trimester) {
         return toViews(repository.findByCourseWithNames(courseId, trimester));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseStudentRisk> byAcademicYearAndTrimester(
+            Integer academicYearId, int trimester) {
+        List<Object[]> rows = repository.findByAcademicYearWithNames(academicYearId, trimester);
+        List<CourseStudentRisk> views = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            views.add(
+                    new CourseStudentRisk(
+                            (UUID) row[0],
+                            new StudentRisk(
+                                    toDomain((RiskPredictionEntity) row[1]),
+                                    (String) row[2],
+                                    (String) row[3],
+                                    (String) row[4])));
+        }
+        return views;
     }
 
     @Override

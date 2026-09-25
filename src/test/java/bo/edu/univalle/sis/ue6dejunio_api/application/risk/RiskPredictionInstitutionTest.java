@@ -2,12 +2,17 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.risk;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskPredictionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseStudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
@@ -19,7 +24,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionDomain;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +69,11 @@ class RiskPredictionInstitutionTest {
     private UUID quintoId;
     private UUID sextoId;
 
+    /**
+     * Every risk the gestión holds, as the single read returns them. Filled by {@link #risksOf}.
+     */
+    private final List<CourseStudentRisk> gestionRisks = new ArrayList<>();
+
     @BeforeEach
     void buildService() {
         service =
@@ -71,7 +83,8 @@ class RiskPredictionInstitutionTest {
                         predictionDomain,
                         notifications,
                         classGroupDomain,
-                        courseService);
+                        courseService,
+                        Clock.systemDefaultZone());
         quintoId = UUID.randomUUID();
         sextoId = UUID.randomUUID();
     }
@@ -301,15 +314,71 @@ class RiskPredictionInstitutionTest {
         assertThat(service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 10)).isEmpty();
     }
 
+    /**
+     * The whole gestión is read once, not once per classroom. A school of thirty courses cost
+     * thirty round trips to answer a list of ten, and every one of them ran inside the Director's
+     * request.
+     *
+     * <p>What the fix must not do is fetch everything and trim afterwards: the list is still
+     * assembled a course at a time, because taking {@code places} per classroom before merging is
+     * what makes it exact. Only the reading collapsed.
+     */
+    @Test
+    void institutionRisk_readsTheWholeGestionInOneQuery() {
+        coursesOfTheYear(course(quintoId, "Quinto", "B"), course(sextoId, "Sexto", "A"));
+        risksOf(quintoId, risk("Ana", "Alvarez", "Matematicas", "0.70", RiskLevel.RIESGO_CRITICO));
+        risksOf(sextoId, risk("Carla", "Cruz", "Fisica", "0.95", RiskLevel.RIESGO_CRITICO));
+
+        service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 10);
+
+        verify(predictionDomain, times(1)).byAcademicYearAndTrimester(ACADEMIC_YEAR_ID, TRIMESTER);
+        verify(predictionDomain, never()).byCourseAndTrimester(any(), anyInt());
+    }
+
+    /**
+     * A gestión with no courses has nobody to rank, and asking the database for its predictions
+     * first is a query whose answer is discarded whatever it says.
+     */
+    @Test
+    void institutionRisk_asksForNoPredictionsWhenTheYearHasNoCourses() {
+        when(courseService.allOfYear(ACADEMIC_YEAR_ID)).thenReturn(List.of());
+
+        service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 10);
+
+        verify(predictionDomain, never()).byAcademicYearAndTrimester(any(), anyInt());
+    }
+
+    /**
+     * A course of the gestión that holds no prediction at all is simply not in the grouped rows.
+     * Reading it as a missing key rather than an empty list would throw on the classroom where
+     * nothing has been predicted yet — which is every classroom, before the first sweep.
+     */
+    @Test
+    void institutionRisk_survivesACourseWithNoPredictions() {
+        coursesOfTheYear(course(quintoId, "Quinto", "B"), course(sextoId, "Sexto", "A"));
+        risksOf(quintoId, risk("Ana", "Alvarez", "Matematicas", "0.70", RiskLevel.RIESGO_CRITICO));
+
+        List<InstitutionRiskEntry> worst = service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 10);
+
+        assertThat(worst).extracting(InstitutionRiskEntry::fullName).containsExactly("Alvarez Ana");
+    }
+
     // ---------------------------------------------------------------- fixtures
 
     private void coursesOfTheYear(Course... courses) {
         when(courseService.allOfYear(ACADEMIC_YEAR_ID)).thenReturn(List.of(courses));
     }
 
+    /**
+     * Accumulates across calls and restubs the single read, so a test still declares its risks one
+     * classroom at a time while the service reads them all at once.
+     */
     private void risksOf(UUID courseId, StudentRisk... risks) {
-        when(predictionDomain.byCourseAndTrimester(eq(courseId), eq(TRIMESTER)))
-                .thenReturn(List.of(risks));
+        for (StudentRisk risk : risks) {
+            gestionRisks.add(new CourseStudentRisk(courseId, risk));
+        }
+        when(predictionDomain.byAcademicYearAndTrimester(ACADEMIC_YEAR_ID, TRIMESTER))
+                .thenReturn(List.copyOf(gestionRisks));
     }
 
     private static StudentRisk risk(

@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseStudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
@@ -68,6 +69,16 @@ public interface IRiskPredictionDomain {
 
     /** Everyone predicted in any subject of a course this trimester, worst first. */
     List<StudentRisk> byCourseAndTrimester(UUID courseId, int trimester);
+
+    /**
+     * Everyone predicted in any subject of any course of one gestión this trimester, each row
+     * saying which course it belongs to.
+     *
+     * <p>One query for the whole building rather than {@link #byCourseAndTrimester} per classroom.
+     * The school-wide list is still assembled a course at a time — that is what keeps it exact —
+     * but assembling it should not cost a round trip per classroom.
+     */
+    List<CourseStudentRisk> byAcademicYearAndTrimester(Integer academicYearId, int trimester);
 
     /** Every standing prediction for one student, worst first. */
     List<StudentRisk> byStudent(UUID studentId);

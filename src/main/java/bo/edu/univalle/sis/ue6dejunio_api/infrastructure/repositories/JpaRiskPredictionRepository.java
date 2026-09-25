@@ -83,6 +83,30 @@ public interface JpaRiskPredictionRepository extends JpaRepository<RiskPredictio
             @Param("courseId") UUID courseId, @Param("trimester") Integer trimester);
 
     /**
+     * Every course of one gestión at once, each row leading with the course it belongs to.
+     *
+     * <p>Same projection and same ordering as {@link #findByCourseWithNames}, so the rows of any
+     * one course arrive exactly as that query would have returned them. The caller groups them by
+     * the leading column instead of running this query once per classroom.
+     */
+    @Query(
+            """
+        SELECT g.course.id, p, s.names, s.lastNames, g.subject.name
+        FROM RiskPredictionEntity p, StudentEntity s, ClassGroupEntity g
+        WHERE s.id = p.studentId AND g.id = p.classGroupId
+          AND g.course.academicYear.id = :academicYearId AND p.trimester = :trimester
+        ORDER BY CASE p.riskLevel
+                     WHEN 'RiesgoCritico' THEN 0
+                     WHEN 'EnRiesgo' THEN 1
+                     WHEN 'SinRiesgo' THEN 2
+                     ELSE 3
+                 END,
+                 s.lastNames, s.names, g.subject.name
+        """)
+    List<Object[]> findByAcademicYearWithNames(
+            @Param("academicYearId") Integer academicYearId, @Param("trimester") Integer trimester);
+
+    /**
      * Stamps every one of these predictions that has not been announced since {@code notBefore}.
      *
      * <p>The write comes first and the read of what was written comes second, which is the whole of

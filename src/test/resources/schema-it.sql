@@ -269,7 +269,10 @@ CREATE TABLE IF NOT EXISTS risk_prediction_queue (
     id_class_group uuid NOT NULL REFERENCES class_groups(id_class_group) ON DELETE CASCADE,
     trimester integer NOT NULL CHECK (trimester BETWEEN 1 AND 3),
     -- clock_timestamp(), not CURRENT_TIMESTAMP: the latter is the transaction's start time.
-    marked_at timestamp NOT NULL DEFAULT clock_timestamp(),
+    -- AT TIME ZONE, not a bare cast: the cast would render it in the session's TimeZone, which
+    -- pgjdbc sets from the JVM's. Mirrors V21.
+    marked_at timestamp NOT NULL
+        DEFAULT (clock_timestamp() AT TIME ZONE 'America/La_Paz'),
     PRIMARY KEY (id_class_group, trimester)
 );
 
@@ -320,6 +323,10 @@ CREATE TABLE IF NOT EXISTS pedagogical_report_failures (
     updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_pedagogical_report_failure UNIQUE (id_pedagogical_report, id_course_enrollment)
 );
+-- The UNIQUE above leads with the report, so it cannot serve a lookup by enrollment alone -- which
+-- is what the ON DELETE CASCADE from course_enrollments performs. Mirrors V20.
+CREATE INDEX IF NOT EXISTS ix_pedagogical_report_failure_enrollment
+    ON pedagogical_report_failures (id_course_enrollment);
 
 -- The catalog seed runs once per Spring context, and more than one context is created against the
 -- same shared container (ProdProfileHardeningIT activates a second profile). Every statement here

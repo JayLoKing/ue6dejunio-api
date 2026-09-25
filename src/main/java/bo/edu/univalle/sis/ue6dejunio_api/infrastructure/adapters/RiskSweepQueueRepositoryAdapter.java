@@ -21,11 +21,18 @@ import org.springframework.transaction.annotation.Transactional;
  * The resolving these statements do (which subjects a course has, which trimester a date falls in)
  * is a question about rows, and the database answers it in the same statement that inserts.
  *
- * <p>Every mark ends in {@code ON CONFLICT ... DO UPDATE SET marked_at = clock_timestamp()}, never
- * {@code DO NOTHING}. The primary key is the coalescing — the second save of a subject adds no
- * second row — but the instant on that row still has to move, because it is what the sweep clears
- * against. Left at the first save's instant, a change arriving while the model was answering would
- * be deleted by a clear bounded on a later one, having never been predicted.
+ * <p>Every mark ends in {@code ON CONFLICT ... DO UPDATE SET marked_at}, never {@code DO NOTHING}.
+ * The primary key is the coalescing — the second save of a subject adds no second row — but the
+ * instant on that row still has to move, because it is what the sweep clears against. Left at the
+ * first save's instant, a change arriving while the model was answering would be deleted by a clear
+ * bounded on a later one, having never been predicted.
+ *
+ * <p>That instant is {@code clock_timestamp()}, rendered {@code AT TIME ZONE 'America/La_Paz'} and
+ * not left to an implicit cast. The cast would render it in the session's {@code TimeZone}, which
+ * pgjdbc sets from the JVM's default — so the same schema would hold La Paz wall time on a
+ * developer's machine and UTC in a container, in a column that records neither. The generation
+ * stays in the database on purpose: a stamp taken in Java when the call is built, and written
+ * milliseconds later, would reopen the very race this column closes.
  *
  * <p>Refreshing cannot starve a busy classroom: a row whose instant keeps moving is still returned
  * by {@link #pending(int)} and still predicted every sweep. Only its deletion waits for the edits
@@ -64,7 +71,7 @@ public class RiskSweepQueueRepositoryAdapter implements IRiskSweepQueueDomain {
                  WHERE cg.id_class_group IN (:ids)
                    AND cg.is_active
                 ON CONFLICT (id_class_group, trimester)
-                DO UPDATE SET marked_at = clock_timestamp()
+                DO UPDATE SET marked_at = (clock_timestamp() AT TIME ZONE 'America/La_Paz')
                 """)
                 .param("trimester", trimester)
                 .param("ids", classGroupIds)
@@ -92,7 +99,7 @@ public class RiskSweepQueueRepositoryAdapter implements IRiskSweepQueueDomain {
                  WHERE cg.id_class_group IN (:ids)
                    AND cg.is_active
                 ON CONFLICT (id_class_group, trimester)
-                DO UPDATE SET marked_at = clock_timestamp()
+                DO UPDATE SET marked_at = (clock_timestamp() AT TIME ZONE 'America/La_Paz')
                 """)
                 .param("date", date)
                 .param("ids", classGroupIds)
@@ -121,7 +128,7 @@ public class RiskSweepQueueRepositoryAdapter implements IRiskSweepQueueDomain {
                  WHERE ce.id_course_enrollment IN (:ids)
                    AND cg.is_active
                 ON CONFLICT (id_class_group, trimester)
-                DO UPDATE SET marked_at = clock_timestamp()
+                DO UPDATE SET marked_at = (clock_timestamp() AT TIME ZONE 'America/La_Paz')
                 """)
                 .param("date", date)
                 .param("ids", courseEnrollmentIds)
