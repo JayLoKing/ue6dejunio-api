@@ -19,6 +19,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
@@ -55,6 +56,7 @@ class RiskPredictionInstitutionTest {
     @Mock private INotificationService notifications;
     @Mock private IClassGroupDomain classGroupDomain;
     @Mock private ICourseService courseService;
+    @Mock private ICourseEnrollmentDomain enrollmentDomain;
 
     /**
      * The row id of the academic year, not the calendar year — {@code id_academic_year} is a
@@ -84,6 +86,7 @@ class RiskPredictionInstitutionTest {
                         notifications,
                         classGroupDomain,
                         courseService,
+                        enrollmentDomain,
                         Clock.systemDefaultZone());
         quintoId = UUID.randomUUID();
         sextoId = UUID.randomUUID();

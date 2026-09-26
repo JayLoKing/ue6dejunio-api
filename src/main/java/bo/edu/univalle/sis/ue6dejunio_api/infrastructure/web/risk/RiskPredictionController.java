@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseRiskSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.InstitutionRiskEntryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RiskPredictionResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RiskRunResponse;
@@ -116,6 +117,27 @@ public class RiskPredictionController {
         return ResponseEntity.ok(
                 predictionService.institutionRisk(academicYearId, trimester, places).stream()
                         .map(InstitutionRiskEntryResponse::from)
+                        .toList());
+    }
+
+    /**
+     * The same gestión, counted by classroom instead of listed by student.
+     *
+     * <p>Sits beside the list above rather than under {@code /courses} because it reads the same
+     * predictions and carries the same scope rule: whole school, Director only.
+     */
+    @GetMapping("/risk/course-summary")
+    @PreAuthorize("hasRole('Director')")
+    @Operation(
+            summary =
+                    "Riesgo por curso en una gestion: cuantos estudiantes de cada curso caen en "
+                            + "cada nivel, contando a cada estudiante una vez por su peor materia")
+    public ResponseEntity<List<CourseRiskSummaryResponse>> courseRiskSummary(
+            @RequestParam("id_academic_year") Integer academicYearId,
+            @RequestParam @Min(1) @Max(3) int trimester) {
+        return ResponseEntity.ok(
+                predictionService.courseRiskSummaries(academicYearId, trimester).stream()
+                        .map(CourseRiskSummaryResponse::from)
                         .toList());
     }
 

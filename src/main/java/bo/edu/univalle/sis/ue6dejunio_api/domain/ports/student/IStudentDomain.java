@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +14,18 @@ import java.util.UUID;
 
 public interface IStudentDomain {
     Student save(Student student);
+
+    /**
+     * How the roll moved during a gestión: intakes and withdrawals by month, and the reasons.
+     *
+     * <p>Two aggregate queries and no rows carried into memory — this answers a chart, and a chart
+     * asks for counts. The intakes come from each enrolment's own {@code enrollment_date}; the
+     * withdrawals from the single status row a student carries, which is the last word and not a
+     * ledger. See {@link
+     * bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary} for what
+     * that costs.
+     */
+    StudentMovementSummary movementSummary(Integer academicYearId);
 
     Optional<Student> findById(UUID id);
 

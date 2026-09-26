@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.gradebook;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAcademicSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HonorRollEntryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
@@ -140,6 +141,23 @@ public class GradebookController {
         return ResponseEntity.ok(
                 gradebookService.institutionHonorRoll(academicYearId, places).stream()
                         .map(HonorRollEntryResponse::from)
+                        .toList());
+    }
+
+    @GetMapping("/course-summary")
+    @PreAuthorize("hasRole('Director')")
+    @Operation(
+            summary =
+                    "Resumen academico por curso de una gestion: estudiantes, aprobados, "
+                            + "reprobados y promedio de cada curso")
+    public ResponseEntity<List<CourseAcademicSummaryResponse>> courseSummary(
+            // Required for the same reason the institution podium requires it: without a gestión
+            // the course listing answers every year at once.
+            @RequestParam("id_academic_year") Integer academicYearId,
+            @RequestParam @Min(1) @Max(3) Integer trimester) {
+        return ResponseEntity.ok(
+                gradebookService.courseSummaries(academicYearId, trimester).stream()
+                        .map(CourseAcademicSummaryResponse::from)
                         .toList());
     }
 

@@ -95,6 +95,15 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
+    public Map<UUID, Long> enrolmentCountsByCourse(Integer academicYearId) {
+        Map<UUID, Long> byCourse = new HashMap<>();
+        for (Object[] row : enrollmentRepo.countByCourseOfAcademicYear(academicYearId)) {
+            byCourse.put((UUID) row[0], (Long) row[1]);
+        }
+        return byCourse;
+    }
+
+    @Override
     public Map<UUID, UUID> courseIdsByEnrollment(Collection<UUID> courseEnrollmentIds) {
         if (courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
             return Map.of();

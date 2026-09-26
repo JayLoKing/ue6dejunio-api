@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAcademicSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.HonorRollEntry;
@@ -46,6 +47,21 @@ public interface IGradebookService {
      *     2024 against one of 2026, which the school never does.
      */
     List<HonorRollEntry> institutionHonorRoll(Integer academicYearId, int places);
+
+    /**
+     * One row per classroom of the gestión: how many students, how many passed, how many failed and
+     * the course average.
+     *
+     * <p>The Director's table. It exists so the school can be read at a glance without the browser
+     * asking the centralizer once per classroom, which is what it was doing — the same N+1 that was
+     * taken out of the risk list.
+     *
+     * <p>The numbers are the centralizer's own: the average is the mean of the students' general
+     * averages, and passed is counted against {@link
+     * bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.PassingMark}. Nothing here
+     * recomputes a mark.
+     */
+    List<CourseAcademicSummary> courseSummaries(Integer academicYearId, Integer trimester);
 
     PageResult<CourseAttendanceRow> courseAttendance(
             UUID courseId, LocalDate date, PageQuery pageQuery);

@@ -68,6 +68,18 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     @Query("SELECT ce.course.id FROM CourseEnrollmentEntity ce WHERE ce.student.id = :studentId")
     List<UUID> findCourseIdsOfStudent(@Param("studentId") UUID studentId);
 
+    /**
+     * (courseId, enrolments) for a whole gestión, as raw rows.
+     *
+     * <p>One grouped count instead of a count per classroom. The Director's tables need the size of
+     * every room at once, and asking room by room is the round trip per course those tables exist
+     * to remove.
+     */
+    @Query(
+            "SELECT ce.course.id, COUNT(ce) FROM CourseEnrollmentEntity ce "
+                    + "WHERE ce.course.academicYear.id = :academicYearId GROUP BY ce.course.id")
+    List<Object[]> countByCourseOfAcademicYear(@Param("academicYearId") Integer academicYearId);
+
     /** Ids of the given enrollments that belong to the given course, in a single query. */
     @Query(
             "SELECT ce.id FROM CourseEnrollmentEntity ce "

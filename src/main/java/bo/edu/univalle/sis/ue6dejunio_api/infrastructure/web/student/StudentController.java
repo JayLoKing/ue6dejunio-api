@@ -11,6 +11,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentDirectoryResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentMovementSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.WithdrawStudentRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -104,6 +105,26 @@ public class StudentController {
                         studentService
                                 .search(query, pageQuery)
                                 .map(StudentDirectoryResponse::from)));
+    }
+
+    /**
+     * Secretaría's movement table, and the Director's.
+     *
+     * <p>Closed to teachers: it is the whole school's intake and every withdrawal reason on record,
+     * which is the kind of thing a homeroom teacher has no scope over — their own course's roster
+     * is what {@code /search} already gives them.
+     */
+    @GetMapping("/movement-summary")
+    @PreAuthorize("hasAnyRole('Director','Secretary')")
+    @Operation(
+            summary =
+                    "Movimiento de estudiantes en una gestion: altas y bajas por mes, y los "
+                            + "motivos de retiro. Sin gestion responde por la actual")
+    public ResponseEntity<StudentMovementSummaryResponse> movementSummary(
+            @RequestParam(value = "id_academic_year", required = false) Integer academicYearId) {
+        return ResponseEntity.ok(
+                StudentMovementSummaryResponse.from(
+                        studentService.movementSummary(academicYearId)));
     }
 
     @PostMapping("/{id}/withdraw")

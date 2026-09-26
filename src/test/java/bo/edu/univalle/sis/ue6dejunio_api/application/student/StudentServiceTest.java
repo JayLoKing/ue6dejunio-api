@@ -18,6 +18,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
@@ -313,5 +314,37 @@ class StudentServiceTest {
                 .isInstanceOf(ValidationException.class);
 
         verify(studentDomain, never()).findById(any());
+    }
+
+    // ---------------------------------------------------------------- movimiento de la matrícula
+
+    /**
+     * A caller who names no gestión gets the current one, the same rule the directory follows.
+     *
+     * <p>Left open the table would span every year the school has run: a student who moved up holds
+     * an enrolment per year, so their intake would be counted again in each, and Secretaría would
+     * read an admission that never happened.
+     */
+    @Test
+    void movementSummary_withoutAGestionAsksForTheCurrentOne() {
+        when(academicYearDomain.currentYearId()).thenReturn(7);
+        when(studentDomain.movementSummary(7))
+                .thenReturn(new StudentMovementSummary(List.of(), List.of()));
+
+        studentService.movementSummary(null);
+
+        verify(studentDomain).movementSummary(7);
+    }
+
+    /** And a caller who does name one is taken at their word: last year's table is last year's. */
+    @Test
+    void movementSummary_respectsTheGestionAsked() {
+        when(studentDomain.movementSummary(5))
+                .thenReturn(new StudentMovementSummary(List.of(), List.of()));
+
+        studentService.movementSummary(5);
+
+        verify(studentDomain).movementSummary(5);
+        verify(academicYearDomain, never()).currentYearId();
     }
 }

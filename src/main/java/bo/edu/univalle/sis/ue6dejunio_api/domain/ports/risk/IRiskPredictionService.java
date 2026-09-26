@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseRiskSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
@@ -47,6 +48,16 @@ public interface IRiskPredictionService {
     List<StudentRisk> byClassGroup(UUID classGroupId, int trimester);
 
     List<StudentRisk> byCourse(UUID courseId, int trimester);
+
+    /**
+     * One row per classroom of the gestión, counting students by their worst risk band.
+     *
+     * <p>Students and not predictions: the model files one row per subject, so a child failing
+     * three areas would otherwise be counted three times and a classroom would report more students
+     * at risk than it holds. The ones the sweep has not reached are counted apart, so an unswept
+     * classroom is not mistaken for a safe one.
+     */
+    List<CourseRiskSummary> courseRiskSummaries(Integer academicYearId, int trimester);
 
     /**
      * The students of the whole school closest to failing this trimester, worst first.

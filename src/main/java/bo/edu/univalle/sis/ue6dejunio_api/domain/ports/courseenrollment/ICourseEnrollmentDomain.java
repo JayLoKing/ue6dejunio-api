@@ -54,6 +54,14 @@ public interface ICourseEnrollmentDomain {
      */
     List<UUID> courseIdsOfStudent(UUID studentId);
 
+    /**
+     * How many students each classroom of a gestión holds, asked once for all of them.
+     *
+     * <p>A course with no enrolments has no entry: a grouped count answers about the rows that
+     * exist, and the caller reads a missing key as zero rather than being handed an invented one.
+     */
+    Map<UUID, Long> enrolmentCountsByCourse(Integer academicYearId);
+
     Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId);
 
     int withdrawActiveEnrollments(UUID studentId);

@@ -24,6 +24,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain.CriterionScoreRow;
@@ -67,6 +68,7 @@ class RiskPredictionServiceTest {
     @Mock private INotificationService notifications;
     @Mock private IClassGroupDomain classGroupDomain;
     @Mock private ICourseService courseService;
+    @Mock private ICourseEnrollmentDomain enrollmentDomain;
 
     private RiskPredictionService service;
 
@@ -97,6 +99,7 @@ class RiskPredictionServiceTest {
                         notifications,
                         classGroupDomain,
                         courseService,
+                        enrollmentDomain,
                         SCHOOL_CLOCK);
     }
 

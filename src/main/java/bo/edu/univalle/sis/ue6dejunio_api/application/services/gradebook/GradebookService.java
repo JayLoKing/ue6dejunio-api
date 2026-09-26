@@ -11,6 +11,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualSubjectScore;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAcademicSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseOverview;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.GradeInWords;
@@ -211,6 +212,127 @@ public class GradebookService implements IGradebookService {
             best.addAll(podiumOf(course, places));
         }
         return ranked(collapsedByStudent(best), places);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseAcademicSummary> courseSummaries(Integer academicYearId, Integer trimester) {
+        // Same reason the honour roll asks for it: without a gestión the course listing answers
+        // every year at once, and the table would put a 2024 classroom beside a 2026 one.
+        if (academicYearId == null) {
+            throw new ValidationException(
+                    "A school-wide course summary needs the gestión it belongs to");
+        }
+
+        List<Course> courses = courseService.allOfYear(academicYearId);
+        if (courses.isEmpty()) {
+            return List.of();
+        }
+
+        /*
+         * Rosters first, then ONE batch of scores for the whole school.
+         *
+         * The scores are where the cost is: read per course they would be one query per classroom,
+         * and read per student one per child. Asked once for every enrolment of the gestión they
+         * are a single statement, and the grouping happens here.
+         *
+         * The rosters are still one read per course, which is the shape `studentsByCourse` has.
+         * That is a deliberate stop rather than an oversight: they are small indexed reads inside
+         * one transaction, against the thirty HTTP round trips — each with its own connection and
+         * its own token check — that the browser would otherwise make to build this same table.
+         * The day it matters, the fix is a port that lists a gestión's enrolments in one query,
+         * not a return to asking from the front end.
+         */
+        Map<UUID, List<CourseStudent>> rosters = new LinkedHashMap<>();
+        List<UUID> everyEnrolment = new ArrayList<>();
+        for (Course course : courses) {
+            List<CourseStudent> roster = rosterOf(course.id());
+            rosters.put(course.id(), roster);
+            roster.forEach(cs -> everyEnrolment.add(cs.courseEnrollmentId()));
+        }
+
+        Map<UUID, List<AcademicScore>> scores =
+                everyEnrolment.isEmpty()
+                        ? Map.of()
+                        : scoreDomain.findByCourseEnrollmentIn(everyEnrolment).stream()
+                                .collect(Collectors.groupingBy(AcademicScore::courseEnrollmentId));
+
+        List<CourseAcademicSummary> summaries = new ArrayList<>(courses.size());
+        for (Course course : courses) {
+            summaries.add(summaryOf(course, rosters.get(course.id()), scores, trimester));
+        }
+        return summaries;
+    }
+
+    /**
+     * One classroom's four numbers, built from the very averages the centralizer prints.
+     *
+     * <p>It goes through {@code buildSummary} rather than averaging the raw marks again, and that
+     * is the whole point of the method. The general average is a mean of totals with its own
+     * rounding; computed a second way it would drift, and the dashboard would call a student passed
+     * on a day the libreta calls them failed.
+     */
+    private CourseAcademicSummary summaryOf(
+            Course course,
+            List<CourseStudent> roster,
+            Map<UUID, List<AcademicScore>> scoresByEnrolment,
+            Integer trimester) {
+        List<BigDecimal> averages = new ArrayList<>();
+        int passed = 0;
+        int failed = 0;
+        for (CourseStudent cs : roster) {
+            BigDecimal average =
+                    buildSummary(
+                                    cs.courseEnrollmentId(),
+                                    cs.studentId(),
+                                    cs.fullName(),
+                                    trimester,
+                                    scoresByEnrolment.getOrDefault(
+                                            cs.courseEnrollmentId(), List.of()))
+                            .generalAverage();
+            // A student nobody graded is neither passed nor failed. Counting them as failed would
+            // publish a reprobación the school never declared, and counting them as passed would
+            // be worse.
+            if (average == null) {
+                continue;
+            }
+            averages.add(average);
+            if (PassingMark.reachedBy(average)) {
+                passed++;
+            } else {
+                failed++;
+            }
+        }
+        return new CourseAcademicSummary(
+                course.id(),
+                course.gradeName(),
+                course.parallelName(),
+                roster.size(),
+                passed,
+                failed,
+                mean(averages));
+    }
+
+    /** Every enrolment of a course, paged through the same way the podium reads it. */
+    private List<CourseStudent> rosterOf(UUID courseId) {
+        List<CourseStudent> all = new ArrayList<>();
+        int pageIndex = 0;
+        while (true) {
+            PageResult<CourseStudent> page =
+                    enrollmentDomain.studentsByCourse(
+                            courseId,
+                            PageQuery.of(
+                                    pageIndex,
+                                    ROSTER_PAGE_SIZE,
+                                    SortField.asc("student.lastNames"),
+                                    SortField.asc("student.names"),
+                                    SortField.asc("id")));
+            all.addAll(page.content());
+            if (readEverything(all.size(), page.content().size(), page.totalElements())) {
+                return all;
+            }
+            pageIndex++;
+        }
     }
 
     /** One entry per student, keeping the best of whatever enrolments they hold in the gestión. */

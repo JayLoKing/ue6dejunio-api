@@ -8,6 +8,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
@@ -55,6 +56,16 @@ public class StudentService implements IStudentService {
     public PageResult<StudentDirectoryItem> search(
             StudentDirectoryQuery query, PageQuery pageQuery) {
         return studentDomain.searchDirectory(inSomeGestion(query), pageQuery);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StudentMovementSummary movementSummary(Integer academicYearId) {
+        // The same rule the directory follows: a caller who named no gestión gets the current one,
+        // rather than a table that spans every year and counts a student who moved up once per
+        // year they were enrolled in.
+        Integer year = academicYearId == null ? academicYearDomain.currentYearId() : academicYearId;
+        return studentDomain.movementSummary(year);
     }
 
     /**

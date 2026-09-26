@@ -6,16 +6,19 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseRiskSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseStudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.InstitutionRiskEntry;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.NewRiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskAssessed;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskFeatures;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskLevel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskFeatureDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskModelClient;
@@ -65,6 +68,13 @@ public class RiskPredictionService implements IRiskPredictionService {
     private final ICourseService courseService;
 
     /**
+     * Only the Director's per-course table needs it, and only to count who the model has NOT
+     * reached. Without the roster four bands adding up to two, in a room of five, read as a room of
+     * two — "nobody is in trouble" and "nobody has been looked at" become the same picture.
+     */
+    private final ICourseEnrollmentDomain enrollmentDomain;
+
+    /**
      * The school's clock, in La Paz. Taken as a bean and not read off the machine, because the
      * daily notification bound is a date, and a date is only a fact once somebody says whose.
      */
@@ -77,6 +87,7 @@ public class RiskPredictionService implements IRiskPredictionService {
             INotificationService notifications,
             IClassGroupDomain classGroupDomain,
             ICourseService courseService,
+            ICourseEnrollmentDomain enrollmentDomain,
             Clock clock) {
         this.featureDomain = featureDomain;
         this.modelClient = modelClient;
@@ -84,6 +95,7 @@ public class RiskPredictionService implements IRiskPredictionService {
         this.notifications = notifications;
         this.classGroupDomain = classGroupDomain;
         this.courseService = courseService;
+        this.enrollmentDomain = enrollmentDomain;
         this.clock = clock;
     }
 
@@ -156,6 +168,92 @@ public class RiskPredictionService implements IRiskPredictionService {
             worst.addAll(worstOf(course, byCourse.getOrDefault(course.id(), List.of()), places));
         }
         return ranked(collapsedByStudent(worst), places);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseRiskSummary> courseRiskSummaries(Integer academicYearId, int trimester) {
+        if (academicYearId == null) {
+            throw new ValidationException(
+                    "A school-wide risk summary needs the gestión it belongs to");
+        }
+        List<Course> courses = courseService.allOfYear(academicYearId);
+        if (courses.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, List<StudentRisk>> byCourse = risksByCourse(academicYearId, trimester);
+        // One grouped count for the gestión, not one per classroom. Asked room by room this would
+        // be a round trip per course inside the very request that exists to remove them.
+        Map<UUID, Long> enrolments = enrollmentDomain.enrolmentCountsByCourse(academicYearId);
+        List<CourseRiskSummary> summaries = new ArrayList<>(courses.size());
+        for (Course course : courses) {
+            summaries.add(
+                    riskSummaryOf(
+                            course,
+                            byCourse.getOrDefault(course.id(), List.of()),
+                            enrolments.getOrDefault(course.id(), 0L)));
+        }
+        return summaries;
+    }
+
+    /**
+     * One classroom's bands, counting students and not rows.
+     *
+     * <p>The model files one prediction per subject, so a child failing three areas leaves three
+     * RiesgoCritico rows. Counted as rows a classroom of twenty reports thirty-one at risk, which
+     * is a number that cannot mean what it says. Each child is folded into their worst band — the
+     * one somebody has to act on — and the students with no prediction at all are counted apart, so
+     * an unswept classroom does not read as a safe one.
+     */
+    private CourseRiskSummary riskSummaryOf(Course course, List<StudentRisk> risks, long enrolled) {
+        Map<UUID, RiskLevel> worstByStudent = new LinkedHashMap<>();
+        for (StudentRisk risk : risks) {
+            worstByStudent.merge(
+                    risk.prediction().studentId(),
+                    risk.prediction().riskLevel(),
+                    RiskPredictionService::worse);
+        }
+
+        int critical = 0;
+        int atRisk = 0;
+        int safe = 0;
+        int outstanding = 0;
+        for (RiskLevel level : worstByStudent.values()) {
+            switch (level) {
+                case RIESGO_CRITICO -> critical++;
+                case EN_RIESGO -> atRisk++;
+                case SIN_RIESGO -> safe++;
+                case SOBRESALIENTE -> outstanding++;
+            }
+        }
+
+        return new CourseRiskSummary(
+                course.id(),
+                course.gradeName(),
+                course.parallelName(),
+                critical,
+                atRisk,
+                safe,
+                outstanding,
+                // Never negative. A withdrawn student keeps their predictions while leaving the
+                // roll, so a swept classroom that since lost somebody can hold more predicted
+                // students than enrolled ones — and "minus two unpredicted" is not a fact.
+                (int) Math.max(0, enrolled - worstByStudent.size()));
+    }
+
+    /** The worse of two bands, by the severity the school reads them in. */
+    private static RiskLevel worse(RiskLevel kept, RiskLevel candidate) {
+        return severityOf(candidate) < severityOf(kept) ? candidate : kept;
+    }
+
+    /** Lower is worse, so the natural minimum is the band that matters. */
+    private static int severityOf(RiskLevel level) {
+        return switch (level) {
+            case RIESGO_CRITICO -> 0;
+            case EN_RIESGO -> 1;
+            case SIN_RIESGO -> 2;
+            case SOBRESALIENTE -> 3;
+        };
     }
 
     /**
