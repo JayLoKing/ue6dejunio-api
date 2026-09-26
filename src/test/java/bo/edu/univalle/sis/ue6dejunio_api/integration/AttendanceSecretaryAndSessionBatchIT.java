@@ -122,6 +122,52 @@ class AttendanceSecretaryAndSessionBatchIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * The secretariat reads the course listing.
+     *
+     * <p>It is the school's map — which grades exist and how many parallels each one has open — and
+     * the role already reads every student in the building by name and RUDE. A roll the secretariat
+     * administers, over classrooms it is not allowed to know the shape of, is half a job.
+     */
+    @Test
+    void secretary_readsCourseListing() throws Exception {
+        mvc.perform(
+                        get("/api/courses")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(secretary, "Secretary")))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * The listing, and nothing else under it.
+     *
+     * <p>The overview carries the roster and the subjects with their teachers, which is the course
+     * opened rather than the course named. Opening the list must not open the file behind it.
+     */
+    @Test
+    void secretary_cannotReadACourseOverview() throws Exception {
+        mvc.perform(
+                        get("/api/courses/" + course + "/overview")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(secretary, "Secretary")))
+                .andExpect(status().isForbidden());
+    }
+
+    /** Reads open, writes closed — the same boundary every other secretariat rule keeps. */
+    @Test
+    void secretary_cannotCreateACourse() throws Exception {
+        mvc.perform(
+                        post("/api/courses")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(secretary, "Secretary"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void secretary_cannotWithdrawStudent() throws Exception {
         // Reads open, writes closed: /api/students/** only lists Secretary on the GET rule.

@@ -61,6 +61,16 @@ public class SecurityConfig {
                                         // reach the handler;
                                         // row-level scope is enforced by @PreAuthorize on each
                                         // read.
+                                        // The listing and nothing under it. It is the school's
+                                        // map — which grades exist and how many parallels
+                                        // each one has open — and the secretariat already reads
+                                        // every student in the building by name and RUDE, which
+                                        // is the more sensitive of the two. Exact path, not
+                                        // "/api/courses/**": the overview behind it carries the
+                                        // roster and the subjects with their teachers, and that
+                                        // is the course opened rather than the course named.
+                                        .requestMatchers(HttpMethod.GET, "/api/courses")
+                                        .hasAnyRole("Director", "Teacher", "Secretary")
                                         .requestMatchers(
                                                 HttpMethod.GET, "/api/courses/*/attendance-stats")
                                         .hasAnyRole("Director", "Teacher", "Secretary")
