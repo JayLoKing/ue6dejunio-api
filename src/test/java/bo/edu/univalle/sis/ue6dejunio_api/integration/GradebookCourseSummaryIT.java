@@ -174,6 +174,58 @@ class GradebookCourseSummaryIT extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * The two counts the Director's course dialog shows, read from the overview endpoint rather
+     * than from the (paged) roster listing — a real database is what proves the GROUP BY reaches
+     * every active enrolment of the course and not just the students seeded above.
+     */
+    @Test
+    void courseOverview_countsMalesAndFemalesOfTheCourse() throws Exception {
+        UUID anotherTeacher = seedUser("Teacher", false);
+        UUID course = seedCourse(anotherTeacher, "C");
+        seedClassGroup(course, anotherTeacher, "Lenguaje");
+
+        UUID male = seedStudent("Diego", "Flores");
+        seedEnrollment(male, course);
+
+        UUID female = seedStudent("Elena", "Mamani");
+        jdbc.update("UPDATE students SET gender = 'F' WHERE id_student = ?", female);
+        seedEnrollment(female, course);
+
+        // Withdrawn: off the roll, so neither count nor "Total estudiantes" may see her.
+        UUID withdrawn = seedStudent("Flora", "Choque");
+        jdbc.update("UPDATE students SET gender = 'F' WHERE id_student = ?", withdrawn);
+        UUID withdrawnEnrollment = seedEnrollment(withdrawn, course);
+        jdbc.update(
+                "UPDATE course_enrollments SET status = 'Withdrawn' WHERE id_course_enrollment = ?",
+                withdrawnEnrollment);
+
+        String body =
+                mvc.perform(
+                                get("/api/courses/" + course + "/overview")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(director, "Director"))
+                                        .param("trimester", "1"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(JsonPath.<Integer>read(body, "$.males")).isEqualTo(1);
+        assertThat(JsonPath.<Integer>read(body, "$.females")).isEqualTo(1);
+
+        // The three numbers a screen puts side by side, and they add up: two on the roll, one boy
+        // and one girl.
+        assertThat(JsonPath.<Integer>read(body, "$.activeStudents")).isEqualTo(2);
+
+        // Three, and that is not a contradiction. "students" is the academic roster and keeps the
+        // withdrawn girl, because the marks she earned before leaving are still owed to the year's
+        // records — see ICourseEnrollmentDomain#studentsByCourse. Pinned so that nobody "fixes"
+        // one of these two totals into the other: they answer different questions.
+        assertThat(JsonPath.<Integer>read(body, "$.students.total")).isEqualTo(3);
+    }
+
     /** A trimester nobody has graded is an empty table of real classrooms, not an error. */
     @Test
     void courseSummary_aTrimesterNobodyGradedStillListsTheClassrooms() throws Exception {

@@ -486,7 +486,11 @@ public class GradebookService implements IGradebookService {
         Course course = courseService.getById(courseId);
         List<ClassGroup> classGroups = classGroupDomain.byCourse(courseId);
         PageResult<StudentTrimesterSummary> students = centralizer(courseId, trimester, pageQuery);
-        return new CourseOverview(course, classGroups, students);
+        Map<String, Long> genderCounts = enrollmentDomain.genderCountsOfCourse(courseId);
+        int males = genderCounts.getOrDefault("M", 0L).intValue();
+        int females = genderCounts.getOrDefault("F", 0L).intValue();
+        int activeStudents = (int) enrollmentDomain.activeEnrolmentCountOfCourse(courseId);
+        return new CourseOverview(course, classGroups, students, males, females, activeStudents);
     }
 
     private StudentTrimesterSummary buildSummary(

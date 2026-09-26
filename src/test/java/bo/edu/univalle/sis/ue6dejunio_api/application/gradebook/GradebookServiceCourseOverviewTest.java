@@ -25,6 +25,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseE
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.score.IScoreDomain;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,6 +99,7 @@ class GradebookServiceCourseOverviewTest {
         PageResult<CourseStudent> page =
                 page(List.of(courseStudent(enrollmentA, studentA, "Ana", "Perez")));
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of("F", 1L));
         List<AcademicScore> batched =
                 List.of(
                         new AcademicScore(
@@ -127,6 +129,104 @@ class GradebookServiceCourseOverviewTest {
         verify(scoreDomain, never()).findByCourseEnrollment(any());
     }
 
+    /**
+     * Both genders present, read straight from the grouped count the port hands back — not derived
+     * by scanning the roster page, which would be wrong on a course larger than one page.
+     */
+    @Test
+    void courseOverview_reportsBothGenderCounts() {
+        Course course =
+                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+        when(courseService.getById(courseId)).thenReturn(course);
+        when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of("M", 3L, "F", 2L));
+
+        CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
+
+        assertThat(overview.males()).isEqualTo(3);
+        assertThat(overview.females()).isEqualTo(2);
+    }
+
+    /**
+     * The roll a person counts heads on, which is not the roster this payload pages through.
+     *
+     * <p>{@code students} deliberately keeps a withdrawn student, because the marks they earned
+     * before leaving are still owed to the year's records. The gender counts read the active roll.
+     * Put side by side on a screen those two disagree, and a Director reading "58 estudiantes"
+     * above "30 varones, 27 mujeres" is looking at arithmetic that does not work with no way to
+     * tell why. This is the number that belongs next to the two.
+     */
+    @Test
+    void courseOverview_countsTheActiveRollApartFromTheAcademicRoster() {
+        Course course =
+                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+        when(courseService.getById(courseId)).thenReturn(course);
+        when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of("M", 3L, "F", 2L));
+        when(enrollmentDomain.activeEnrolmentCountOfCourse(courseId)).thenReturn(5L);
+
+        assertThat(service.courseOverview(courseId, 1, pageQuery).activeStudents()).isEqualTo(5);
+    }
+
+    /**
+     * A student whose gender was never recorded is on the roll all the same.
+     *
+     * <p>The two gender counts add up to the active roll only when every student has one. They are
+     * not derived from it and must not be: padding either side to close the gap would invent a
+     * child.
+     */
+    @Test
+    void courseOverview_theActiveRollIsNotTheSumOfTheTwoGenders() {
+        Course course =
+                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+        when(courseService.getById(courseId)).thenReturn(course);
+        when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of("M", 3L, "F", 2L));
+        when(enrollmentDomain.activeEnrolmentCountOfCourse(courseId)).thenReturn(6L);
+
+        CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
+
+        assertThat(overview.activeStudents()).isEqualTo(6);
+        assertThat(overview.males() + overview.females()).isEqualTo(5);
+    }
+
+    /**
+     * A student with no gender on record — or one stored as anything other than "M"/"F" — counts as
+     * neither. The two totals must not silently pad one side to cover for the gap.
+     */
+    @Test
+    void courseOverview_aStudentWithNoRecognisedGenderCountsAsNeither() {
+        Course course =
+                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+        when(courseService.getById(courseId)).thenReturn(course);
+        when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of("M", 1L));
+
+        CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
+
+        assertThat(overview.males()).isEqualTo(1);
+        assertThat(overview.females()).isZero();
+    }
+
+    /** An all-boys course reports females as zero, never null — the dialog prints a count. */
+    @Test
+    void courseOverview_allBoysCourseReportsFemalesAsZeroNotNull() {
+        Course course =
+                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+        when(courseService.getById(courseId)).thenReturn(course);
+        when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
+        when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of("M", 5L));
+
+        CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
+
+        assertThat(overview.females()).isEqualTo(0);
+    }
+
     @Test
     void courseOverview_unknownCourse_propagatesNotFound() {
         when(courseService.getById(courseId))
@@ -137,6 +237,7 @@ class GradebookServiceCourseOverviewTest {
 
         verify(classGroupDomain, never()).byCourse(any());
         verify(enrollmentDomain, never()).studentsByCourse(any(), any());
+        verify(enrollmentDomain, never()).genderCountsOfCourse(any());
     }
 
     @Test
@@ -147,11 +248,14 @@ class GradebookServiceCourseOverviewTest {
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         PageResult<CourseStudent> emptyPage = page(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(emptyPage);
+        when(enrollmentDomain.genderCountsOfCourse(courseId)).thenReturn(Map.of());
 
         CourseOverview overview = service.courseOverview(courseId, 1, pageQuery);
 
         assertThat(overview.students().content()).isEmpty();
         assertThat(overview.students().totalElements()).isZero();
+        assertThat(overview.males()).isZero();
+        assertThat(overview.females()).isZero();
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());
     }
 

@@ -142,6 +142,23 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     }
 
     @Override
+    public Map<String, Long> genderCountsOfCourse(UUID courseId) {
+        Map<String, Long> byGender = new HashMap<>();
+        for (Object[] row :
+                enrollmentRepo.countByCourseAndStatusGroupedByGender(courseId, STATUS_EFFECTIVE)) {
+            if (row[0] != null) {
+                byGender.put((String) row[0], (Long) row[1]);
+            }
+        }
+        return byGender;
+    }
+
+    @Override
+    public long activeEnrolmentCountOfCourse(UUID courseId) {
+        return enrollmentRepo.countByCourse_IdAndStatus(courseId, STATUS_EFFECTIVE);
+    }
+
+    @Override
     public UUID courseOfEnrollment(UUID courseEnrollmentId) {
         return enrollmentRepo
                 .findById(courseEnrollmentId)

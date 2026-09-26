@@ -91,6 +91,35 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     List<CourseEnrollmentEntity> findByStudent_IdAndStatus(UUID studentId, String status);
 
     /**
+     * (gender, enrolments) for the active enrolments of one course, as raw rows.
+     *
+     * <p>Only the status {@code
+     * bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters.CourseEnrollmentRepositoryAdapter#activeStudentsByCourse}
+     * also uses: a withdrawn student is off the roll and does not belong in either count. That is
+     * why these two numbers disagree with {@code CourseOverview.students().totalElements()} on a
+     * course somebody left — the roster total intentionally keeps every enrolment, active or not,
+     * because the marks earned before a withdrawal are still owed to the year's records (see {@code
+     * GradebookService#centralizer}, which reads {@code #findByCourse_Id} rather than the
+     * active-only listing). The head count that does agree with these is {@link
+     * #countByCourse_IdAndStatus} below.
+     */
+    @Query(
+            "SELECT e.student.gender, COUNT(e) FROM CourseEnrollmentEntity e "
+                    + "WHERE e.course.id = :courseId AND e.status = :status "
+                    + "GROUP BY e.student.gender")
+    List<Object[]> countByCourseAndStatusGroupedByGender(
+            @Param("courseId") UUID courseId, @Param("status") String status);
+
+    /**
+     * The same population as the grouped count above, counted whole.
+     *
+     * <p>Not the sum of that map: a student whose gender was never recorded groups under null and
+     * is dropped, so summing would lose them. A derived query rather than a {@code @Query} because
+     * it is exactly what the method name says.
+     */
+    long countByCourse_IdAndStatus(UUID courseId, String status);
+
+    /**
      * The homeroom teachers of every course the student sat in, active accounts only.
      *
      * <p>Enrolments of any status: a withdrawal is what closes them, so asking for the active ones

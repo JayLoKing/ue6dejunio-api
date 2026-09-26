@@ -65,4 +65,25 @@ public interface ICourseEnrollmentDomain {
     Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId);
 
     int withdrawActiveEnrollments(UUID studentId);
+
+    /**
+     * How many active enrolments of the course hold each stored gender value, grouped once rather
+     * than counted by scanning a (paged) roster.
+     *
+     * <p>Keys are the raw stored values — {@code "M"} and {@code "F"} in practice, since that is
+     * all {@code CreateStudentRequest} accepts — and {@code gender} is nullable on a student, so a
+     * student with none is absent from the map rather than counted under either key.
+     */
+    Map<String, Long> genderCountsOfCourse(UUID courseId);
+
+    /**
+     * How many students are on the course's roll right now.
+     *
+     * <p>The companion of {@link #genderCountsOfCourse}: same population, counted whole. It exists
+     * because the two gender counts add up to it only when every student has a gender on record,
+     * and deriving the roll from them would quietly lose the ones who do not. It is also not the
+     * academic roster's total, which keeps a withdrawn student on purpose — see {@link
+     * #activeStudentsByCourse}.
+     */
+    long activeEnrolmentCountOfCourse(UUID courseId);
 }

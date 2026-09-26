@@ -65,19 +65,30 @@ class UserServiceTest {
         verify(emailService).sendWelcomeCredentials("ana@ue6.bo", "Ana Quispe", "Gen3rat3d!");
     }
 
+    /**
+     * The message reaches a person, so it is written for one.
+     *
+     * <p>It used to read {@code Recurso duplicado: email=ana@ue6.bo} — a field name, an equals sign
+     * and the value, which is a log line. The web shows this string verbatim in a toast, so the
+     * Director creating an account read a debug message and had to work out what went wrong. The
+     * address stays in it: pasting a list of new staff, naming the one that collided is the whole
+     * point.
+     */
     @Test
-    void create_duplicateEmail_throws() {
+    void create_duplicateEmail_saysSoInWordsAPersonReads() {
         when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(true);
         assertThatThrownBy(() -> userService.create(validCommand()))
-                .isInstanceOf(DuplicateResourceException.class);
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El correo ana@ue6.bo ya está registrado con un usuario del sistema.");
     }
 
     @Test
-    void create_duplicateCi_throws() {
+    void create_duplicateCi_saysSoInWordsAPersonReads() {
         when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(false);
         when(userDomain.existsByCi("1234567")).thenReturn(true);
         assertThatThrownBy(() -> userService.create(validCommand()))
-                .isInstanceOf(DuplicateResourceException.class);
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El CI 1234567 ya está registrado con un usuario del sistema.");
     }
 
     @Test
