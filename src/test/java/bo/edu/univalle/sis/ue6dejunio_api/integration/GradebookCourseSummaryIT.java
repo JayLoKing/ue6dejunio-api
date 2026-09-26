@@ -101,6 +101,21 @@ class GradebookCourseSummaryIT extends AbstractIntegrationTest {
     }
 
     /**
+     * The course is named {@code courseId}, camelCase, like every other response of this API.
+     *
+     * <p>Pinned because nothing else pins it. The field names of a response are its contract with
+     * the browser, and a rename that no test reads breaks the screen while the suite stays green —
+     * which is exactly what happened here once. snake_case belongs to request parameters and
+     * bodies; what goes out is camelCase.
+     */
+    @Test
+    void courseSummary_namesTheCourseInCamelCase() throws Exception {
+        String body = summaryAsDirector();
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].courseId")).hasSize(2);
+    }
+
+    /**
      * The numbers are the sheets' numbers.
      *
      * <p>90 and 47 are what {@code total_score} computes from those four dimensions, so the course

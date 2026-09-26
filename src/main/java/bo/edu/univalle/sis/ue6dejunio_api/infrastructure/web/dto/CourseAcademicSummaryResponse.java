@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAcademicSummary;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -12,7 +11,7 @@ import java.util.UUID;
  * no average, and sending a zero would tell the dashboard the whole class failed.
  */
 public record CourseAcademicSummaryResponse(
-        @JsonProperty("id_course") UUID courseId,
+        UUID courseId,
         String gradeName,
         String parallelName,
         int students,

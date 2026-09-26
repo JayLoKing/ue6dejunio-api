@@ -107,6 +107,20 @@ class RiskCourseSummaryIT extends AbstractIntegrationTest {
                 .containsExactlyInAnyOrder("A", "B");
     }
 
+    /**
+     * The course is named {@code courseId}, camelCase, like every other response of this API.
+     *
+     * <p>The academic summary pins the same thing for the same reason: these two are read side by
+     * side to build one table, and they are joined on this field. If one of them drifts the join
+     * silently finds nothing and the risk columns come out empty.
+     */
+    @Test
+    void courseRiskSummary_namesTheCourseInCamelCase() throws Exception {
+        String body = summaryAsDirector();
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].courseId")).hasSize(2);
+    }
+
     /** Ana fails two areas and is one student in critical trouble. */
     @Test
     void courseRiskSummary_countsAStudentOnceHoweverManySubjectsTheyFail() throws Exception {

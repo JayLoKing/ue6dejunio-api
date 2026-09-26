@@ -1,7 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.CourseRiskSummary;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
 /**
@@ -18,7 +17,7 @@ import java.util.UUID;
  * students} is the enrolment; this is the shape of who has been looked at.
  */
 public record CourseRiskSummaryResponse(
-        @JsonProperty("id_course") UUID courseId,
+        UUID courseId,
         String gradeName,
         String parallelName,
         int critical,
