@@ -155,6 +155,24 @@ class AttendanceSecretaryAndSessionBatchIT extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * A teacher does not get the listing with it.
+     *
+     * <p>Not an oversight — the widening is the secretariat's alone. A teacher's world is the class
+     * groups they were given, which {@code /api/teachers/{id}/class-groups} already answers; the
+     * whole school's course list is a question their screens never ask. Pinned so that opening it
+     * to them later is a decision somebody makes on purpose.
+     */
+    @Test
+    void teacher_stillCannotReadTheCourseListing() throws Exception {
+        mvc.perform(
+                        get("/api/courses")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher")))
+                .andExpect(status().isForbidden());
+    }
+
     /** Reads open, writes closed — the same boundary every other secretariat rule keeps. */
     @Test
     void secretary_cannotCreateACourse() throws Exception {

@@ -69,8 +69,18 @@ public class SecurityConfig {
                                         // "/api/courses/**": the overview behind it carries the
                                         // roster and the subjects with their teachers, and that
                                         // is the course opened rather than the course named.
+                                        //
+                                        // No Teacher here, deliberately. A teacher's world is the
+                                        // class groups they were given, which
+                                        // /api/teachers/{id}/class-groups already answers; the
+                                        // whole school's course list is a question their screens
+                                        // never ask.
+                                        //
+                                        // Unlike the rules below it, this one carries no row-level
+                                        // scope behind it, and needs none: a directory of
+                                        // classrooms has no row that belongs to one caller.
                                         .requestMatchers(HttpMethod.GET, "/api/courses")
-                                        .hasAnyRole("Director", "Teacher", "Secretary")
+                                        .hasAnyRole("Director", "Secretary")
                                         .requestMatchers(
                                                 HttpMethod.GET, "/api/courses/*/attendance-stats")
                                         .hasAnyRole("Director", "Teacher", "Secretary")
