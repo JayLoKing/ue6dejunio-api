@@ -276,6 +276,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         homeroomTeacher,
                                         "Ana",
+                                        true,
                                         true)));
 
         assertThat(authz.canReadEnrollmentScope(token(homeroomTeacher, "Teacher"), ceId)).isTrue();
@@ -301,6 +302,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         homeroomTeacher,
                                         "Ana",
+                                        true,
                                         true)));
 
         assertThat(authz.canReadEnrollmentScope(token(otherTeacher, "Teacher"), ceId)).isFalse();
@@ -422,6 +424,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         UUID.randomUUID(),
                                         "Ana",
+                                        true,
                                         true)));
         when(classGroupDomain.teachesInCourse(technicalTeacher, courseId)).thenReturn(true);
 
@@ -448,6 +451,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         homeroomTeacher,
                                         "Ana",
+                                        true,
                                         true)));
 
         assertThat(authz.canReadCourseRoster(token(homeroomTeacher, "Teacher"), courseId)).isTrue();
@@ -470,6 +474,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         UUID.randomUUID(),
                                         "Ana",
+                                        true,
                                         true)));
         when(classGroupDomain.teachesInCourse(otherTeacher, courseId)).thenReturn(false);
 
@@ -635,7 +640,18 @@ class AuthorizationComponentTest {
     }
 
     private Course course(UUID id, UUID homeroomTeacherId) {
-        return new Course(id, 5, "Quinto", 2, "B", 1, 2026, homeroomTeacherId, "Aula", true);
+        return new Course(
+                id,
+                5,
+                "Quinto",
+                2,
+                "B",
+                1,
+                2026,
+                homeroomTeacherId,
+                "Aula",
+                true,
+                homeroomTeacherId != null);
     }
 
     @Test
@@ -861,6 +877,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         homeroomTeacher,
                                         "Ana",
+                                        true,
                                         true)));
 
         assertThat(authz.canReadCourse(token(homeroomTeacher, "Teacher"), courseId)).isTrue();
@@ -884,6 +901,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         homeroomTeacher,
                                         "Ana",
+                                        true,
                                         true)));
 
         assertThat(authz.canReadCourse(token(otherTeacher, "Teacher"), courseId)).isFalse();
@@ -945,6 +963,7 @@ class AuthorizationComponentTest {
                                         2026,
                                         UUID.randomUUID(),
                                         "Ana",
+                                        true,
                                         true)));
 
         // Read access must never leak into the write predicates: they share ownsEnrollmentCourse,

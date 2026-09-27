@@ -174,6 +174,7 @@ public class CourseRepositoryAdapter implements ICourseDomain {
                 e.getAcademicYear().getYear(),
                 ht != null ? ht.getId() : null,
                 ht != null ? ht.getNames() + " " + ht.getLastNames() : null,
-                e.isActive());
+                e.isActive(),
+                ht != null && ht.isActive());
     }
 }

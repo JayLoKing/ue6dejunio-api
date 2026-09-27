@@ -80,10 +80,7 @@ public class CourseService implements ICourseService {
         getById(id);
         Course result = null;
         if (c.homeroomTeacherId() != null) {
-            if (!courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
-                throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
-            }
-            result = courseDomain.setHomeroomTeacher(id, c.homeroomTeacherId());
+            result = assignHomeroomTeacher(id, c.homeroomTeacherId());
         }
         if (c.active() != null) {
             result = courseDomain.setActive(id, c.active());
@@ -94,9 +91,33 @@ public class CourseService implements ICourseService {
     @Override
     @Transactional
     public Course setHomeroomTeacher(UUID id, UUID teacherId) {
-        getById(id);
+        return assignHomeroomTeacher(id, teacherId);
+    }
+
+    /**
+     * Only one teacher can be homeroom of a course at a time. The school's real process is: when a
+     * teacher goes on leave or does not come back, the Director deactivates their account in
+     * Usuarios, creates a new user for the substitute, and only then assigns that new user here.
+     * Deactivation is never a side effect of this call — it stays the Director's own, separate
+     * decision in Usuarios.
+     *
+     * <p>So a reassignment away from the current homeroom teacher is refused while that teacher's
+     * account is still active, unless the incoming id is that same person (a no-op re-save must not
+     * be blocked by its own rule).
+     */
+    private Course assignHomeroomTeacher(UUID id, UUID teacherId) {
+        Course current = getById(id);
         if (!courseDomain.userIsNonTechnicalTeacher(teacherId)) {
             throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
+        }
+        UUID outgoingTeacherId = current.homeroomTeacherId();
+        if (outgoingTeacherId != null
+                && current.homeroomTeacherActive()
+                && !outgoingTeacherId.equals(teacherId)) {
+            throw new ConflictException(
+                    current.homeroomTeacherName()
+                            + " sigue activo como docente de aula de este curso. Para"
+                            + " reasignarlo, primero dale de baja en Usuarios.");
         }
         return courseDomain.setHomeroomTeacher(id, teacherId);
     }

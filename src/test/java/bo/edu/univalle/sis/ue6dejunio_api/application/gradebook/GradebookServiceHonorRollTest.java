@@ -367,7 +367,17 @@ class GradebookServiceHonorRollTest {
 
     private static Course course(UUID id, String gradeName, String parallelName) {
         return new Course(
-                id, 5, gradeName, 2, parallelName, 1, 2026, UUID.randomUUID(), "Ana Perez", true);
+                id,
+                5,
+                gradeName,
+                2,
+                parallelName,
+                1,
+                2026,
+                UUID.randomUUID(),
+                "Ana Perez",
+                true,
+                true);
     }
 
     private static AcademicScore score(

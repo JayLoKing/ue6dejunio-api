@@ -99,6 +99,7 @@ class GradebookServiceReportCardTest {
                                 2026,
                                 UUID.randomUUID(),
                                 "Nora Arnez Veliz",
+                                true,
                                 true));
     }
 

@@ -275,6 +275,7 @@ class RiskPredictionCourseSummaryTest {
                 2026,
                 UUID.randomUUID(),
                 "Ana Perez",
+                true,
                 true);
     }
 }

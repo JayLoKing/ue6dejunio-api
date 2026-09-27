@@ -422,6 +422,7 @@ class RiskPredictionInstitutionTest {
                 2026,
                 UUID.randomUUID(),
                 "Ana Perez",
+                true,
                 true);
     }
 }

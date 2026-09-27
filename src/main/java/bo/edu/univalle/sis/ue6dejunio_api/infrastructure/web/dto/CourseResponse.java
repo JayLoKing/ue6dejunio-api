@@ -13,7 +13,8 @@ public record CourseResponse(
         Integer year,
         UUID homeroomTeacherId,
         String homeroomTeacherName,
-        boolean active) {
+        boolean active,
+        boolean homeroomTeacherActive) {
     public static CourseResponse from(Course c) {
         return new CourseResponse(
                 c.id(),
@@ -25,6 +26,7 @@ public record CourseResponse(
                 c.year(),
                 c.homeroomTeacherId(),
                 c.homeroomTeacherName(),
-                c.active());
+                c.active(),
+                c.homeroomTeacherActive());
     }
 }

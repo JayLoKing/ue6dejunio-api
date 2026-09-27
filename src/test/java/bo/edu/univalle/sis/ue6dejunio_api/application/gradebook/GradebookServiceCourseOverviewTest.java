@@ -79,7 +79,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_composesHeaderClassGroupsAndBatchedStudents() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
 
         List<ClassGroup> classGroups =
@@ -136,7 +147,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_reportsBothGenderCounts() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
@@ -160,7 +182,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_countsTheActiveRollApartFromTheAcademicRoster() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
@@ -180,7 +213,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_theActiveRollIsNotTheSumOfTheTwoGenders() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
@@ -200,7 +244,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_aStudentWithNoRecognisedGenderCountsAsNeither() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
@@ -216,7 +271,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_allBoysCourseReportsFemalesAsZeroNotNull() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
@@ -243,7 +309,18 @@ class GradebookServiceCourseOverviewTest {
     @Test
     void courseOverview_emptyCourse_returnsEmptyStudentPage() {
         Course course =
-                new Course(courseId, 1, "Primero", 1, "A", 1, 2026, UUID.randomUUID(), "Ana", true);
+                new Course(
+                        courseId,
+                        1,
+                        "Primero",
+                        1,
+                        "A",
+                        1,
+                        2026,
+                        UUID.randomUUID(),
+                        "Ana",
+                        true,
+                        true);
         when(courseService.getById(courseId)).thenReturn(course);
         when(classGroupDomain.byCourse(courseId)).thenReturn(List.of());
         PageResult<CourseStudent> emptyPage = page(List.of());
