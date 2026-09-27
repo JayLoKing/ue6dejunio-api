@@ -46,6 +46,19 @@ public class AuthController {
         return ResponseEntity.ok(AuthResponse.from(authenticated));
     }
 
+    /**
+     * Renews the session of whoever holds a still-valid token. No body: the id comes from the token
+     * the resource server already verified, so nobody can ask to renew somebody else's session.
+     */
+    @PostMapping("/refresh")
+    @Operation(
+            summary = "Renovar la sesion con el token vigente",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<AuthResponse> refresh(JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getToken().getSubject());
+        return ResponseEntity.ok(AuthResponse.from(authService.refresh(userId)));
+    }
+
     @GetMapping("/me")
     @Operation(
             summary = "Datos del usuario autenticado",

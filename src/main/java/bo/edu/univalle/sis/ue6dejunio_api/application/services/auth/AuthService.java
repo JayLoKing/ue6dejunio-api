@@ -63,6 +63,39 @@ public class AuthService implements IAuthService {
             throw new UserInactiveException();
         }
 
+        return issueFor(user);
+    }
+
+    /**
+     * See {@link IAuthService#refresh} for why this re-reads instead of trusting the token.
+     *
+     * <p>The renewal is unconditional as long as the account is open: there is no server-side
+     * record of the session, so nothing here can tell a long working afternoon from a token that
+     * was copied. That is the cost of the no-table design, and the reason the access window stays
+     * short.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AuthenticatedUser refresh(UUID userId) {
+        User user =
+                userDomain
+                        .findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
+        if (!user.isActive()) {
+            throw new UserInactiveException();
+        }
+
+        return issueFor(user);
+    }
+
+    /**
+     * The claims a token carries, derived from the record rather than copied from anywhere.
+     *
+     * <p>Shared by login and refresh on purpose: the homeroom claims are what the notebook reads to
+     * know which course belongs to a teacher, and two builders would let a renewed token disagree
+     * with a fresh login about the same teacher.
+     */
+    private AuthenticatedUser issueFor(User user) {
         String gradeName = null;
         String parallelName = null;
         UUID courseId = null;
