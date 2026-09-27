@@ -208,6 +208,24 @@ class CourseOverviewIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * The secretariat's "ver curso". Asserted here because the route sits above the Director-only
+     * rule for {@code /api/courses/**} in the chain, and dropping it there would take this view
+     * away from the Secretary without any test noticing.
+     */
+    @Test
+    void secretaryAccess_ok() throws Exception {
+        mvc.perform(
+                        get("/api/courses/{id}/overview", courseA)
+                                .header(
+                                        "Authorization",
+                                        "Bearer "
+                                                + tokenFor(
+                                                        seedUser("Secretary", false), "Secretary"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void nonOwnerTeacher_rejected_forbidden() throws Exception {
         mvc.perform(

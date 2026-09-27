@@ -92,8 +92,13 @@ public class SecurityConfig {
                                                 HttpMethod.GET,
                                                 "/api/courses/*/attendance-by-student")
                                         .hasAnyRole("Director", "Teacher", "Secretary")
+                                        // The secretariat's "ver curso": the same consolidated view
+                                        // the Director reads, and the screen its student directory
+                                        // links into. Read-only like every rule that names it —
+                                        // withdrawing a student stays the Director's alone, and it
+                                        // is a different route.
                                         .requestMatchers(HttpMethod.GET, "/api/courses/*/overview")
-                                        .hasAnyRole("Director", "Teacher")
+                                        .hasAnyRole("Director", "Teacher", "Secretary")
                                         // Stated before the Director-only rule below, which would
                                         // otherwise swallow it: a
                                         // course risk panel a teacher cannot open is a panel
