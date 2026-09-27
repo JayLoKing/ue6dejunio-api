@@ -2,7 +2,9 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.CourseAttendanceStats;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.CourseStudentAttendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyBatchResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +30,17 @@ public interface IAttendanceService {
      * scope="annual" (whole year); trimester 1-3 means scope="trimester".
      */
     CourseAttendanceStats attendanceStats(UUID courseId, Integer trimester);
+
+    /**
+     * RF 37 — the attendance percentage of each student in a course, with their totals of present,
+     * absent, excused and late days. trimester == null means the annual scope.
+     *
+     * <p>Reports the roll as it stands, not the academic roster: this backs a certificate of
+     * regularity, and a student the school took off the roll is not owed one. It is the same
+     * population the attendance sheets are filled in for.
+     */
+    CourseStudentAttendance attendanceByStudent(
+            UUID courseId, Integer trimester, PageQuery pageQuery);
 
     record DailyMark(UUID courseEnrollmentId, String status) {}
 }

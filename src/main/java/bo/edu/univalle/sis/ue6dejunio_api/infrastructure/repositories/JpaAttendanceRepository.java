@@ -56,4 +56,22 @@ public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity,
         GROUP BY a.date, a.status
         """)
     List<Object[]> dailyStatusCountsByCourseGroupedByDate(@Param("courseId") UUID courseId);
+
+    /**
+     * The same daily-only rows grouped one level finer, per (enrolment, date, status), for the
+     * per-student attendance report. Scoped by an IN over the roster page being reported rather
+     * than by course, so a class of forty costs one query and not forty.
+     *
+     * <p>Raw {@code Object[]} for the same reason as its sibling above: COUNT() arrives as Long and
+     * that conversion belongs to the adapter.
+     */
+    @Query(
+            """
+        SELECT a.courseEnrollment.id, a.date, a.status, COUNT(a)
+        FROM AttendanceEntity a
+        WHERE a.courseEnrollment.id IN :courseEnrollmentIds AND a.classGroup IS NULL
+        GROUP BY a.courseEnrollment.id, a.date, a.status
+        """)
+    List<Object[]> dailyStatusCountsByEnrollmentIn(
+            @Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds);
 }

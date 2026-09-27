@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyStatusCount;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.EnrollmentStatusCount;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AttendanceEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAttendanceRepository;
@@ -80,6 +81,24 @@ public class AttendanceRepositoryAdapter implements IAttendanceDomain {
                                         (LocalDate) row[0],
                                         (String) row[1],
                                         ((Number) row[2]).longValue()))
+                .toList();
+    }
+
+    @Override
+    public List<EnrollmentStatusCount> dailyStatusCountsByEnrollmentIn(
+            Collection<UUID> courseEnrollmentIds) {
+        // An empty IN list is not a query worth sending, and some dialects reject it outright.
+        if (courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
+            return List.of();
+        }
+        return attendanceRepo.dailyStatusCountsByEnrollmentIn(courseEnrollmentIds).stream()
+                .map(
+                        row ->
+                                new EnrollmentStatusCount(
+                                        (UUID) row[0],
+                                        (LocalDate) row[1],
+                                        (String) row[2],
+                                        ((Number) row[3]).longValue()))
                 .toList();
     }
 

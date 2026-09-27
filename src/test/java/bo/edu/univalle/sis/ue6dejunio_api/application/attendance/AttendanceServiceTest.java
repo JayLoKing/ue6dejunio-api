@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import java.time.Clock;
@@ -70,8 +72,15 @@ class AttendanceServiceTest {
     }
 
     private void initWith(Clock clock) {
+        // The roll is only read by the per-student report, which lives in its own test class; these
+        // scenarios record attendance and never ask for it.
         attendanceService =
-                new AttendanceService(attendanceDomain, trimesterPeriodDomain, events, clock);
+                new AttendanceService(
+                        attendanceDomain,
+                        trimesterPeriodDomain,
+                        mock(ICourseEnrollmentDomain.class),
+                        events,
+                        clock);
     }
 
     @Test

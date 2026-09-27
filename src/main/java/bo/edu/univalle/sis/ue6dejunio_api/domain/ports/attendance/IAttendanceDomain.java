@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyStatusCount;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.EnrollmentStatusCount;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -72,4 +73,18 @@ public interface IAttendanceDomain {
      * status) for all enrollments in the given course. No per-enrollment loop.
      */
     List<DailyStatusCount> dailyStatusCountsByCourseGroupedByDate(UUID courseId);
+
+    /**
+     * The same daily rows as {@link #dailyStatusCountsByCourseGroupedByDate}, grouped one level
+     * finer: per (enrolment, date, status). Backs the per-student report of RF 37, which the
+     * course-wide grouping cannot answer.
+     *
+     * <p>Scoped to a set of enrolments rather than to a course so it can be asked for exactly the
+     * page of the roster being reported, in one IN query instead of one lookup per student.
+     *
+     * @return no row for an enrolment nobody ever marked; the caller reads that absence as zero
+     *     rather than being handed an invented count
+     */
+    List<EnrollmentStatusCount> dailyStatusCountsByEnrollmentIn(
+            Collection<UUID> courseEnrollmentIds);
 }

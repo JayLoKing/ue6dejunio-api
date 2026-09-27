@@ -84,6 +84,14 @@ public class SecurityConfig {
                                         .requestMatchers(
                                                 HttpMethod.GET, "/api/courses/*/attendance-stats")
                                         .hasAnyRole("Director", "Teacher", "Secretary")
+                                        // RF 37 names Director and Secretario. Stated before the
+                                        // Director-only rule below for the same reason the risk
+                                        // panel is: swallowed by it, the @PreAuthorize that decides
+                                        // which course each of them may read would never run.
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/api/courses/*/attendance-by-student")
+                                        .hasAnyRole("Director", "Teacher", "Secretary")
                                         .requestMatchers(HttpMethod.GET, "/api/courses/*/overview")
                                         .hasAnyRole("Director", "Teacher")
                                         // Stated before the Director-only rule below, which would

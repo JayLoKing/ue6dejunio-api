@@ -15,6 +15,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ClassGroupRespo
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceStatsResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseOverviewResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseStudentAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseWithSubjectsResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateCourseRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HomeroomTeacherRequest;
@@ -169,6 +170,35 @@ public class CourseController {
         return ResponseEntity.ok(
                 CourseAttendanceStatsResponse.from(
                         attendanceService.attendanceStats(id, trimester)));
+    }
+
+    /**
+     * RF 37. The companion of {@code attendance-stats}: that one reports the classroom, this one
+     * reports the students in it. Both read the same rows through the same trimester periods, so
+     * adding up these rows gives back that one's {@code overall}.
+     */
+    @GetMapping("/{id}/attendance-by-student")
+    @PreAuthorize("@authz.canReadCourse(authentication, #id)")
+    @Operation(
+            summary =
+                    "Porcentaje de asistencia por estudiante del curso. "
+                            + "trimester opcional: presente -> alcance trimestral, ausente -> anual")
+    public ResponseEntity<CourseStudentAttendanceResponse> attendanceByStudent(
+            @PathVariable UUID id,
+            @RequestParam(required = false) @Min(1) @Max(3) Integer trimester,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(200) int limit) {
+        // Alphabetical by surname, the order a roll is read in — and stated here because PageQuery
+        // carries no default ordering, so an unsorted page would shuffle between requests.
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                CourseStudentAttendanceResponse.from(
+                        attendanceService.attendanceByStudent(id, trimester, p)));
     }
 
     @PutMapping("/{courseId}/class-groups/{classGroupId}/teacher")

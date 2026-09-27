@@ -5,21 +5,29 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.AttendanceCounts;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.CourseAttendanceStats;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.CourseStudentAttendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyBatchResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.DailyStatusCount;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.EnrollmentStatusCount;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.MonthlyAttendance;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.StudentAttendanceSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.TrimesterAttendance;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.DailyAttendanceRecorded;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.SessionAttendanceRecorded;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.TrimesterPeriod;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,16 +54,19 @@ public class AttendanceService implements IAttendanceService {
 
     private final IAttendanceDomain attendanceDomain;
     private final ITrimesterPeriodDomain trimesterPeriodDomain;
+    private final ICourseEnrollmentDomain enrollmentDomain;
     private final IDomainEventPublisher events;
     private final Clock clock;
 
     public AttendanceService(
             IAttendanceDomain attendanceDomain,
             ITrimesterPeriodDomain trimesterPeriodDomain,
+            ICourseEnrollmentDomain enrollmentDomain,
             IDomainEventPublisher events,
             Clock clock) {
         this.attendanceDomain = attendanceDomain;
         this.trimesterPeriodDomain = trimesterPeriodDomain;
+        this.enrollmentDomain = enrollmentDomain;
         this.events = events;
         this.clock = clock;
     }
@@ -194,9 +205,16 @@ public class AttendanceService implements IAttendanceService {
         return attendanceDomain.byCourseEnrollment(courseEnrollmentId);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public CourseAttendanceStats attendanceStats(UUID courseId, Integer trimester) {
+    /**
+     * Which dates a report covers, and what to call that coverage.
+     *
+     * <p>Shared by the course panel and the per-student report so the two can never disagree about
+     * which days are in the trimester. Their totals reconcile only because they filter through this
+     * same answer.
+     */
+    private record ReportScope(List<TrimesterPeriod> periods, String scope) {}
+
+    private ReportScope resolveScope(UUID courseId, Integer trimester) {
         if (!attendanceDomain.courseExists(courseId)) {
             throw new ResourceNotFoundException("Course", courseId);
         }
@@ -209,25 +227,78 @@ public class AttendanceService implements IAttendanceService {
                             + "El Director debe configurar los periodos de trimestre primero.");
         }
 
-        List<TrimesterPeriod> includedPeriods;
-        String scope;
-        if (trimester != null) {
-            TrimesterPeriod requested =
-                    periods.stream()
-                            .filter(p -> p.trimester() == trimester)
-                            .findFirst()
-                            .orElseThrow(
-                                    () ->
-                                            new ConflictException(
-                                                    "El trimestre "
-                                                            + trimester
-                                                            + " no tiene un periodo configurado para el año académico del curso."));
-            includedPeriods = List.of(requested);
-            scope = SCOPE_TRIMESTER;
-        } else {
-            includedPeriods = periods;
-            scope = SCOPE_ANNUAL;
+        if (trimester == null) {
+            return new ReportScope(periods, SCOPE_ANNUAL);
         }
+        TrimesterPeriod requested =
+                periods.stream()
+                        .filter(p -> p.trimester() == trimester)
+                        .findFirst()
+                        .orElseThrow(
+                                () ->
+                                        new ConflictException(
+                                                "El trimestre "
+                                                        + trimester
+                                                        + " no tiene un periodo configurado para el año académico del curso."));
+        return new ReportScope(List.of(requested), SCOPE_TRIMESTER);
+    }
+
+    /**
+     * RF 37. See {@link IAttendanceService#attendanceByStudent} for why this reports the roll
+     * rather than the academic roster.
+     *
+     * <p>Two queries whatever the class size: one for the page of the roll, one IN query for every
+     * mark those enrolments hold. The marks are then bucketed in memory, because the filter that
+     * decides which dates count lives in the Director's trimester periods and not in the database.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public CourseStudentAttendance attendanceByStudent(
+            UUID courseId, Integer trimester, PageQuery pageQuery) {
+        ReportScope resolved = resolveScope(courseId, trimester);
+        PageResult<CourseStudent> roll =
+                enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
+
+        List<UUID> enrollmentIds =
+                roll.content().stream().map(CourseStudent::courseEnrollmentId).toList();
+        Map<UUID, long[]> countsByEnrollment = new HashMap<>();
+        // An empty page is not a question worth asking the database.
+        if (!enrollmentIds.isEmpty()) {
+            for (EnrollmentStatusCount row :
+                    attendanceDomain.dailyStatusCountsByEnrollmentIn(enrollmentIds)) {
+                if (periodContaining(resolved.periods(), row.date()) == null) {
+                    continue; // out-of-period date: excluded here exactly as in the course panel
+                }
+                addToCounts(
+                        countsByEnrollment.computeIfAbsent(
+                                row.courseEnrollmentId(), k -> new long[4]),
+                        row.status(),
+                        row.count());
+            }
+        }
+
+        // Everyone on the page appears, marked or not: a student nobody recorded reports zero days
+        // and a null percentage, which is the honest answer and not the 0% an absence of rows would
+        // otherwise be read as.
+        PageResult<StudentAttendanceSummary> students =
+                roll.map(
+                        s ->
+                                new StudentAttendanceSummary(
+                                        s.courseEnrollmentId(),
+                                        s.studentId(),
+                                        s.fullName(),
+                                        toAttendanceCounts(
+                                                countsByEnrollment.getOrDefault(
+                                                        s.courseEnrollmentId(), new long[4]))));
+        return new CourseStudentAttendance(courseId, resolved.scope(), trimester, students);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CourseAttendanceStats attendanceStats(UUID courseId, Integer trimester) {
+        ReportScope resolved = resolveScope(courseId, trimester);
+        List<TrimesterPeriod> includedPeriods = resolved.periods();
+        String scope = resolved.scope();
 
         List<DailyStatusCount> rows =
                 attendanceDomain.dailyStatusCountsByCourseGroupedByDate(courseId);

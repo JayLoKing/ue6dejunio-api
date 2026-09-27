@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.attendance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.attendance.AttendanceService;
@@ -15,6 +16,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.MonthlyAttend
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.TrimesterAttendance;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.trimesterperiod.TrimesterPeriod;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.event.IDomainEventPublisher;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimesterPeriodDomain;
 import java.time.Clock;
@@ -77,8 +79,15 @@ class AttendanceStatsServiceTest {
 
     @BeforeEach
     void setUp() {
+        // These scenarios are the course-wide panel, which never reads the roll — the per-student
+        // report has its own test class.
         service =
-                new AttendanceService(attendanceDomain, trimesterPeriodDomain, events, FIXED_CLOCK);
+                new AttendanceService(
+                        attendanceDomain,
+                        trimesterPeriodDomain,
+                        mock(ICourseEnrollmentDomain.class),
+                        events,
+                        FIXED_CLOCK);
         courseId = UUID.randomUUID();
         lenient().when(attendanceDomain.courseExists(courseId)).thenReturn(true);
         lenient().when(attendanceDomain.academicYearOfCourse(courseId)).thenReturn(YEAR_ID);
