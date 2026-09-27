@@ -140,19 +140,25 @@ class AttendanceSecretaryAndSessionBatchIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The listing, and nothing else under it.
+     * The listing, and the course behind it.
      *
-     * <p>The overview carries the roster and the subjects with their teachers, which is the course
-     * opened rather than the course named. Opening the list must not open the file behind it.
+     * <p>This asserted the opposite until the secretariat was given "ver curso": the overview was
+     * read as the course opened rather than named, and opening the list was not meant to open the
+     * file behind it. The school decided otherwise — the secretariat's student directory links into
+     * this view, and it is the same read the Director gets.
+     *
+     * <p>What did not widen is writing. Withdrawing a student is a different route and still the
+     * Director's alone, which is what {@code secretary_cannotWithdrawStudent} below pins.
      */
     @Test
-    void secretary_cannotReadACourseOverview() throws Exception {
+    void secretary_readsACourseOverview() throws Exception {
         mvc.perform(
                         get("/api/courses/" + course + "/overview")
+                                .param("trimester", "1")
                                 .header(
                                         "Authorization",
                                         "Bearer " + tokenFor(secretary, "Secretary")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     /**
