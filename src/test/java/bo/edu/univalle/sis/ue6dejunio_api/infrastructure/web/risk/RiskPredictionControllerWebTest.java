@@ -16,6 +16,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.RiskPrediction;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService.RunSummary;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.JwtAuthConverter;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.error.GlobalExceptionHandler;
 import java.math.BigDecimal;
@@ -63,7 +64,7 @@ class RiskPredictionControllerWebTest {
 
         @Bean
         JwtAuthConverter jwtAuthConverter() {
-            return new JwtAuthConverter();
+            return new JwtAuthConverter(mock(IUserDomain.class));
         }
     }
 

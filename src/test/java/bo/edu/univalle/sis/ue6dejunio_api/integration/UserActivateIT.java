@@ -17,12 +17,17 @@ class UserActivateIT extends AbstractIntegrationTest {
 
     private UUID director;
     private UUID teacher;
+    private UUID activeTeacher;
 
     @BeforeEach
     void seed() {
         director = seedUser("Director", false);
         teacher = seedUser("Teacher", false);
         jdbc.update("UPDATE users SET is_active = false WHERE id_user = ?", teacher);
+        // The role check needs a caller who gets as far as being authorized. `teacher` is the
+        // subject of these tests and is deactivated, so a request signed as them is now refused at
+        // authentication -- before any role has a chance to be wrong.
+        activeTeacher = seedUser("Teacher", false);
     }
 
     @Test
@@ -63,7 +68,23 @@ class UserActivateIT extends AbstractIntegrationTest {
     void activate_nonDirectorRole_returns403() throws Exception {
         mvc.perform(
                         post("/api/users/{id}/activate", teacher)
-                                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(activeTeacher, "Teacher")))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * The session of a closed account stops at authentication, not at authorization: the token is
+     * still signed and still inside its window, so only re-reading the account can tell. Asserted
+     * here and not only in {@code JwtAuthConverterTest} because what matters is that the real
+     * filter chain does it — a unit test proves the converter, not that anything calls it.
+     */
+    @Test
+    void anyRequest_fromADeactivatedUser_returns401() throws Exception {
+        mvc.perform(
+                        post("/api/users/{id}/activate", teacher)
+                                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher")))
+                .andExpect(status().isUnauthorized());
     }
 }

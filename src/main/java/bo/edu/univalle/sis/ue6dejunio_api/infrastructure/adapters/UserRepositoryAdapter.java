@@ -51,6 +51,11 @@ public class UserRepositoryAdapter implements IUserDomain {
     }
 
     @Override
+    public boolean isActive(UUID id) {
+        return repo.existsByIdAndActiveTrue(id);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return repo.existsByEmail(email);
     }

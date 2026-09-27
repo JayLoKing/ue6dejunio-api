@@ -18,6 +18,13 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByCi(String ci);
 
+    /**
+     * Existence plus the flag in one indexed lookup, for the per-request session check. Derived
+     * rather than loading the entity: {@code UserEntity} fetches its role eagerly and holds the
+     * password hash, and neither belongs in a boolean.
+     */
+    boolean existsByIdAndActiveTrue(UUID id);
+
     List<UserEntity> findByRole_NameAndActiveTrueOrderByLastNames(String roleName);
 
     List<UserEntity> findByRole_NameAndActiveTrueAndTechnicalOrderByLastNames(

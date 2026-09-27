@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.ClientIpResolver;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.InMemoryBucketStore;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitProperties;
@@ -66,7 +67,7 @@ class RateLimitingFilterWebTest {
 
         @Bean
         JwtAuthConverter jwtAuthConverter() {
-            return new JwtAuthConverter();
+            return new JwtAuthConverter(mock(IUserDomain.class));
         }
 
         // Minimal permitAll chain (mirrors production's csrf-disabled, stateless setup) so the
