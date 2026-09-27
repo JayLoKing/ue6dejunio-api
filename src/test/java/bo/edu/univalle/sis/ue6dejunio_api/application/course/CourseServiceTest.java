@@ -18,6 +18,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import java.util.List;
@@ -34,6 +35,7 @@ class CourseServiceTest {
 
     @Mock private ICourseDomain courseDomain;
     @Mock private IClassGroupService classGroupService;
+    @Mock private IClassGroupDomain classGroupDomain;
     @InjectMocks private CourseService courseService;
 
     private Course course(UUID id) {
@@ -181,6 +183,84 @@ class CourseServiceTest {
                 .hasMessageContaining("Nora Arnez");
 
         verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+    }
+
+    /**
+     * A course with no prior homeroom teacher has nobody to inherit from: the assignment goes
+     * through and the class-group port is never touched.
+     */
+    @Test
+    void setHomeroom_courseHadNoHomeroomTeacher_classGroupsNeverMoved() {
+        UUID id = UUID.randomUUID();
+        UUID newTeacher = UUID.randomUUID();
+        when(courseDomain.findById(id)).thenReturn(Optional.of(course(id)));
+        when(courseDomain.userIsNonTechnicalTeacher(newTeacher)).thenReturn(true);
+        when(courseDomain.setHomeroomTeacher(id, newTeacher))
+                .thenReturn(courseWithHomeroom(id, newTeacher, true));
+
+        courseService.setHomeroomTeacher(id, newTeacher);
+
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    /**
+     * Reassigning a course to the same person it already has is the no-op re-save the guard lets
+     * through. Nothing changed hands, so nothing should move.
+     */
+    @Test
+    void setHomeroom_samePersonReassigned_classGroupsNeverMoved() {
+        UUID id = UUID.randomUUID();
+        UUID teacher = UUID.randomUUID();
+        when(courseDomain.findById(id))
+                .thenReturn(Optional.of(courseWithHomeroom(id, teacher, true)));
+        when(courseDomain.userIsNonTechnicalTeacher(teacher)).thenReturn(true);
+        when(courseDomain.setHomeroomTeacher(id, teacher))
+                .thenReturn(courseWithHomeroom(id, teacher, true));
+
+        courseService.setHomeroomTeacher(id, teacher);
+
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    /**
+     * The actual reassignment: once the guard lets a genuine change of person through (the outgoing
+     * teacher is inactive), every class group the outgoing teacher held in this course must move to
+     * the incoming one — "todas las que dictaba el anterior docente".
+     */
+    @Test
+    void setHomeroom_outgoingInactiveAndDifferentPerson_movesOutgoingTeachersClassGroups() {
+        UUID id = UUID.randomUUID();
+        UUID outgoing = UUID.randomUUID();
+        UUID incoming = UUID.randomUUID();
+        when(courseDomain.findById(id))
+                .thenReturn(Optional.of(courseWithHomeroom(id, outgoing, false)));
+        when(courseDomain.userIsNonTechnicalTeacher(incoming)).thenReturn(true);
+        when(courseDomain.setHomeroomTeacher(id, incoming))
+                .thenReturn(courseWithHomeroom(id, incoming, true));
+
+        courseService.setHomeroomTeacher(id, incoming);
+
+        verify(classGroupDomain).reassignTeacherInCourse(id, outgoing, incoming);
+    }
+
+    /**
+     * The same move must happen through {@code update(...)}, not just through the dedicated
+     * endpoint — both paths share the private {@code assignHomeroomTeacher}.
+     */
+    @Test
+    void update_outgoingInactiveAndDifferentPerson_movesOutgoingTeachersClassGroups() {
+        UUID id = UUID.randomUUID();
+        UUID outgoing = UUID.randomUUID();
+        UUID incoming = UUID.randomUUID();
+        when(courseDomain.findById(id))
+                .thenReturn(Optional.of(courseWithHomeroom(id, outgoing, false)));
+        when(courseDomain.userIsNonTechnicalTeacher(incoming)).thenReturn(true);
+        when(courseDomain.setHomeroomTeacher(id, incoming))
+                .thenReturn(courseWithHomeroom(id, incoming, true));
+
+        courseService.update(id, new UpdateCourseCommand(incoming, null));
+
+        verify(classGroupDomain).reassignTeacherInCourse(id, outgoing, incoming);
     }
 
     /**

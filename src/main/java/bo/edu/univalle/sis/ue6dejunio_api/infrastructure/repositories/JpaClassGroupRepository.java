@@ -1,11 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.ClassGroupEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -89,4 +91,23 @@ public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity,
     @EntityGraph(attributePaths = {"course", "subject", "subject.area", "teacher"})
     List<ClassGroupEntity> findActiveOfCoursesInPlanOrder(
             @Param("courseIds") Collection<UUID> courseIds);
+
+    /**
+     * Moves every ACTIVE class group of {@code courseId} taught by {@code fromTeacherId} over to
+     * {@code toTeacherId} in one statement, so a homeroom reassignment costs one update no matter
+     * how many subjects the outgoing teacher held — see {@link
+     * bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain#reassignTeacherInCourse}
+     * for the boundary this enforces.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+        UPDATE ClassGroupEntity cg
+        SET cg.teacher = :toTeacher
+        WHERE cg.course.id = :courseId AND cg.teacher.id = :fromTeacherId AND cg.active = true
+        """)
+    int reassignTeacherInCourse(
+            @Param("courseId") UUID courseId,
+            @Param("fromTeacherId") UUID fromTeacherId,
+            @Param("toTeacher") UserEntity toTeacher);
 }

@@ -11,6 +11,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseService;
@@ -29,10 +30,15 @@ public class CourseService implements ICourseService {
 
     private final ICourseDomain courseDomain;
     private final IClassGroupService classGroupService;
+    private final IClassGroupDomain classGroupDomain;
 
-    public CourseService(ICourseDomain courseDomain, IClassGroupService classGroupService) {
+    public CourseService(
+            ICourseDomain courseDomain,
+            IClassGroupService classGroupService,
+            IClassGroupDomain classGroupDomain) {
         this.courseDomain = courseDomain;
         this.classGroupService = classGroupService;
+        this.classGroupDomain = classGroupDomain;
     }
 
     @Override
@@ -104,6 +110,12 @@ public class CourseService implements ICourseService {
      * <p>So a reassignment away from the current homeroom teacher is refused while that teacher's
      * account is still active, unless the incoming id is that same person (a no-op re-save must not
      * be blocked by its own rule).
+     *
+     * <p>Once a genuine change of person is allowed through, every class group of this course that
+     * the outgoing teacher held moves to the incoming one — "todas las que dictaba el anterior
+     * docente". Otherwise the incoming homeroom teacher would see all nine subjects (the homeroom
+     * read rule) but be able to write to none of them (the class-group teacher still points at
+     * whoever left).
      */
     private Course assignHomeroomTeacher(UUID id, UUID teacherId) {
         Course current = getById(id);
@@ -119,7 +131,11 @@ public class CourseService implements ICourseService {
                             + " sigue activo como docente de aula de este curso. Para"
                             + " reasignarlo, primero dale de baja en Usuarios.");
         }
-        return courseDomain.setHomeroomTeacher(id, teacherId);
+        Course updated = courseDomain.setHomeroomTeacher(id, teacherId);
+        if (outgoingTeacherId != null && !outgoingTeacherId.equals(teacherId)) {
+            classGroupDomain.reassignTeacherInCourse(id, outgoingTeacherId, teacherId);
+        }
+        return updated;
     }
 
     @Override

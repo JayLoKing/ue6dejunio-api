@@ -78,4 +78,22 @@ public interface IClassGroupDomain {
     void setActive(UUID classGroupId, boolean active);
 
     ClassGroup setTeacher(UUID classGroupId, UUID teacherId);
+
+    /**
+     * Moves every ACTIVE class group of {@code courseId} that {@code fromTeacherId} was teaching
+     * over to {@code toTeacherId} — the rule the Director asked for on a homeroom reassignment:
+     * "todas las que dictaba el anterior docente". Technical subjects included, if the outgoing
+     * homeroom teacher held any in this course.
+     *
+     * <p>The boundary is exactly two things, and both matter: (1) only the class groups {@code
+     * fromTeacherId} held in {@code courseId} move — a subject of the same course held by some
+     * third teacher stays with that third teacher, and (2) only within {@code courseId} — a subject
+     * {@code fromTeacherId} teaches in another course is untouched.
+     *
+     * <p>Only ACTIVE class groups move. An inactive one is a subject that was closed; rewriting its
+     * teacher would rewrite who taught it, which is a historical fact, not an oversight to fix.
+     *
+     * @return how many class groups moved, 0 when the outgoing teacher held none in this course
+     */
+    int reassignTeacherInCourse(UUID courseId, UUID fromTeacherId, UUID toTeacherId);
 }

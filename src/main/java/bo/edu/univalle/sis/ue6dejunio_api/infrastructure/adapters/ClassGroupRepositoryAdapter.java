@@ -235,6 +235,15 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         return toDomain(classGroupRepo.save(e));
     }
 
+    @Override
+    @Transactional
+    public int reassignTeacherInCourse(UUID courseId, UUID fromTeacherId, UUID toTeacherId) {
+        // A reference, not a fetch: the caller already validated toTeacherId is a non-technical
+        // teacher before reaching this port, so this only needs an id to write, not a row to read.
+        UserEntity toTeacher = userRepo.getReferenceById(toTeacherId);
+        return classGroupRepo.reassignTeacherInCourse(courseId, fromTeacherId, toTeacher);
+    }
+
     private ClassGroup toDomain(ClassGroupEntity e) {
         CourseEntity c = e.getCourse();
         UserEntity t = e.getTeacher();
