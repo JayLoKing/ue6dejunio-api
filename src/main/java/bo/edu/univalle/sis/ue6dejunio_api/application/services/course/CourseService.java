@@ -116,11 +116,25 @@ public class CourseService implements ICourseService {
      * docente". Otherwise the incoming homeroom teacher would see all nine subjects (the homeroom
      * read rule) but be able to write to none of them (the class-group teacher still points at
      * whoever left).
+     *
+     * <p>{@code id_homeroom_teacher} carries no UNIQUE constraint, so a teacher who is already
+     * homeroom of a different course is refused here too — otherwise they would silently end up
+     * homeroom of both. That case is not an error on its own: it is exactly what {@link
+     * #swapHomeroomTeachers} exists for, and this message points there.
      */
     private Course assignHomeroomTeacher(UUID id, UUID teacherId) {
         Course current = getById(id);
         if (!courseDomain.userIsNonTechnicalTeacher(teacherId)) {
             throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
+        }
+        Optional<Course> teacherHomeroomElsewhere = courseDomain.homeroomCourseOf(teacherId);
+        if (teacherHomeroomElsewhere.isPresent()
+                && !teacherHomeroomElsewhere.get().id().equals(id)) {
+            throw new ConflictException(
+                    "Ya es docente de aula de "
+                            + courseLabel(teacherHomeroomElsewhere.get())
+                            + ". Para moverlo aqui usa el intercambio de docentes de aula entre"
+                            + " cursos.");
         }
         UUID outgoingTeacherId = current.homeroomTeacherId();
         if (outgoingTeacherId != null
@@ -136,6 +150,68 @@ public class CourseService implements ICourseService {
             classGroupDomain.reassignTeacherInCourse(id, outgoingTeacherId, teacherId);
         }
         return updated;
+    }
+
+    /**
+     * See {@link ICourseService#swapHomeroomTeachers} for the rules. The order the two {@link
+     * IClassGroupDomain#reassignTeacherInCourse} calls run in is safe precisely because each is
+     * scoped to one course: the first call only touches class groups of {@code courseAId}, so by
+     * the time the second call runs against {@code courseBId} there is nothing from the first move
+     * for it to pick up. Swapping the roles of A and B here would not change that — the two calls
+     * never share a course id.
+     */
+    @Override
+    @Transactional
+    public Course swapHomeroomTeachers(UUID courseAId, UUID courseBId) {
+        if (courseAId.equals(courseBId)) {
+            throw new ConflictException(
+                    "No se puede intercambiar el docente de aula de un curso consigo mismo.");
+        }
+        Course courseA = getById(courseAId);
+        Course courseB = getById(courseBId);
+
+        UUID teacherA = courseA.homeroomTeacherId();
+        UUID teacherB = courseB.homeroomTeacherId();
+        if (teacherA == null) {
+            throw new ConflictException(
+                    courseLabel(courseA)
+                            + " no tiene un docente de aula asignado; nada que"
+                            + " intercambiar.");
+        }
+        if (teacherB == null) {
+            throw new ConflictException(
+                    courseLabel(courseB)
+                            + " no tiene un docente de aula asignado; nada que"
+                            + " intercambiar.");
+        }
+        if (!courseA.homeroomTeacherActive()) {
+            throw new ConflictException(
+                    courseA.homeroomTeacherName()
+                            + " (docente de aula de "
+                            + courseLabel(courseA)
+                            + ") esta dado de baja; esto no es un intercambio. Usa la"
+                            + " reasignacion normal.");
+        }
+        if (!courseB.homeroomTeacherActive()) {
+            throw new ConflictException(
+                    courseB.homeroomTeacherName()
+                            + " (docente de aula de "
+                            + courseLabel(courseB)
+                            + ") esta dado de baja; esto no es un intercambio. Usa la"
+                            + " reasignacion normal.");
+        }
+
+        Course updatedA = courseDomain.setHomeroomTeacher(courseAId, teacherB);
+        courseDomain.setHomeroomTeacher(courseBId, teacherA);
+
+        classGroupDomain.reassignTeacherInCourse(courseAId, teacherA, teacherB);
+        classGroupDomain.reassignTeacherInCourse(courseBId, teacherB, teacherA);
+
+        return updatedA;
+    }
+
+    private String courseLabel(Course course) {
+        return course.gradeName() + " " + course.parallelName();
     }
 
     @Override

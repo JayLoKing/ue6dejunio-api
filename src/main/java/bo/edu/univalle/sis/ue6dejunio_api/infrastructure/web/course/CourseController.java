@@ -20,6 +20,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateCourseReq
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HomeroomTeacherRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReassignTeacherRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.SwapHomeroomTeachersRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateCourseRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -114,6 +115,18 @@ public class CourseController {
             @PathVariable UUID id, @Valid @RequestBody HomeroomTeacherRequest r) {
         return ResponseEntity.ok(
                 CourseResponse.from(courseService.setHomeroomTeacher(id, r.homeroomTeacherId())));
+    }
+
+    @PutMapping("/homeroom-teachers/swap")
+    @Operation(
+            summary =
+                    "Intercambiar el docente de aula entre dos cursos (ambos activos, ninguno de"
+                            + " baja)")
+    public ResponseEntity<CourseResponse> swapHomeroomTeachers(
+            @Valid @RequestBody SwapHomeroomTeachersRequest r) {
+        return ResponseEntity.ok(
+                CourseResponse.from(
+                        courseService.swapHomeroomTeachers(r.courseAId(), r.courseBId())));
     }
 
     @DeleteMapping("/{id}")

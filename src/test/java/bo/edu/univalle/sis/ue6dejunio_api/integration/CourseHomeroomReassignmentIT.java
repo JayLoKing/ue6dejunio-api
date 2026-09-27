@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,5 +127,154 @@ class CourseHomeroomReassignmentIT extends AbstractIntegrationTest {
                 "SELECT id_teacher FROM class_groups WHERE id_class_group = ?",
                 UUID.class,
                 classGroupId);
+    }
+
+    private String swapBody(UUID courseAId, UUID courseBId) throws Exception {
+        return json.writeValueAsString(
+                Map.of(
+                        "id_course_a", courseAId.toString(),
+                        "id_course_b", courseBId.toString()));
+    }
+
+    private UUID insertSubject(String name) {
+        UUID id = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO subjects (id_subject, name, id_area) "
+                        + "SELECT ?, ?, id_area FROM knowledge_areas LIMIT 1",
+                id,
+                name);
+        return id;
+    }
+
+    private UUID seedClassGroupBySubjectId(UUID ofCourseId, UUID teacherId, UUID subjectId) {
+        UUID id = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO class_groups (id_class_group, id_course, id_subject, id_teacher, "
+                        + "is_active) VALUES (?,?,?,?,true)",
+                id,
+                ofCourseId,
+                subjectId,
+                teacherId);
+        return id;
+    }
+
+    /**
+     * Spec: {@code PUT /api/courses/homeroom-teachers/swap} trades the homeroom teacher of two
+     * courses, both active, and each teacher inherits what the outgoing teacher held IN THE COURSE
+     * THEY ARRIVE AT — never what they used to teach themselves. The user's own example: 1ro A's
+     * homeroom teaches 7 of its 9 subjects (a third teacher holds the other 2); 2do A's homeroom
+     * teaches all 9. After the swap, the one arriving at 1ro A teaches exactly those 7, and the one
+     * arriving at 2do A teaches all 9 — and the third teacher's 2 subjects in 1ro A never moved.
+     */
+    @Test
+    void swap_bothActive_eachTeacherInheritsTheArrivingCoursesSubjects() throws Exception {
+        UUID director2 = seedUser("Director", false);
+        UUID teacherA = seedUser("Teacher", false);
+        UUID teacherB = seedUser("Teacher", false);
+        UUID thirdTeacher = seedUser("Teacher", false);
+
+        // "B" and "C": the @BeforeEach above already seeded a course on parallel "A" for this
+        // same grade and gestión, and (id_grade, id_parallel, id_academic_year) is UNIQUE.
+        UUID courseA = seedCourse(teacherA, "B");
+        UUID courseB = seedCourse(teacherB, "C");
+
+        // 1ro A: 9 subjects, 7 held by teacherA, 2 held by a third teacher.
+        List<UUID> aTeacherGroups = new ArrayList<>();
+        for (int i = 1; i <= 7; i++) {
+            UUID subjectId = insertSubject("SwapIT-A-" + i);
+            aTeacherGroups.add(seedClassGroupBySubjectId(courseA, teacherA, subjectId));
+        }
+        List<UUID> thirdTeacherGroups = new ArrayList<>();
+        for (int i = 1; i <= 2; i++) {
+            UUID subjectId = insertSubject("SwapIT-A-third-" + i);
+            thirdTeacherGroups.add(seedClassGroupBySubjectId(courseA, thirdTeacher, subjectId));
+        }
+
+        // 2do A (course B here): 9 subjects, all held by teacherB.
+        List<UUID> bTeacherGroups = new ArrayList<>();
+        for (int i = 1; i <= 9; i++) {
+            UUID subjectId = insertSubject("SwapIT-B-" + i);
+            bTeacherGroups.add(seedClassGroupBySubjectId(courseB, teacherB, subjectId));
+        }
+
+        mvc.perform(
+                        put("/api/courses/homeroom-teachers/swap")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director2, "Director"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(swapBody(courseA, courseB)))
+                .andExpect(status().isOk());
+
+        // Homeroom teachers traded places.
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT id_homeroom_teacher FROM courses WHERE id_course = ?",
+                                UUID.class,
+                                courseA))
+                .isEqualTo(teacherB);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT id_homeroom_teacher FROM courses WHERE id_course = ?",
+                                UUID.class,
+                                courseB))
+                .isEqualTo(teacherA);
+
+        // teacherB (arriving at course A) now teaches exactly the 7 subjects teacherA held there.
+        for (UUID classGroupId : aTeacherGroups) {
+            assertThat(teacherOfClassGroup(classGroupId)).isEqualTo(teacherB);
+        }
+        // The third teacher's 2 subjects in course A never moved.
+        for (UUID classGroupId : thirdTeacherGroups) {
+            assertThat(teacherOfClassGroup(classGroupId)).isEqualTo(thirdTeacher);
+        }
+        // teacherA (arriving at course B) now teaches all 9 subjects teacherB held there.
+        for (UUID classGroupId : bTeacherGroups) {
+            assertThat(teacherOfClassGroup(classGroupId)).isEqualTo(teacherA);
+        }
+    }
+
+    @Test
+    void swap_sameCourseTwice_refused() throws Exception {
+        UUID director2 = seedUser("Director", false);
+        mvc.perform(
+                        put("/api/courses/homeroom-teachers/swap")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director2, "Director"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(swapBody(courseId, courseId)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void swap_oneCourseHasNoHomeroomTeacher_refused() throws Exception {
+        UUID director2 = seedUser("Director", false);
+        UUID courseWithNoHomeroom = seedCourse(null, "B");
+
+        mvc.perform(
+                        put("/api/courses/homeroom-teachers/swap")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director2, "Director"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(swapBody(courseId, courseWithNoHomeroom)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void swap_oneTeacherInactive_refused() throws Exception {
+        UUID director2 = seedUser("Director", false);
+        UUID courseB = seedCourse(incomingTeacher, "B");
+        jdbc.update("UPDATE users SET is_active = false WHERE id_user = ?", incomingTeacher);
+
+        mvc.perform(
+                        put("/api/courses/homeroom-teachers/swap")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(director2, "Director"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(swapBody(courseId, courseB)))
+                .andExpect(status().isConflict());
     }
 }

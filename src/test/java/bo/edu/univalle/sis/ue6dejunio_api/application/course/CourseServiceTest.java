@@ -47,6 +47,22 @@ class CourseServiceTest {
                 id, 1, "Primero", 1, "A", 1, 2026, teacherId, "Nora Arnez", true, teacherActive);
     }
 
+    private Course courseNamed(
+            UUID id, String gradeName, String parallelName, UUID teacherId, boolean teacherActive) {
+        return new Course(
+                id,
+                2,
+                gradeName,
+                2,
+                parallelName,
+                1,
+                2026,
+                teacherId,
+                "Otro Docente",
+                true,
+                teacherActive);
+    }
+
     private CreateCourseCommand cmd(UUID homeroom) {
         return new CreateCourseCommand(
                 1,
@@ -261,6 +277,159 @@ class CourseServiceTest {
         courseService.update(id, new UpdateCourseCommand(incoming, null));
 
         verify(classGroupDomain).reassignTeacherInCourse(id, outgoing, incoming);
+    }
+
+    /**
+     * The two-courses hole: {@code id_homeroom_teacher} has no UNIQUE constraint, and until now
+     * nothing stopped a teacher who is already homeroom of one course from being made homeroom of
+     * another too.
+     */
+    @Test
+    void setHomeroom_incomingAlreadyHomeroomOfDifferentCourse_throwsAndNeverAssigns() {
+        UUID id = UUID.randomUUID();
+        UUID otherCourseId = UUID.randomUUID();
+        UUID incoming = UUID.randomUUID();
+        when(courseDomain.findById(id)).thenReturn(Optional.of(course(id)));
+        when(courseDomain.userIsNonTechnicalTeacher(incoming)).thenReturn(true);
+        when(courseDomain.homeroomCourseOf(incoming))
+                .thenReturn(
+                        Optional.of(courseNamed(otherCourseId, "Segundo", "B", incoming, true)));
+
+        assertThatThrownBy(() -> courseService.setHomeroomTeacher(id, incoming))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Segundo")
+                .hasMessageContaining("B");
+
+        verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+    }
+
+    /**
+     * A teacher who is already homeroom of THIS SAME course (a re-save through {@code update}, or a
+     * repeated call) is not "already homeroom elsewhere" — the guard must only look at other
+     * courses.
+     */
+    @Test
+    void setHomeroom_incomingAlreadyHomeroomOfThisSameCourse_allowedAsNoOp() {
+        UUID id = UUID.randomUUID();
+        UUID teacher = UUID.randomUUID();
+        when(courseDomain.findById(id))
+                .thenReturn(Optional.of(courseWithHomeroom(id, teacher, true)));
+        when(courseDomain.userIsNonTechnicalTeacher(teacher)).thenReturn(true);
+        when(courseDomain.homeroomCourseOf(teacher))
+                .thenReturn(Optional.of(courseWithHomeroom(id, teacher, true)));
+        when(courseDomain.setHomeroomTeacher(id, teacher))
+                .thenReturn(courseWithHomeroom(id, teacher, true));
+
+        Course result = courseService.setHomeroomTeacher(id, teacher);
+
+        assertThat(result.homeroomTeacherId()).isEqualTo(teacher);
+    }
+
+    /** Same id twice is not a swap; nothing to trade. */
+    @Test
+    void swapHomeroom_sameCourseTwice_throwsAndNeverTouchesAnything() {
+        UUID id = UUID.randomUUID();
+
+        assertThatThrownBy(() -> courseService.swapHomeroomTeachers(id, id))
+                .isInstanceOf(ConflictException.class);
+
+        verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    /** An empty seat on either side would leave a course headless; refuse and say which one. */
+    @Test
+    void swapHomeroom_courseAHasNoHomeroomTeacher_throwsAndNeverTouchesAnything() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        when(courseDomain.findById(a)).thenReturn(Optional.of(course(a)));
+        when(courseDomain.findById(b))
+                .thenReturn(Optional.of(courseWithHomeroom(b, UUID.randomUUID(), true)));
+
+        assertThatThrownBy(() -> courseService.swapHomeroomTeachers(a, b))
+                .isInstanceOf(ConflictException.class);
+
+        verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    @Test
+    void swapHomeroom_courseBHasNoHomeroomTeacher_throwsAndNeverTouchesAnything() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        when(courseDomain.findById(a))
+                .thenReturn(Optional.of(courseWithHomeroom(a, UUID.randomUUID(), true)));
+        when(courseDomain.findById(b)).thenReturn(Optional.of(course(b)));
+
+        assertThatThrownBy(() -> courseService.swapHomeroomTeachers(a, b))
+                .isInstanceOf(ConflictException.class);
+
+        verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    /** An inactive homeroom teacher on either side means this is not a swap — nobody left. */
+    @Test
+    void swapHomeroom_courseATeacherInactive_throwsAndNeverTouchesAnything() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        UUID teacherA = UUID.randomUUID();
+        UUID teacherB = UUID.randomUUID();
+        when(courseDomain.findById(a))
+                .thenReturn(Optional.of(courseWithHomeroom(a, teacherA, false)));
+        when(courseDomain.findById(b))
+                .thenReturn(Optional.of(courseWithHomeroom(b, teacherB, true)));
+
+        assertThatThrownBy(() -> courseService.swapHomeroomTeachers(a, b))
+                .isInstanceOf(ConflictException.class);
+
+        verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    @Test
+    void swapHomeroom_courseBTeacherInactive_throwsAndNeverTouchesAnything() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        UUID teacherA = UUID.randomUUID();
+        UUID teacherB = UUID.randomUUID();
+        when(courseDomain.findById(a))
+                .thenReturn(Optional.of(courseWithHomeroom(a, teacherA, true)));
+        when(courseDomain.findById(b))
+                .thenReturn(Optional.of(courseWithHomeroom(b, teacherB, false)));
+
+        assertThatThrownBy(() -> courseService.swapHomeroomTeachers(a, b))
+                .isInstanceOf(ConflictException.class);
+
+        verify(courseDomain, never()).setHomeroomTeacher(any(), any());
+        verify(classGroupDomain, never()).reassignTeacherInCourse(any(), any(), any());
+    }
+
+    /**
+     * The swap itself: A gets B's teacher, B gets A's teacher, and {@code reassignTeacherInCourse}
+     * runs once per course, each scoped so the second call cannot pick up what the first just
+     * moved.
+     */
+    @Test
+    void swapHomeroom_bothActive_swapsTeachersAndReassignsBothCourses() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        UUID teacherA = UUID.randomUUID();
+        UUID teacherB = UUID.randomUUID();
+        when(courseDomain.findById(a))
+                .thenReturn(Optional.of(courseWithHomeroom(a, teacherA, true)));
+        when(courseDomain.findById(b))
+                .thenReturn(Optional.of(courseWithHomeroom(b, teacherB, true)));
+        when(courseDomain.setHomeroomTeacher(a, teacherB))
+                .thenReturn(courseWithHomeroom(a, teacherB, true));
+
+        Course result = courseService.swapHomeroomTeachers(a, b);
+
+        assertThat(result.homeroomTeacherId()).isEqualTo(teacherB);
+        verify(courseDomain).setHomeroomTeacher(a, teacherB);
+        verify(courseDomain).setHomeroomTeacher(b, teacherA);
+        verify(classGroupDomain).reassignTeacherInCourse(a, teacherA, teacherB);
+        verify(classGroupDomain).reassignTeacherInCourse(b, teacherB, teacherA);
     }
 
     /**
