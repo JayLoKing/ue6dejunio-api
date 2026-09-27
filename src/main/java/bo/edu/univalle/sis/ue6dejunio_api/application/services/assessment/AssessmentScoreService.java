@@ -75,6 +75,17 @@ public class AssessmentScoreService implements IAssessmentScoreService {
                     "El estudiante no pertenece al curso de la materia evaluada");
         }
 
+        // The roster a teacher grades is the academic one, and it keeps the withdrawn student on
+        // purpose: the marks they earned before leaving are still part of the year. Keeping the row
+        // readable is not the same as keeping it writable -- once the school takes someone off the
+        // roll it stops grading them, so no new mark lands on a closed seat. Deleting is left open:
+        // a mark typed by mistake before the withdrawal must still have a way out.
+        if (scoreDomain.courseEnrollmentIsWithdrawn(c.courseEnrollmentId())) {
+            throw new ConflictException(
+                    "El estudiante fue dado de baja de este curso: no se pueden registrar notas"
+                            + " nuevas");
+        }
+
         // A score may not exceed the cap of its criterion's dimension. The dimension is guarded by
         // a CHECK constraint, so an unknown one means the row drifted from the schema -- a
         // conflict to report, not the raw IllegalArgumentException the lookup would raise.

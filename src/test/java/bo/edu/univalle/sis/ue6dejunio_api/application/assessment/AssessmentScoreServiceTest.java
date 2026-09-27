@@ -275,6 +275,24 @@ class AssessmentScoreServiceTest {
                 .isInstanceOf(ValidationException.class);
     }
 
+    /**
+     * A withdrawn student keeps the marks they earned before leaving — the roster shows them for
+     * exactly that reason — but the school stops grading them the day they go. The roster the
+     * teacher's notebook lists is the academic one, so the row is there to be typed into unless
+     * something refuses the write.
+     */
+    @Test
+    void setScore_forAWithdrawnEnrollment_throws() {
+        UUID eventId = UUID.randomUUID();
+        when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Doing")));
+        sameCourse();
+        when(scoreDomain.courseEnrollmentIsWithdrawn(enrollment)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.setScore(onEvent(eventId, "30")))
+                .isInstanceOf(ConflictException.class);
+        verify(scoreDomain, never()).upsertForEvent(any(), any(), any());
+    }
+
     @Test
     void setScore_wrongCourse_throws() {
         UUID eventId = UUID.randomUUID();

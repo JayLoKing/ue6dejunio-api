@@ -31,5 +31,14 @@ public interface IAssessmentScoreDomain {
 
     UUID courseOfCourseEnrollment(UUID courseEnrollmentId);
 
+    /**
+     * Whether the school has taken this enrolment off the roll.
+     *
+     * <p>Asked of the enrolment and not of the student: the UNIQUE on course enrolments is per
+     * course, so the same student can hold a live seat in one course and a closed one in another.
+     * Answering from the student's own status would refuse a mark in the course they still attend.
+     */
+    boolean courseEnrollmentIsWithdrawn(UUID courseEnrollmentId);
+
     void deleteById(UUID id);
 }

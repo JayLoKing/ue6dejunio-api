@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain {
 
+    private static final String STATUS_WITHDRAWN = "Withdrawn";
+
     private final JpaAssessmentScoreRepository scoreRepo;
     private final JpaAssessmentEventRepository eventRepo;
     private final JpaEvaluationCriterionRepository criterionRepo;
@@ -112,6 +114,21 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
         return enrollmentRepo
                 .findById(courseEnrollmentId)
                 .map(en -> en.getCourse().getId())
+                .orElseThrow(
+                        () ->
+                                new ResourceNotFoundException(
+                                        "CourseEnrollment", courseEnrollmentId));
+    }
+
+    /**
+     * Same lookup {@link #courseOfCourseEnrollment} just did, and inside the same transaction, so
+     * the persistence context answers it without a second statement.
+     */
+    @Override
+    public boolean courseEnrollmentIsWithdrawn(UUID courseEnrollmentId) {
+        return enrollmentRepo
+                .findById(courseEnrollmentId)
+                .map(en -> STATUS_WITHDRAWN.equals(en.getStatus()))
                 .orElseThrow(
                         () ->
                                 new ResourceNotFoundException(
