@@ -86,6 +86,9 @@ CREATE TABLE IF NOT EXISTS course_enrollments (
     id_course uuid NOT NULL REFERENCES courses(id_course) ON DELETE RESTRICT,
     enrollment_date date DEFAULT CURRENT_DATE,
     status varchar(20) DEFAULT 'Effective',
+    final_average numeric(5,2) NULL,
+    final_result varchar(10) NULL CONSTRAINT chk_course_enrollments_final_result CHECK (final_result IN ('APPROVED', 'FAILED')),
+    closed_at timestamp NULL,
     CONSTRAINT uq_course_enrollment UNIQUE (id_student, id_course)
 );
 

@@ -7,7 +7,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -37,4 +39,16 @@ public class CourseEnrollmentEntity {
 
     @Column(name = "status", length = 20)
     private String status;
+
+    /** Frozen when the year closes; see V23. Null until then, and for withdrawn or ungraded. */
+    @Column(name = "final_average", precision = 5, scale = 2)
+    private BigDecimal finalAverage;
+
+    /** {@code APPROVED} or {@code FAILED}; same lifecycle as {@link #finalAverage}. */
+    @Column(name = "final_result", length = 10)
+    private String finalResult;
+
+    /** When the enrollment's year was closed; cleared again when the year is reopened. */
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
 }
