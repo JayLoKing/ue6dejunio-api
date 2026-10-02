@@ -67,6 +67,28 @@ class ClosedYearGuardTest {
     }
 
     @Test
+    void plan_ofAClosedYear_isRefused_andAnOpenOneAndAnUnknownOnePass() {
+        when(lock.closedYearsOfPlans(Set.of(id))).thenReturn(Set.of(2026));
+        when(lock.closedYearsOfPlans(Set.of(other))).thenReturn(Set.of());
+
+        assertThatThrownBy(() -> guard.requireOpenForPlan(id))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("La gestión 2026 está cerrada; no admite cambios.");
+        assertThatCode(() -> guard.requireOpenForPlan(other)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void riskPrediction_ofAClosedYear_isRefused_andAnOpenOneAndAnUnknownOnePass() {
+        when(lock.closedYearsOfRiskPredictions(Set.of(id))).thenReturn(Set.of(2025));
+        when(lock.closedYearsOfRiskPredictions(Set.of(other))).thenReturn(Set.of());
+
+        assertThatThrownBy(() -> guard.requireOpenForRiskPrediction(id))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("La gestión 2025 está cerrada; no admite cambios.");
+        assertThatCode(() -> guard.requireOpenForRiskPrediction(other)).doesNotThrowAnyException();
+    }
+
+    @Test
     void classGroups_aBatchIsOneQueryNoMatterHowManyIds() {
         when(lock.closedYearsOfClassGroups(Set.of(id, other))).thenReturn(Set.of());
 

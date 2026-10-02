@@ -67,6 +67,14 @@ public class ClosedYearGuard {
         refuseIfClosed(lock.closedYearsOfCourses(Set.copyOf(courseIds)));
     }
 
+    public void requireOpenForPlan(UUID planId) {
+        refuseIfClosed(lock.closedYearsOfPlans(Set.of(planId)));
+    }
+
+    public void requireOpenForRiskPrediction(UUID predictionId) {
+        refuseIfClosed(lock.closedYearsOfRiskPredictions(Set.of(predictionId)));
+    }
+
     /** For a caller that already holds the {@code id_academic_year} row id. */
     public void requireOpenForYear(int academicYearId) {
         years.findItem(academicYearId)

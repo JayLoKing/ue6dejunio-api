@@ -70,6 +70,36 @@ class AcademicYearLockIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void closedYear_isFoundFromAPlanAndFromARiskPrediction() {
+        UUID plan = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO curriculum_plans (id_curriculum_plan, id_course, plan_number, "
+                        + "trimester, period_start, period_end) "
+                        + "VALUES (?,?,1,1,DATE '2026-02-01',DATE '2026-02-28')",
+                plan,
+                course2026);
+        UUID prediction = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO risk_predictions (id_risk_prediction, id_student, id_class_group, "
+                        + "trimester, risk_level, p_fail, p_outstanding) "
+                        + "SELECT ?, ce.id_student, ?, 1, 'EnRiesgo', 0.6, 0.1 "
+                        + "FROM course_enrollments ce WHERE ce.id_course_enrollment = ?",
+                prediction,
+                classGroup2026,
+                enrollment2026);
+
+        assertThat(lock.closedYearsOfPlans(List.of(plan))).isEmpty();
+        assertThat(lock.closedYearsOfRiskPredictions(List.of(prediction))).isEmpty();
+
+        close(2026);
+
+        assertThat(lock.closedYearsOfPlans(List.of(plan))).containsExactly(2026);
+        assertThat(lock.closedYearsOfRiskPredictions(List.of(prediction))).containsExactly(2026);
+        assertThat(lock.closedYearsOfPlans(List.of(UUID.randomUUID()))).isEmpty();
+        assertThat(lock.closedYearsOfRiskPredictions(List.of(UUID.randomUUID()))).isEmpty();
+    }
+
+    @Test
     void unknownIds_answerNothing() {
         close(2026);
 

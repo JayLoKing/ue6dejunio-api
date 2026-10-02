@@ -46,7 +46,7 @@ public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEnt
     @Query("UPDATE AcademicYearEntity y SET y.closedAt = NULL WHERE y.id = :id")
     int reopen(@Param("id") Integer id);
 
-    // The three below answer "which closed years do these records sit in" for the closed-year
+    // The ones below answer "which closed years do these records sit in" for the closed-year
     // guard: one query each however many ids, joined up to the year, so a batch never asks per row.
     @Query(
             """
@@ -71,4 +71,22 @@ public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEnt
         WHERE c.id IN :ids AND y.closedAt IS NOT NULL
         """)
     List<Integer> closedYearsOfCourses(@Param("ids") Collection<UUID> ids);
+
+    @Query(
+            """
+        SELECT DISTINCT y.year FROM CurriculumPlanEntity p
+        JOIN p.course c JOIN c.academicYear y
+        WHERE p.id IN :ids AND y.closedAt IS NOT NULL
+        """)
+    List<Integer> closedYearsOfPlans(@Param("ids") Collection<UUID> ids);
+
+    // A prediction carries its class group as a bare uuid, not an association, so the join to the
+    // class group is spelled out.
+    @Query(
+            """
+        SELECT DISTINCT y.year FROM RiskPredictionEntity rp, ClassGroupEntity cg
+        JOIN cg.course c JOIN c.academicYear y
+        WHERE rp.id IN :ids AND cg.id = rp.classGroupId AND y.closedAt IS NOT NULL
+        """)
+    List<Integer> closedYearsOfRiskPredictions(@Param("ids") Collection<UUID> ids);
 }

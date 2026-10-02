@@ -22,4 +22,10 @@ public interface IAcademicYearLockDomain {
 
     /** Year numbers of the closed years the given courses sit in. */
     Set<Integer> closedYearsOfCourses(Collection<UUID> courseIds);
+
+    /** Year numbers of the closed years the given curricular plans (PDC) sit in. */
+    Set<Integer> closedYearsOfPlans(Collection<UUID> planIds);
+
+    /** Year numbers of the closed years the given risk predictions sit in. */
+    Set<Integer> closedYearsOfRiskPredictions(Collection<UUID> predictionIds);
 }

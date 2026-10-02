@@ -32,4 +32,14 @@ public class AcademicYearLockRepositoryAdapter implements IAcademicYearLockDomai
     public Set<Integer> closedYearsOfCourses(Collection<UUID> courseIds) {
         return Set.copyOf(yearRepo.closedYearsOfCourses(courseIds));
     }
+
+    @Override
+    public Set<Integer> closedYearsOfPlans(Collection<UUID> planIds) {
+        return Set.copyOf(yearRepo.closedYearsOfPlans(planIds));
+    }
+
+    @Override
+    public Set<Integer> closedYearsOfRiskPredictions(Collection<UUID> predictionIds) {
+        return Set.copyOf(yearRepo.closedYearsOfRiskPredictions(predictionIds));
+    }
 }
