@@ -16,6 +16,31 @@ public interface JpaCourseRepository extends JpaRepository<CourseEntity, UUID> {
     boolean existsByGrade_IdAndParallel_IdAndAcademicYear_Id(
             Integer gradeId, Integer parallelId, Integer yearId);
 
+    /** The open courses of a gestión, with the to-ones the copy names its skipped ones by. */
+    @Query(
+            """
+        SELECT c FROM CourseEntity c
+        WHERE c.academicYear.id = :yearId AND c.active = true
+        ORDER BY c.grade.id, c.parallel.id
+        """)
+    @EntityGraph(attributePaths = {"grade", "parallel", "academicYear", "homeroomTeacher"})
+    List<CourseEntity> findActiveOfYear(@Param("yearId") Integer yearId);
+
+    /** Only the two ids, so asking what a gestión already holds loads no entity at all. */
+    @Query(
+            """
+        SELECT c.grade.id AS gradeId, c.parallel.id AS parallelId FROM CourseEntity c
+        WHERE c.academicYear.id = :yearId
+        """)
+    List<GradeParallelRow> findGradeParallelsOfYear(@Param("yearId") Integer yearId);
+
+    /** A grade and a parallel, as the query above hands them back. */
+    interface GradeParallelRow {
+        Integer getGradeId();
+
+        Integer getParallelId();
+    }
+
     boolean existsByGrade_Id(Integer gradeId);
 
     boolean existsByParallel_Id(Integer parallelId);

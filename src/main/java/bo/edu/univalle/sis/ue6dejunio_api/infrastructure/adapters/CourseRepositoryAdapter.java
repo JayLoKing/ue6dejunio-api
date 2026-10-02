@@ -4,7 +4,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.GradeParallel;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
@@ -13,10 +15,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaGradeRe
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaParallelRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -155,6 +161,53 @@ public class CourseRepositoryAdapter implements ICourseDomain {
                 .findFirstByHomeroomTeacher_IdAndAcademicYear_IdAndActiveTrue(
                         teacherId, academicYearId)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public List<Course> activeOfYear(Integer academicYearId) {
+        return courseRepo.findActiveOfYear(academicYearId).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Set<GradeParallel> gradeParallelsOfYear(Integer academicYearId) {
+        return courseRepo.findGradeParallelsOfYear(academicYearId).stream()
+                .map(row -> new GradeParallel(row.getGradeId(), row.getParallelId()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * References and not fetches: the pairs came out of rows that exist, so the three foreign keys
+     * only need an id to write. Mapping the saved entities back to the domain would read the grade
+     * and parallel names through those references, one select each, which is why the ids are all
+     * this hands back.
+     */
+    @Override
+    @Transactional
+    public Map<GradeParallel, UUID> createWithoutHomeroom(
+            Integer academicYearId, Collection<GradeParallel> pairs) {
+        if (pairs.isEmpty()) {
+            return Map.of();
+        }
+        AcademicYearEntity year = yearRepo.getReferenceById(academicYearId);
+        List<GradeParallel> ordered = List.copyOf(pairs);
+        List<CourseEntity> entities =
+                ordered.stream()
+                        .map(
+                                pair -> {
+                                    CourseEntity e = new CourseEntity();
+                                    e.setGrade(gradeRepo.getReferenceById(pair.gradeId()));
+                                    e.setParallel(parallelRepo.getReferenceById(pair.parallelId()));
+                                    e.setAcademicYear(year);
+                                    e.setActive(true);
+                                    return e;
+                                })
+                        .toList();
+        List<CourseEntity> saved = courseRepo.saveAll(entities);
+        Map<GradeParallel, UUID> ids = new HashMap<>();
+        for (int i = 0; i < ordered.size(); i++) {
+            ids.put(ordered.get(i), saved.get(i).getId());
+        }
+        return ids;
     }
 
     private CourseEntity load(UUID id) {

@@ -3,8 +3,12 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.GradeParallel;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface ICourseDomain {
@@ -51,4 +55,23 @@ public interface ICourseDomain {
      * second assignment is refused: a teacher is homeroom of one classroom per year, not for life.
      */
     Optional<Course> homeroomCourseOf(UUID teacherId, Integer academicYearId);
+
+    /**
+     * The open classrooms of a gestión, in one query: the ones a copy into another year starts
+     * from. Closed courses are logical deletes and do not travel.
+     */
+    List<Course> activeOfYear(Integer academicYearId);
+
+    /**
+     * Every grade and parallel that already has a course in the gestión, closed ones included: the
+     * pair is unique per year whatever the course's state, so a copy must not meet it twice.
+     */
+    Set<GradeParallel> gradeParallelsOfYear(Integer academicYearId);
+
+    /**
+     * Opens one active course per pair in the gestión, with no homeroom teacher, and says which id
+     * each pair got. Reads nothing per row: the copy is written, not looked up.
+     */
+    Map<GradeParallel, UUID> createWithoutHomeroom(
+            Integer academicYearId, Collection<GradeParallel> pairs);
 }
