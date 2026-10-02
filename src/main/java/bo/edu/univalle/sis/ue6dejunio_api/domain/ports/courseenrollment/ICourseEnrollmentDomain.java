@@ -66,6 +66,11 @@ public interface ICourseEnrollmentDomain {
 
     Optional<CourseStudent> courseStudentById(UUID courseEnrollmentId);
 
+    /**
+     * Withdraws the student's effective enrollments in years that are still open, and returns how
+     * many it changed. Enrollments of a closed year are left as they are: their status and frozen
+     * result are that year's history.
+     */
     int withdrawActiveEnrollments(UUID studentId);
 
     /**

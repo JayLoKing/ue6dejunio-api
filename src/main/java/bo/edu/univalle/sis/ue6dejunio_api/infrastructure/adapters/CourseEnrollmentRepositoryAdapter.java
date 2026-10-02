@@ -138,13 +138,8 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     @Override
     @Transactional
     public int withdrawActiveEnrollments(UUID studentId) {
-        List<CourseEnrollmentEntity> active =
-                enrollmentRepo.findByStudent_IdAndStatus(studentId, STATUS_EFFECTIVE);
-        for (CourseEnrollmentEntity e : active) {
-            e.setStatus(STATUS_WITHDRAWN);
-        }
-        enrollmentRepo.saveAll(active);
-        return active.size();
+        return enrollmentRepo.withdrawEffectiveInOpenYears(
+                studentId, STATUS_EFFECTIVE, STATUS_WITHDRAWN);
     }
 
     @Override

@@ -64,6 +64,24 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
             @Param("at") LocalDateTime at,
             @Param("withdrawn") String withdrawn);
 
+    /**
+     * Withdraws a student's effective enrollments in the years still open, in one statement. A
+     * closed year keeps its history: neither the status nor the frozen result of an enrollment
+     * there changes when the student leaves later.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+        UPDATE CourseEnrollmentEntity e SET e.status = :withdrawn
+        WHERE e.student.id = :studentId AND e.status = :effective
+        AND e.course.id IN (
+            SELECT c.id FROM CourseEntity c WHERE c.academicYear.closedAt IS NULL)
+        """)
+    int withdrawEffectiveInOpenYears(
+            @Param("studentId") UUID studentId,
+            @Param("effective") String effective,
+            @Param("withdrawn") String withdrawn);
+
     /** Reopens the enrollments of a year; the frozen average and result stay. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
@@ -115,8 +133,6 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     List<UUID> findIdsInCourse(
             @Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds,
             @Param("courseId") UUID courseId);
-
-    List<CourseEnrollmentEntity> findByStudent_IdAndStatus(UUID studentId, String status);
 
     /**
      * (gender, enrolments) for the active enrolments of one course, as raw rows.
