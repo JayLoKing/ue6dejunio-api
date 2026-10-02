@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -113,4 +114,11 @@ public interface ICourseEnrollmentDomain {
      * result stay: they are overwritten by the next close, never cleared here.
      */
     void reopenEnrollmentsOfYear(int academicYearId);
+
+    /**
+     * The frozen average and result of the given enrollments, with whether each one's year is
+     * closed now, in one query however many ids there are. An id that does not exist is absent from
+     * the map.
+     */
+    Map<UUID, EnrollmentOutcome> outcomesOf(Collection<UUID> courseEnrollmentIds);
 }

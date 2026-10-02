@@ -91,6 +91,20 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
         """)
     int reopenOfYear(@Param("yearId") Integer yearId);
 
+    /**
+     * (enrollmentId, finalAverage, finalResult, year closedAt) of the given enrollments, as raw
+     * rows. Scalars only: no entity, no student, no course is hydrated to read four columns.
+     */
+    @Query(
+            """
+        SELECT e.id, e.finalAverage, e.finalResult, y.closedAt
+        FROM CourseEnrollmentEntity e
+        JOIN e.course c
+        JOIN c.academicYear y
+        WHERE e.id IN :ids
+        """)
+    List<Object[]> outcomesOf(@Param("ids") Collection<UUID> ids);
+
     @EntityGraph(attributePaths = "student")
     Page<CourseEnrollmentEntity> findByCourse_Id(UUID courseId, Pageable pageable);
 

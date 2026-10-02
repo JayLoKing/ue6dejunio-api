@@ -4,13 +4,16 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEnrollmentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseEnrollmentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -202,6 +205,27 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     @Transactional
     public void reopenEnrollmentsOfYear(int academicYearId) {
         enrollmentRepo.reopenOfYear(academicYearId);
+    }
+
+    @Override
+    public Map<UUID, EnrollmentOutcome> outcomesOf(Collection<UUID> courseEnrollmentIds) {
+        // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
+        if (courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, EnrollmentOutcome> byEnrollment = new HashMap<>();
+        for (Object[] row : enrollmentRepo.outcomesOf(courseEnrollmentIds)) {
+            UUID id = (UUID) row[0];
+            String result = (String) row[2];
+            byEnrollment.put(
+                    id,
+                    new EnrollmentOutcome(
+                            id,
+                            row[3] != null,
+                            (BigDecimal) row[1],
+                            result == null ? null : AnnualResult.valueOf(result)));
+        }
+        return byEnrollment;
     }
 
     private CourseStudent toCourseStudent(CourseEnrollmentEntity e) {
