@@ -72,7 +72,16 @@ class RiskSweepQueueingIT extends AbstractIntegrationTest {
         scores.setScore(
                 new SetScoreCommand(
                         enrollmentId, null, criterionId, new BigDecimal("40.00"), null));
-        queue.clearSwept(java.util.List.of(classGroupId), 1, java.time.LocalDateTime.now());
+        // The bound is the newest instant the queue itself reports, which is what the real sweep
+        // clears against. Taking it from the JVM clock instead compares two clocks that disagree:
+        // marked_at is the database's clock rendered in La Paz time, so a JVM in another zone, or a
+        // container whose clock runs ahead of the host, leaves the row "unswept" and fails here.
+        java.time.LocalDateTime sweptAsOf =
+                queue.pending(10).stream()
+                        .map(SweepTarget::markedAt)
+                        .max(java.util.Comparator.naturalOrder())
+                        .orElseThrow();
+        queue.clearSwept(java.util.List.of(classGroupId), 1, sweptAsOf);
         assertThat(queue.pending(10)).isEmpty();
 
         scores.setScore(
