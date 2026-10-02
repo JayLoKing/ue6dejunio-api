@@ -1,13 +1,19 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.academicyear;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.CreatedAcademicYear;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AcademicYearResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateAcademicYearRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +27,19 @@ public class AcademicYearController {
 
     public AcademicYearController(IAcademicYearService academicYearService) {
         this.academicYearService = academicYearService;
+    }
+
+    @PostMapping
+    @Operation(
+            summary = "Crear una gestión (inactiva y abierta)",
+            description = "Idempotente: 201 si la creó, 200 con la gestión existente si ya estaba.")
+    public ResponseEntity<AcademicYearResponse> create(
+            @Valid @RequestBody CreateAcademicYearRequest r) {
+        CreatedAcademicYear result = academicYearService.create(r.year());
+        AcademicYearResponse body = AcademicYearResponse.from(result.year());
+        return result.created()
+                ? ResponseEntity.status(HttpStatus.CREATED).body(body)
+                : ResponseEntity.ok(body);
     }
 
     @PutMapping("/{id}/close")

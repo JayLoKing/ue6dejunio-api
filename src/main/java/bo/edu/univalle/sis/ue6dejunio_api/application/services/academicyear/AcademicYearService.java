@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.CreatedAcademicYear;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
@@ -31,6 +32,14 @@ public class AcademicYearService implements IAcademicYearService {
         this.academicYearDomain = academicYearDomain;
         this.freezer = freezer;
         this.enrollmentDomain = enrollmentDomain;
+    }
+
+    @Override
+    @Transactional
+    public CreatedAcademicYear create(int year) {
+        boolean existed = academicYearDomain.yearExists(year);
+        AcademicYearItem item = load(academicYearDomain.ensureYear(year));
+        return new CreatedAcademicYear(item, !existed);
     }
 
     @Override

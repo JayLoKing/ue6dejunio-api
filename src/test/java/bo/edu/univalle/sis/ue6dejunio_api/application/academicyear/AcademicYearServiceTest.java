@@ -15,6 +15,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.Year
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.CreatedAcademicYear;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import java.time.Clock;
@@ -152,5 +153,32 @@ class AcademicYearServiceTest {
 
         verify(domain, never()).reopen(anyInt());
         verify(enrollments, never()).reopenEnrollmentsOfYear(anyInt());
+    }
+
+    @Test
+    void create_newYear_isProvisionedAndReportedAsCreated() {
+        when(domain.yearExists(2027)).thenReturn(false);
+        when(domain.ensureYear(2027)).thenReturn(7);
+        when(domain.findItem(7))
+                .thenReturn(Optional.of(new AcademicYearItem(7, 2027, false, false)));
+
+        CreatedAcademicYear result = service.create(2027);
+
+        assertThat(result.created()).isTrue();
+        assertThat(result.year()).isEqualTo(new AcademicYearItem(7, 2027, false, false));
+        verify(domain, never()).setActive(anyInt());
+    }
+
+    @Test
+    void create_existingYear_returnsItUnchangedAndNotCreated() {
+        when(domain.yearExists(2026)).thenReturn(true);
+        when(domain.ensureYear(2026)).thenReturn(1);
+        when(domain.findItem(1))
+                .thenReturn(Optional.of(new AcademicYearItem(1, 2026, true, false)));
+
+        CreatedAcademicYear result = service.create(2026);
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.year()).isEqualTo(new AcademicYearItem(1, 2026, true, false));
     }
 }
