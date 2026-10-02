@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentReportCard;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -25,7 +26,9 @@ public record StudentReportCardResponse(
         List<BigDecimal> trimesterAverages,
         BigDecimal finalAverage,
         String finalAverageInWords,
-        List<Outcome> trimesterOutcomes) {
+        List<Outcome> trimesterOutcomes,
+        AnnualResult finalResult,
+        boolean frozen) {
     /** A field of knowledge with the curricular areas under it. */
     public record Field(String fieldName, Integer displayOrder, List<Area> areas) {}
 
@@ -83,6 +86,8 @@ public record StudentReportCardResponse(
                 averages,
                 c.finalAverage(),
                 c.finalAverageInWords(),
-                outcomes);
+                outcomes,
+                c.finalResult(),
+                c.frozen());
     }
 }

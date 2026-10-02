@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.StudentAnnualSummary;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -17,7 +18,9 @@ public record StudentAnnualSummaryResponse(
         String fullName,
         List<Subject> subjects,
         List<BigDecimal> trimesterAverages,
-        BigDecimal finalAverage) {
+        BigDecimal finalAverage,
+        AnnualResult finalResult,
+        boolean frozen) {
     /**
      * A null trimester means the area has no row there; {@code average} covers only the trimesters
      * it was graded in.
@@ -54,6 +57,8 @@ public record StudentAnnualSummaryResponse(
                 s.fullName(),
                 subs,
                 averages,
-                s.finalAverage());
+                s.finalAverage(),
+                s.finalResult(),
+                s.frozen());
     }
 }
