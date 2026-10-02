@@ -11,6 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.CourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
@@ -42,6 +43,8 @@ class CourseEnrollmentServiceEnrollTest {
 
     @Mock private IStudentDomain studentDomain;
     @Mock private ICourseEnrollmentDomain enrollmentDomain;
+
+    @Mock private ClosedYearGuard closedYearGuard;
 
     @InjectMocks private CourseEnrollmentService service;
 

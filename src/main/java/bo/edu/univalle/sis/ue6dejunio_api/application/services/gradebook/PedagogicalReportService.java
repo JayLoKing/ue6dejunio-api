@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
@@ -65,16 +66,19 @@ public class PedagogicalReportService implements IPedagogicalReportService {
     private final ICourseService courseService;
     private final ICourseEnrollmentDomain enrollmentDomain;
     private final IScoreDomain scoreDomain;
+    private final ClosedYearGuard closedYearGuard;
 
     public PedagogicalReportService(
             IPedagogicalReportDomain reports,
             ICourseService courseService,
             ICourseEnrollmentDomain enrollmentDomain,
-            IScoreDomain scoreDomain) {
+            IScoreDomain scoreDomain,
+            ClosedYearGuard closedYearGuard) {
         this.reports = reports;
         this.courseService = courseService;
         this.enrollmentDomain = enrollmentDomain;
         this.scoreDomain = scoreDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -90,6 +94,7 @@ public class PedagogicalReportService implements IPedagogicalReportService {
     @Transactional
     public PedagogicalReportSheet save(UUID courseId, int trimester, PedagogicalReportDraft draft) {
         Course course = courseService.getById(courseId);
+        closedYearGuard.requireOpenForCourse(courseId);
         rejectNotesFromAnotherClassroom(courseId, draft);
         PedagogicalReport written = reports.save(courseId, trimester, draft);
         // Read after the write, not before: the statistics and the list of who failed are what the

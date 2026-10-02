@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.gradebook.PedagogicalReportService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
@@ -57,6 +58,7 @@ class PedagogicalReportServiceTest {
     @Mock private ICourseService courseService;
     @Mock private ICourseEnrollmentDomain enrollmentDomain;
     @Mock private IScoreDomain scoreDomain;
+    @Mock private ClosedYearGuard closedYearGuard;
 
     private PedagogicalReportService service;
 
@@ -72,7 +74,8 @@ class PedagogicalReportServiceTest {
     @BeforeEach
     void setUp() {
         service =
-                new PedagogicalReportService(reports, courseService, enrollmentDomain, scoreDomain);
+                new PedagogicalReportService(
+                        reports, courseService, enrollmentDomain, scoreDomain, closedYearGuard);
         courseId = UUID.randomUUID();
         mathGroup = UUID.randomUUID();
         languageGroup = UUID.randomUUID();

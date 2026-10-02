@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
@@ -33,11 +34,15 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
 
     private final IStudentDomain studentDomain;
     private final ICourseEnrollmentDomain enrollmentDomain;
+    private final ClosedYearGuard closedYearGuard;
 
     public CourseEnrollmentService(
-            IStudentDomain studentDomain, ICourseEnrollmentDomain enrollmentDomain) {
+            IStudentDomain studentDomain,
+            ICourseEnrollmentDomain enrollmentDomain,
+            ClosedYearGuard closedYearGuard) {
         this.studentDomain = studentDomain;
         this.enrollmentDomain = enrollmentDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -46,6 +51,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         if (!enrollmentDomain.courseExists(command.courseId())) {
             throw new ResourceNotFoundException("Course", command.courseId());
         }
+        // Before the first lookup, and so before any student is created: a roster import is the one
+        // enrolment write that also writes students, and none of it may land on a closed year.
+        closedYearGuard.requireOpenForCourse(command.courseId());
         // A roster is imported whole, so the three lookups it needs are done once for the whole
         // batch. Asking per student turned a class of forty into a hundred-odd round trips.
         Map<String, Student> byRude =
