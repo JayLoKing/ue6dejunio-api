@@ -2,7 +2,6 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 /**
  * The libreta's "Literal" column: the annual mark spelled out beside its numeral.
@@ -85,7 +84,7 @@ public final class GradeInWords {
         if (mark == null) {
             return "";
         }
-        int whole = mark.setScale(0, RoundingMode.HALF_UP).intValueExact();
+        int whole = PrintedMark.of(mark).intValueExact();
         if (whole < 0 || whole > 100) {
             // Outside the scale there is no right word, and inventing one would make an
             // impossible mark look like a real one on a signed document. A domain exception and
