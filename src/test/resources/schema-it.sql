@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS academic_years (
     id_academic_year SERIAL PRIMARY KEY,
     year integer NOT NULL UNIQUE,
     active boolean NOT NULL DEFAULT false,
-    closed_at timestamptz NULL
+    closed_at timestamp NULL
 );
 -- Mirrors V22: at most one active year, enforced by the database.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_academic_years_single_active ON academic_years (active) WHERE active;

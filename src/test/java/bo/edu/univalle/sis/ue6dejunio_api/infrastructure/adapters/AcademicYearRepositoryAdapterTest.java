@@ -66,7 +66,6 @@ class AcademicYearRepositoryAdapterTest {
         Integer id = adapter.currentYearId();
 
         assertThat(id).isEqualTo(4);
-        verify(yearRepo, never()).findTopByOrderByYearDesc();
     }
 
     @Test

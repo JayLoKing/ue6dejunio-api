@@ -23,7 +23,7 @@ ALTER TABLE public.academic_years
     ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT false;
 
 ALTER TABLE public.academic_years
-    ADD COLUMN IF NOT EXISTS closed_at timestamptz NULL;
+    ADD COLUMN IF NOT EXISTS closed_at timestamp NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_academic_years_single_active
     ON public.academic_years (active)

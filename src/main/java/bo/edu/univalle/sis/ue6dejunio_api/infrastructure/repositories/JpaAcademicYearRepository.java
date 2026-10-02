@@ -6,8 +6,6 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEntity, Integer> {
-    Optional<AcademicYearEntity> findTopByOrderByYearDesc();
-
     Optional<AcademicYearEntity> findByYear(Integer year);
 
     Optional<AcademicYearEntity> findByActiveTrue();
