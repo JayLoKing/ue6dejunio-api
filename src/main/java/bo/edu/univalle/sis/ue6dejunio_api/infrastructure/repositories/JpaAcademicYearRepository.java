@@ -2,8 +2,10 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -43,4 +45,30 @@ public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEnt
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE AcademicYearEntity y SET y.closedAt = NULL WHERE y.id = :id")
     int reopen(@Param("id") Integer id);
+
+    // The three below answer "which closed years do these records sit in" for the closed-year
+    // guard: one query each however many ids, joined up to the year, so a batch never asks per row.
+    @Query(
+            """
+        SELECT DISTINCT y.year FROM ClassGroupEntity cg
+        JOIN cg.course c JOIN c.academicYear y
+        WHERE cg.id IN :ids AND y.closedAt IS NOT NULL
+        """)
+    List<Integer> closedYearsOfClassGroups(@Param("ids") Collection<UUID> ids);
+
+    @Query(
+            """
+        SELECT DISTINCT y.year FROM CourseEnrollmentEntity ce
+        JOIN ce.course c JOIN c.academicYear y
+        WHERE ce.id IN :ids AND y.closedAt IS NOT NULL
+        """)
+    List<Integer> closedYearsOfEnrollments(@Param("ids") Collection<UUID> ids);
+
+    @Query(
+            """
+        SELECT DISTINCT y.year FROM CourseEntity c
+        JOIN c.academicYear y
+        WHERE c.id IN :ids AND y.closedAt IS NOT NULL
+        """)
+    List<Integer> closedYearsOfCourses(@Param("ids") Collection<UUID> ids);
 }
