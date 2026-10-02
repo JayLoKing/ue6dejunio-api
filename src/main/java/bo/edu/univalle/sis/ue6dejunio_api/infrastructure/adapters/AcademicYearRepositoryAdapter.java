@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -75,6 +76,18 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
         // Two statements, in this order: see JpaAcademicYearRepository#deactivateAllExcept.
         yearRepo.deactivateAllExcept(academicYearId);
         yearRepo.activate(academicYearId);
+    }
+
+    @Override
+    @Transactional
+    public void close(int academicYearId, LocalDateTime closedAt) {
+        yearRepo.close(academicYearId, closedAt);
+    }
+
+    @Override
+    @Transactional
+    public void reopen(int academicYearId) {
+        yearRepo.reopen(academicYearId);
     }
 
     @Override

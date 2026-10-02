@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,4 +34,13 @@ public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEnt
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE AcademicYearEntity y SET y.active = true WHERE y.id = :id")
     int activate(@Param("id") Integer id);
+
+    /** Closing also clears {@code active}: setting a flag to false never meets the unique index. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AcademicYearEntity y SET y.closedAt = :at, y.active = false WHERE y.id = :id")
+    int close(@Param("id") Integer id, @Param("at") LocalDateTime at);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AcademicYearEntity y SET y.closedAt = NULL WHERE y.id = :id")
+    int reopen(@Param("id") Integer id);
 }

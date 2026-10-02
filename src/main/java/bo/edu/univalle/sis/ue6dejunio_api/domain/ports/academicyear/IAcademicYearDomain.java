@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -32,4 +33,16 @@ public interface IAcademicYearDomain {
      * checked the year exists and is open.
      */
     void setActive(int academicYearId);
+
+    /**
+     * Stamps {@code closedAt} and clears the active flag in one step, so a closed year is never the
+     * working year. No other year is activated. The caller has checked the year exists and is open.
+     */
+    void close(int academicYearId, LocalDateTime closedAt);
+
+    /**
+     * Clears the closing moment. The year stays inactive: reopening is not activating. The caller
+     * has checked the year exists and is closed.
+     */
+    void reopen(int academicYearId);
 }

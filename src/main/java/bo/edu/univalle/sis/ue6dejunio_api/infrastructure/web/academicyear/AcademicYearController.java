@@ -23,6 +23,18 @@ public class AcademicYearController {
         this.academicYearService = academicYearService;
     }
 
+    @PutMapping("/{id}/close")
+    @Operation(summary = "Cerrar una gestión (deja de ser la gestión de trabajo)")
+    public ResponseEntity<AcademicYearResponse> close(@PathVariable int id) {
+        return ResponseEntity.ok(AcademicYearResponse.from(academicYearService.close(id)));
+    }
+
+    @PutMapping("/{id}/reopen")
+    @Operation(summary = "Reabrir una gestión cerrada (no la activa)")
+    public ResponseEntity<AcademicYearResponse> reopen(@PathVariable int id) {
+        return ResponseEntity.ok(AcademicYearResponse.from(academicYearService.reopen(id)));
+    }
+
     @PutMapping("/{id}/activate")
     @Operation(summary = "Activar una gestión (la gestión de trabajo del sistema)")
     public ResponseEntity<AcademicYearResponse> activate(@PathVariable int id) {

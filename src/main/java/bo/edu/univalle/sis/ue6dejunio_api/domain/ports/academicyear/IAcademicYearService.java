@@ -9,4 +9,17 @@ public interface IAcademicYearService {
      * ResourceNotFoundException for an unknown id and ConflictException for a closed year.
      */
     AcademicYearItem activate(int academicYearId);
+
+    /**
+     * Closes the year; if it was the active one it stops being active and no other year takes its
+     * place. Idempotent: closing a closed year changes nothing, not even its closing moment. Throws
+     * ResourceNotFoundException for an unknown id.
+     */
+    AcademicYearItem close(int academicYearId);
+
+    /**
+     * Reopens a closed year without activating it. Idempotent for a year that is already open.
+     * Throws ResourceNotFoundException for an unknown id.
+     */
+    AcademicYearItem reopen(int academicYearId);
 }
