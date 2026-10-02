@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.risk;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -80,6 +81,8 @@ public class RiskPredictionService implements IRiskPredictionService {
      */
     private final Clock clock;
 
+    private final ClosedYearGuard closedYearGuard;
+
     public RiskPredictionService(
             IRiskFeatureDomain featureDomain,
             IRiskModelClient modelClient,
@@ -88,7 +91,8 @@ public class RiskPredictionService implements IRiskPredictionService {
             IClassGroupDomain classGroupDomain,
             ICourseService courseService,
             ICourseEnrollmentDomain enrollmentDomain,
-            Clock clock) {
+            Clock clock,
+            ClosedYearGuard closedYearGuard) {
         this.featureDomain = featureDomain;
         this.modelClient = modelClient;
         this.predictionDomain = predictionDomain;
@@ -97,6 +101,7 @@ public class RiskPredictionService implements IRiskPredictionService {
         this.courseService = courseService;
         this.enrollmentDomain = enrollmentDomain;
         this.clock = clock;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -384,6 +389,9 @@ public class RiskPredictionService implements IRiskPredictionService {
     @Override
     @Transactional
     public RiskPrediction markAttended(UUID predictionId, boolean attended) {
+        // The only write here that is a teacher's own entry. Running a prediction derives data from
+        // the record, so predictYear and the class-group runs stay open on a closed year.
+        closedYearGuard.requireOpenForRiskPrediction(predictionId);
         return predictionDomain.markAttended(predictionId, attended);
     }
 

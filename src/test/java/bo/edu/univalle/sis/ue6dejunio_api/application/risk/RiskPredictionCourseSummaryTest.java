@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskPredictionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
@@ -59,6 +60,7 @@ class RiskPredictionCourseSummaryTest {
     @Mock private IClassGroupDomain classGroupDomain;
     @Mock private ICourseService courseService;
     @Mock private ICourseEnrollmentDomain enrollmentDomain;
+    @Mock private ClosedYearGuard closedYearGuard;
 
     private static final Integer ACADEMIC_YEAR_ID = 7;
     private static final int TRIMESTER = 1;
@@ -81,7 +83,8 @@ class RiskPredictionCourseSummaryTest {
                         classGroupDomain,
                         courseService,
                         enrollmentDomain,
-                        Clock.systemDefaultZone());
+                        Clock.systemDefaultZone(),
+                        closedYearGuard);
         quinto = UUID.randomUUID();
         sexto = UUID.randomUUID();
     }

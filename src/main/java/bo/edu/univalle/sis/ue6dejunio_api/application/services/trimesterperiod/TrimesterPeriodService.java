@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.trimesterperiod;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -19,9 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class TrimesterPeriodService implements ITrimesterPeriodService {
 
     private final ITrimesterPeriodDomain trimesterPeriodDomain;
+    private final ClosedYearGuard closedYearGuard;
 
-    public TrimesterPeriodService(ITrimesterPeriodDomain trimesterPeriodDomain) {
+    public TrimesterPeriodService(
+            ITrimesterPeriodDomain trimesterPeriodDomain, ClosedYearGuard closedYearGuard) {
         this.trimesterPeriodDomain = trimesterPeriodDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -30,6 +34,7 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
         if (!trimesterPeriodDomain.academicYearExists(c.academicYearId())) {
             throw new ResourceNotFoundException("AcademicYear", c.academicYearId());
         }
+        closedYearGuard.requireOpenForYear(c.academicYearId());
         validateDateRange(c.startDate(), c.endDate());
         if (trimesterPeriodDomain.existsByAcademicYearAndTrimester(
                 c.academicYearId(), c.trimester())) {
@@ -47,6 +52,7 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
     @Transactional
     public TrimesterPeriod update(UUID id, UpdateTrimesterPeriodCommand c) {
         TrimesterPeriod current = getById(id);
+        closedYearGuard.requireOpenForYear(current.academicYearId());
         validateDateRange(c.startDate(), c.endDate());
         List<TrimesterPeriod> existing =
                 trimesterPeriodDomain.findByAcademicYear(current.academicYearId());
@@ -71,7 +77,7 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
     @Override
     @Transactional
     public void delete(UUID id) {
-        getById(id);
+        closedYearGuard.requireOpenForYear(getById(id).academicYearId());
         trimesterPeriodDomain.delete(id);
     }
 

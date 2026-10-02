@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.risk.RiskPredictionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.RiskModelUnavailableException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
@@ -69,6 +70,7 @@ class RiskPredictionServiceTest {
     @Mock private IClassGroupDomain classGroupDomain;
     @Mock private ICourseService courseService;
     @Mock private ICourseEnrollmentDomain enrollmentDomain;
+    @Mock private ClosedYearGuard closedYearGuard;
 
     private RiskPredictionService service;
 
@@ -100,7 +102,8 @@ class RiskPredictionServiceTest {
                         classGroupDomain,
                         courseService,
                         enrollmentDomain,
-                        SCHOOL_CLOCK);
+                        SCHOOL_CLOCK,
+                        closedYearGuard);
     }
 
     // ---------------------------------------------------------------- fixtures

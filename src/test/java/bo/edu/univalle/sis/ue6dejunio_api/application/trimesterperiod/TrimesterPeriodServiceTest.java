@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.trimesterperiod.TrimesterPeriodService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
@@ -32,13 +33,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class TrimesterPeriodServiceTest {
 
     @Mock private ITrimesterPeriodDomain domain;
+    @Mock private ClosedYearGuard closedYearGuard;
 
     private TrimesterPeriodService service;
     private static final Integer YEAR_ID = 1;
 
     @BeforeEach
     void setUp() {
-        service = new TrimesterPeriodService(domain);
+        service = new TrimesterPeriodService(domain, closedYearGuard);
     }
 
     private static TrimesterPeriod period(UUID id, int trimester, String start, String end) {
