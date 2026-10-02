@@ -2,8 +2,11 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.academicyear;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.CreatedAcademicYear;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IYearStructureService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AcademicYearResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateAcademicYearRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.DuplicateYearStructureRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.YearStructureCopyResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,8 +28,12 @@ public class AcademicYearController {
 
     private final IAcademicYearService academicYearService;
 
-    public AcademicYearController(IAcademicYearService academicYearService) {
+    private final IYearStructureService yearStructureService;
+
+    public AcademicYearController(
+            IAcademicYearService academicYearService, IYearStructureService yearStructureService) {
         this.academicYearService = academicYearService;
+        this.yearStructureService = yearStructureService;
     }
 
     @PostMapping
@@ -40,6 +47,19 @@ public class AcademicYearController {
         return result.created()
                 ? ResponseEntity.status(HttpStatus.CREATED).body(body)
                 : ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/{targetId}/duplicate-structure")
+    @Operation(
+            summary = "Copiar cursos y materias de otra gestión (sin docentes)",
+            description =
+                    "Copia los cursos y materias activos del origen. Lo que el destino ya tiene se"
+                            + " omite y se informa; repetirlo no cambia nada.")
+    public ResponseEntity<YearStructureCopyResponse> duplicateStructure(
+            @PathVariable int targetId, @Valid @RequestBody DuplicateYearStructureRequest r) {
+        return ResponseEntity.ok(
+                YearStructureCopyResponse.from(
+                        yearStructureService.duplicate(targetId, r.sourceAcademicYearId())));
     }
 
     @PutMapping("/{id}/close")
