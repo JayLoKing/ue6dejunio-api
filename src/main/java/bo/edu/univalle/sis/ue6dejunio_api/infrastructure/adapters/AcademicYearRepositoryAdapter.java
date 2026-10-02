@@ -42,8 +42,22 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
     }
 
     @Override
+    @Transactional
+    public boolean activateIfNoneActive(int yearId) {
+        if (yearRepo.existsByActiveTrue()) {
+            return false;
+        }
+        AcademicYearEntity entity =
+                yearRepo.findById(yearId)
+                        .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", yearId));
+        entity.setActive(true);
+        yearRepo.save(entity);
+        return true;
+    }
+
+    @Override
     public Integer currentYearId() {
-        return yearRepo.findTopByOrderByYearDesc()
+        return yearRepo.findByActiveTrue()
                 .map(AcademicYearEntity::getId)
                 .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", "actual"));
     }

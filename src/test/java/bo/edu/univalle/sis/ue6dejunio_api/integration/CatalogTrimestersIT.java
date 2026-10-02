@@ -13,8 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * GET /api/catalog/trimesters — any authenticated user (Teacher included) can read; defaults to the
- * current (latest) academic year when id_academic_year is omitted. Requires Docker/Testcontainers;
- * SKIPPED in this environment (Docker unavailable).
+ * active academic year when id_academic_year is omitted. Requires Docker/Testcontainers; SKIPPED in
+ * this environment (Docker unavailable).
  */
 class CatalogTrimestersIT extends AbstractIntegrationTest {
 

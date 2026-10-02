@@ -10,6 +10,10 @@ public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEnt
 
     Optional<AcademicYearEntity> findByYear(Integer year);
 
+    Optional<AcademicYearEntity> findByActiveTrue();
+
+    boolean existsByActiveTrue();
+
     /**
      * Newest first: the gestión a school works in is the one it opens a picker to select, and every
      * year before it is history somebody scrolls back to.

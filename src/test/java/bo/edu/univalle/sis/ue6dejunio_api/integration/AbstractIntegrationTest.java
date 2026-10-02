@@ -215,11 +215,10 @@ public abstract class AbstractIntegrationTest {
         return id;
     }
 
-    /** The latest year on record, which is what the application calls the current gestión. */
+    /** The active year, which is what the application calls the current gestión. */
     protected Integer currentAcademicYearId() {
         return jdbc.queryForObject(
-                "SELECT id_academic_year FROM academic_years ORDER BY year DESC LIMIT 1",
-                Integer.class);
+                "SELECT id_academic_year FROM academic_years WHERE active", Integer.class);
     }
 
     protected Integer academicYearId(int year) {

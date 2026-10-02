@@ -19,7 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Idempotent auto-provisioning of academic_years rows and "current = latest year" resolution.
+ * Idempotent auto-provisioning of academic_years rows and "current = active year" resolution.
  * DB-independent (mocked JPA repository).
  */
 @ExtendWith(MockitoExtension.class)
@@ -56,22 +56,59 @@ class AcademicYearRepositoryAdapterTest {
     }
 
     @Test
-    void currentYearId_returnsLatestYearId() {
-        AcademicYearEntity latest = new AcademicYearEntity();
-        latest.setId(9);
-        latest.setYear(2027);
-        when(yearRepo.findTopByOrderByYearDesc()).thenReturn(Optional.of(latest));
+    void currentYearId_returnsTheActiveYearNotTheLatest() {
+        AcademicYearEntity active = new AcademicYearEntity();
+        active.setId(4);
+        active.setYear(2026);
+        active.setActive(true);
+        when(yearRepo.findByActiveTrue()).thenReturn(Optional.of(active));
 
         Integer id = adapter.currentYearId();
 
-        assertThat(id).isEqualTo(9);
+        assertThat(id).isEqualTo(4);
+        verify(yearRepo, never()).findTopByOrderByYearDesc();
     }
 
     @Test
-    void currentYearId_none_throwsResourceNotFound() {
-        when(yearRepo.findTopByOrderByYearDesc()).thenReturn(Optional.empty());
+    void currentYearId_noneActive_throwsResourceNotFound() {
+        when(yearRepo.findByActiveTrue()).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> adapter.currentYearId())
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void activateIfNoneActive_nothingActive_activatesThatYear() {
+        AcademicYearEntity row = new AcademicYearEntity();
+        row.setId(7);
+        row.setYear(2026);
+        when(yearRepo.existsByActiveTrue()).thenReturn(false);
+        when(yearRepo.findById(7)).thenReturn(Optional.of(row));
+
+        boolean activated = adapter.activateIfNoneActive(7);
+
+        assertThat(activated).isTrue();
+        assertThat(row.isActive()).isTrue();
+        verify(yearRepo).save(row);
+    }
+
+    @Test
+    void activateIfNoneActive_anotherYearIsActive_changesNothing() {
+        when(yearRepo.existsByActiveTrue()).thenReturn(true);
+
+        boolean activated = adapter.activateIfNoneActive(7);
+
+        assertThat(activated).isFalse();
+        verify(yearRepo, never()).save(any(AcademicYearEntity.class));
+    }
+
+    @Test
+    void activateIfNoneActive_unknownYear_throwsResourceNotFound() {
+        when(yearRepo.existsByActiveTrue()).thenReturn(false);
+        when(yearRepo.findById(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adapter.activateIfNoneActive(99))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(yearRepo, never()).save(any(AcademicYearEntity.class));
     }
 }

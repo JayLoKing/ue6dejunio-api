@@ -1,16 +1,23 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear;
 
 /**
- * Auto-provisioning and "current academic year" resolution. The current academic year is always the
- * LATEST created one (max(year)) — never a fixed/first row.
+ * Auto-provisioning and "current academic year" resolution. The current academic year is the one
+ * flagged active (exactly one at a time, guaranteed by the database) — never the newest row.
+ * Creating a year does not make it current.
  */
 public interface IAcademicYearDomain {
     /**
      * Idempotent: creates the academic_years row for {@code year} if missing, returns its id either
-     * way.
+     * way. The row is created inactive.
      */
     Integer ensureYear(int year);
 
-    /** Id of the latest (current) academic year. Throws if none exist yet. */
+    /** Id of the active academic year. Throws ResourceNotFoundException if none is active. */
     Integer currentYearId();
+
+    /**
+     * Fresh-install bootstrap: marks {@code yearId} active only when no year is active at all, so
+     * an existing choice is never overridden. Returns whether it activated the year.
+     */
+    boolean activateIfNoneActive(int yearId);
 }

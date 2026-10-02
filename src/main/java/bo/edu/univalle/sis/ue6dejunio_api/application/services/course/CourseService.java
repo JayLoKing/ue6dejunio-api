@@ -11,6 +11,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
@@ -29,14 +30,17 @@ public class CourseService implements ICourseService {
     private static final int COURSE_PAGE_SIZE = 200;
 
     private final ICourseDomain courseDomain;
+    private final IAcademicYearDomain academicYearDomain;
     private final IClassGroupService classGroupService;
     private final IClassGroupDomain classGroupDomain;
 
     public CourseService(
             ICourseDomain courseDomain,
+            IAcademicYearDomain academicYearDomain,
             IClassGroupService classGroupService,
             IClassGroupDomain classGroupDomain) {
         this.courseDomain = courseDomain;
+        this.academicYearDomain = academicYearDomain;
         this.classGroupService = classGroupService;
         this.classGroupDomain = classGroupDomain;
     }
@@ -50,7 +54,7 @@ public class CourseService implements ICourseService {
         if (!courseDomain.parallelExists(c.parallelId())) {
             throw new ResourceNotFoundException("Paralelo", c.parallelId());
         }
-        Integer yearId = courseDomain.currentAcademicYearId();
+        Integer yearId = academicYearDomain.currentYearId();
         if (courseDomain.existsByGradeParallelYear(c.gradeId(), c.parallelId(), yearId)) {
             throw new DuplicateResourceException(
                     "curso (grado+paralelo+anio)",

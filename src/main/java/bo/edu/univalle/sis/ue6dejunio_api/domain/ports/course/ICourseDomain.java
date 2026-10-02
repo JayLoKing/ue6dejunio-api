@@ -14,8 +14,6 @@ public interface ICourseDomain {
 
     boolean userIsNonTechnicalTeacher(UUID userId);
 
-    Integer currentAcademicYearId();
-
     boolean existsByGradeParallelYear(Integer gradeId, Integer parallelId, Integer academicYearId);
 
     Course create(

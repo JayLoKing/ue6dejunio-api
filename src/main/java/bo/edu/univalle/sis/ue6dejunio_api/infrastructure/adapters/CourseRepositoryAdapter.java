@@ -5,7 +5,6 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
-import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
@@ -66,13 +65,6 @@ public class CourseRepositoryAdapter implements ICourseDomain {
                                         && TEACHER_ROLE.equals(u.getRole().getName())
                                         && !u.isTechnical())
                 .orElse(false);
-    }
-
-    @Override
-    public Integer currentAcademicYearId() {
-        return yearRepo.findTopByOrderByYearDesc()
-                .map(AcademicYearEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", "actual"));
     }
 
     @Override

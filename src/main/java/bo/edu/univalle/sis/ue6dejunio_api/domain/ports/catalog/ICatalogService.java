@@ -20,9 +20,6 @@ public interface ICatalogService {
     /** Every gestión on record, newest first. Feeds the year filter of the student directory. */
     List<AcademicYearItem> academicYears();
 
-    /**
-     * Configured trimester periods for {@code academicYearId}, or the current (latest) year if
-     * null.
-     */
+    /** Configured trimester periods for {@code academicYearId}, or the active year if null. */
     List<TrimesterPeriodItem> trimesters(Integer academicYearId);
 }

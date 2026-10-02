@@ -12,9 +12,10 @@ import org.springframework.stereotype.Component;
 /**
  * Ensures an academic_years row exists for the current year (per the injected La Paz Clock) on
  * every startup. Idempotent: does nothing if the row already exists (see
- * AcademicYearRepositoryAdapter#ensureYear). Dependents (course creation, trimester catalog
- * default) resolve the "current academic management" as the LATEST academic year, not this one
- * specifically — this runner only guarantees the row exists.
+ * AcademicYearRepositoryAdapter#ensureYear). Dependents resolve the "current academic management"
+ * as the ACTIVE year, which the Director chooses. Creating a year never activates it; the one
+ * exception is a fresh install with no active year at all, where the bootstrap year is activated so
+ * the system has a current year.
  */
 @Component
 @Profile("!test & !it")
@@ -34,6 +35,9 @@ public class AcademicYearBootstrapRunner implements CommandLineRunner {
     public void run(String... args) {
         int year = LocalDate.now(clock).getYear();
         Integer id = academicYearDomain.ensureYear(year);
+        if (academicYearDomain.activateIfNoneActive(id)) {
+            log.info("Bootstrap: no academic year was active, activated {}.", year);
+        }
         log.info("Bootstrap: ensured academic_years row for year {} (id={}).", year, id);
     }
 }

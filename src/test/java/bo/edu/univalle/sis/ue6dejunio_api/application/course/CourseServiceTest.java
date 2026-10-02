@@ -18,6 +18,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
@@ -34,6 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CourseServiceTest {
 
     @Mock private ICourseDomain courseDomain;
+    @Mock private IAcademicYearDomain academicYearDomain;
     @Mock private IClassGroupService classGroupService;
     @Mock private IClassGroupDomain classGroupDomain;
     @InjectMocks private CourseService courseService;
@@ -76,7 +78,7 @@ class CourseServiceTest {
         UUID id = UUID.randomUUID();
         when(courseDomain.gradeExists(1)).thenReturn(true);
         when(courseDomain.parallelExists(1)).thenReturn(true);
-        when(courseDomain.currentAcademicYearId()).thenReturn(1);
+        when(academicYearDomain.currentYearId()).thenReturn(1);
         when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(false);
         when(courseDomain.create(1, 1, 1, null)).thenReturn(course(id));
         when(classGroupService.createForCourse(any())).thenReturn(List.of());
@@ -89,7 +91,7 @@ class CourseServiceTest {
     void create_duplicate_throws() {
         when(courseDomain.gradeExists(1)).thenReturn(true);
         when(courseDomain.parallelExists(1)).thenReturn(true);
-        when(courseDomain.currentAcademicYearId()).thenReturn(1);
+        when(academicYearDomain.currentYearId()).thenReturn(1);
         when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(true);
         assertThatThrownBy(() -> courseService.create(cmd(null)))
                 .isInstanceOf(DuplicateResourceException.class);
@@ -100,7 +102,7 @@ class CourseServiceTest {
         UUID t = UUID.randomUUID();
         when(courseDomain.gradeExists(1)).thenReturn(true);
         when(courseDomain.parallelExists(1)).thenReturn(true);
-        when(courseDomain.currentAcademicYearId()).thenReturn(1);
+        when(academicYearDomain.currentYearId()).thenReturn(1);
         when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(false);
         when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(false);
         assertThatThrownBy(() -> courseService.create(cmd(t)))

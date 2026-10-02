@@ -21,7 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Catalog exposure of Director-configured trimester periods. When no academic year is given,
- * defaults to the current (latest) academic year via IAcademicYearDomain.
+ * defaults to the active academic year via IAcademicYearDomain.
  */
 @ExtendWith(MockitoExtension.class)
 class CatalogServiceTest {

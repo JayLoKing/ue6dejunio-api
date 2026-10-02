@@ -34,6 +34,7 @@ class AcademicYearBootstrapRunnerTest {
         runner.run();
 
         verify(academicYearDomain, times(1)).ensureYear(2026);
+        verify(academicYearDomain, times(1)).activateIfNoneActive(1);
     }
 
     @Test
@@ -47,5 +48,6 @@ class AcademicYearBootstrapRunnerTest {
         runner.run();
 
         verify(academicYearDomain, times(1)).ensureYear(2027);
+        verify(academicYearDomain, times(1)).activateIfNoneActive(5);
     }
 }
