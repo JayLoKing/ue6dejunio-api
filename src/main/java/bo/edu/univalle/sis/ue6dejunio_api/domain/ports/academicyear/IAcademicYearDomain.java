@@ -1,5 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
+import java.util.Optional;
+
 /**
  * Auto-provisioning and "current academic year" resolution. The current academic year is the one
  * flagged active (exactly one at a time, guaranteed by the database) — never the newest row.
@@ -20,4 +23,13 @@ public interface IAcademicYearDomain {
      * an existing choice is never overridden. Returns whether it activated the year.
      */
     boolean activateIfNoneActive(int yearId);
+
+    /** The year as the catalogue shows it, or empty when no such id exists. */
+    Optional<AcademicYearItem> findItem(int academicYearId);
+
+    /**
+     * Makes {@code academicYearId} the one active year, clearing the previous one. The caller has
+     * checked the year exists and is open.
+     */
+    void setActive(int academicYearId);
 }

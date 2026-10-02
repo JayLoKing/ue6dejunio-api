@@ -1,9 +1,11 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
+import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +55,26 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
         entity.setActive(true);
         yearRepo.save(entity);
         return true;
+    }
+
+    @Override
+    public Optional<AcademicYearItem> findItem(int academicYearId) {
+        return yearRepo.findById(academicYearId)
+                .map(
+                        y ->
+                                new AcademicYearItem(
+                                        y.getId(),
+                                        y.getYear(),
+                                        y.isActive(),
+                                        y.getClosedAt() != null));
+    }
+
+    @Override
+    @Transactional
+    public void setActive(int academicYearId) {
+        // Two statements, in this order: see JpaAcademicYearRepository#deactivateAllExcept.
+        yearRepo.deactivateAllExcept(academicYearId);
+        yearRepo.activate(academicYearId);
     }
 
     @Override

@@ -92,7 +92,13 @@ public class CatalogRepositoryAdapter implements ICatalogDomain {
     @Override
     public List<AcademicYearItem> academicYears() {
         return academicYearRepo.findAllByOrderByYearDesc().stream()
-                .map(y -> new AcademicYearItem(y.getId(), y.getYear()))
+                .map(
+                        y ->
+                                new AcademicYearItem(
+                                        y.getId(),
+                                        y.getYear(),
+                                        y.isActive(),
+                                        y.getClosedAt() != null))
                 .toList();
     }
 }

@@ -33,6 +33,9 @@ class CatalogAcademicYearsIT extends AbstractIntegrationTest {
                                                         seedUser("Director", false), "Director")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].year").value(2026))
+                .andExpect(jsonPath("$[0].active").value(true))
+                .andExpect(jsonPath("$[0].closed").value(false))
+                .andExpect(jsonPath("$[1].active").value(false))
                 .andExpect(jsonPath("$[1].year").value(2025));
     }
 
