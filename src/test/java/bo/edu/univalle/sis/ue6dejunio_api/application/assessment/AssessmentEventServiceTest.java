@@ -2,10 +2,14 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.assessment;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment.AssessmentEventService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -20,6 +24,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,6 +34,7 @@ class AssessmentEventServiceTest {
 
     @Mock private IAssessmentEventDomain eventDomain;
     @Mock private ICriterionDomain criterionDomain;
+    @Mock private ClosedYearGuard closedYearGuard;
     @InjectMocks private AssessmentEventService service;
 
     private final UUID classGroup = UUID.randomUUID();
@@ -171,5 +177,72 @@ class AssessmentEventServiceTest {
 
         assertThatThrownBy(() -> service.delete(id)).isInstanceOf(ResourceNotFoundException.class);
         verify(eventDomain, never()).deleteById(any());
+    }
+
+    // ---- closed year: the guard runs before anything is written ----
+
+    private void yearIsClosed() {
+        doThrow(new ConflictException("La gestión 2026 está cerrada; no admite cambios."))
+                .when(closedYearGuard)
+                .requireOpenForClassGroup(classGroup);
+    }
+
+    @Test
+    void create_inAClosedYear_isRefusedBeforeAnyWrite() {
+        when(criterionDomain.findById(criterionId)).thenReturn(Optional.of(activityCriterion()));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> service.create(new CreateEventCommand(criterionId, "Tema 3")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(eventDomain, never()).create(any(), any());
+    }
+
+    @Test
+    void create_asksTheYearBeforeItWrites() {
+        when(criterionDomain.findById(criterionId)).thenReturn(Optional.of(activityCriterion()));
+
+        service.create(new CreateEventCommand(criterionId, "Tema 3"));
+
+        InOrder order = inOrder(closedYearGuard, eventDomain);
+        order.verify(closedYearGuard).requireOpenForClassGroup(classGroup);
+        order.verify(eventDomain).create(criterionId, "Tema 3");
+    }
+
+    @Test
+    void update_inAClosedYear_isRefusedAndChangesNothing() {
+        UUID id = UUID.randomUUID();
+        when(eventDomain.findById(id)).thenReturn(Optional.of(item(id, "Tema 1")));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> service.update(id, new UpdateEventCommand("Otro")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(eventDomain, never()).update(any(), any());
+    }
+
+    @Test
+    void delete_inAClosedYear_isRefusedAndRemovesNothing() {
+        UUID id = UUID.randomUUID();
+        when(eventDomain.findById(id)).thenReturn(Optional.of(item(id, "Tema 1")));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> service.delete(id))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(eventDomain, never()).deleteById(any());
+    }
+
+    @Test
+    void create_underAnUnknownCriterion_keepsItsOwn404() {
+        when(criterionDomain.findById(criterionId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(new CreateEventCommand(criterionId, "Tema 3")))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(closedYearGuard);
     }
 }

@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.criterion.CriterionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -37,6 +39,7 @@ class CriterionServiceTest {
     @Mock private ICriterionDomain criterionDomain;
     @Mock private IAssessmentEventDomain eventDomain;
     @Mock private IDomainEventPublisher events;
+    @Mock private ClosedYearGuard closedYearGuard;
     @InjectMocks private CriterionService criterionService;
 
     private final UUID classGroupId = UUID.randomUUID();
@@ -258,5 +261,80 @@ class CriterionServiceTest {
         when(criterionDomain.findById(id)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> criterionService.getById(id))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ---- closed year: the guard runs before anything is written ----
+
+    private void yearIsClosed() {
+        doThrow(new ConflictException("La gestión 2026 está cerrada; no admite cambios."))
+                .when(closedYearGuard)
+                .requireOpenForClassGroup(classGroupId);
+    }
+
+    @Test
+    void create_inAClosedYear_isRefusedBeforeAnyWrite() {
+        when(criterionDomain.classGroupExists(classGroupId)).thenReturn(true);
+        yearIsClosed();
+
+        assertThatThrownBy(() -> criterionService.create(command("Participacion", null, null)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(criterionDomain, never()).create(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(eventDomain, events);
+    }
+
+    @Test
+    void create_asksTheYearBeforeItWrites() {
+        UUID id = UUID.randomUUID();
+        when(criterionDomain.classGroupExists(classGroupId)).thenReturn(true);
+        when(criterionDomain.create(classGroupId, 1, "Doing", "Participacion", null, null))
+                .thenReturn(criterion(id, "Participacion", null));
+
+        criterionService.create(command("Participacion", null, null));
+
+        InOrder order = inOrder(closedYearGuard, criterionDomain);
+        order.verify(closedYearGuard).requireOpenForClassGroup(classGroupId);
+        order.verify(criterionDomain).create(classGroupId, 1, "Doing", "Participacion", null, null);
+    }
+
+    @Test
+    void update_inAClosedYear_isRefusedAndChangesNothing() {
+        UUID id = UUID.randomUUID();
+        when(criterionDomain.findById(id))
+                .thenReturn(Optional.of(criterion(id, "Participacion", null)));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> criterionService.update(id, new UpdateCriterionCommand("Nuevo")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(criterionDomain, never()).update(any(), any());
+    }
+
+    @Test
+    void delete_inAClosedYear_isRefusedAndRemovesNothing() {
+        UUID id = UUID.randomUUID();
+        when(criterionDomain.findById(id))
+                .thenReturn(Optional.of(criterion(id, "Participacion", null)));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> criterionService.delete(id))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(criterionDomain, never()).deleteById(any());
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void update_ofAnUnknownCriterion_keepsItsOwn404() {
+        UUID id = UUID.randomUUID();
+        when(criterionDomain.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> criterionService.update(id, new UpdateCriterionCommand("Nuevo")))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(closedYearGuard);
     }
 }

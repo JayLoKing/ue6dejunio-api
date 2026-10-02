@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.criterion;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -27,14 +28,17 @@ public class CriterionService implements ICriterionService {
     private final ICriterionDomain criterionDomain;
     private final IAssessmentEventDomain eventDomain;
     private final IDomainEventPublisher events;
+    private final ClosedYearGuard closedYearGuard;
 
     public CriterionService(
             ICriterionDomain criterionDomain,
             IAssessmentEventDomain eventDomain,
-            IDomainEventPublisher events) {
+            IDomainEventPublisher events,
+            ClosedYearGuard closedYearGuard) {
         this.criterionDomain = criterionDomain;
         this.eventDomain = eventDomain;
         this.events = events;
+        this.closedYearGuard = closedYearGuard;
     }
 
     /**
@@ -51,6 +55,7 @@ public class CriterionService implements ICriterionService {
         if (!criterionDomain.classGroupExists(c.classGroupId())) {
             throw new ResourceNotFoundException("ClassGroup", c.classGroupId());
         }
+        closedYearGuard.requireOpenForClassGroup(c.classGroupId());
         // The adapter links the plan through getReferenceById, which never reads: an id that
         // matches nothing would only fail at flush, as a foreign key violation reported as 500.
         if (c.curriculumPlanId() != null
@@ -91,7 +96,8 @@ public class CriterionService implements ICriterionService {
     @Override
     @Transactional
     public EvaluationCriterion update(UUID id, UpdateCriterionCommand c) {
-        getById(id);
+        EvaluationCriterion existing = getById(id);
+        closedYearGuard.requireOpenForClassGroup(existing.classGroupId());
         if (criterionDomain.hasScoresForCriterion(id)) {
             throw new ConflictException(
                     "El criterio no puede modificarse porque ya cuenta con calificaciones registradas");
@@ -122,6 +128,7 @@ public class CriterionService implements ICriterionService {
         // Read before the delete, not after: the criterion is what names the subject and trimester
         // the model has to be told about, and afterwards there is nothing left to ask.
         EvaluationCriterion deleted = getById(id);
+        closedYearGuard.requireOpenForClassGroup(deleted.classGroupId());
         if (criterionDomain.hasScoresForCriterion(id)) {
             throw new ConflictException(
                     "El criterio no puede eliminarse porque ya cuenta con calificaciones registradas");

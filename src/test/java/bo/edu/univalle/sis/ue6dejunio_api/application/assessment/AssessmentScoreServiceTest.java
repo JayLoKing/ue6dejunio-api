@@ -4,12 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment.AssessmentScoreService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
@@ -30,6 +35,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +49,7 @@ class AssessmentScoreServiceTest {
     @Mock private IScoreDomain academicScoreDomain;
     @Mock private IClassGroupDomain classGroupDomain;
     @Mock private IDomainEventPublisher events;
+    @Mock private ClosedYearGuard closedYearGuard;
     @InjectMocks private AssessmentScoreService service;
 
     private final UUID enrollment = UUID.randomUUID();
@@ -368,5 +375,95 @@ class AssessmentScoreServiceTest {
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO);
+    }
+
+    // ---- closed year: the guard runs before anything is written ----
+
+    private void yearIsClosed() {
+        doThrow(new ConflictException("La gestión 2026 está cerrada; no admite cambios."))
+                .when(closedYearGuard)
+                .requireOpenForClassGroup(classGroup);
+    }
+
+    @Test
+    void setScore_onAnActivityItem_inAClosedYear_isRefusedBeforeAnyWrite() {
+        UUID eventId = UUID.randomUUID();
+        when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> service.setScore(onEvent(eventId, "40")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verifyNoInteractions(scoreDomain, academicScoreDomain, events);
+    }
+
+    @Test
+    void setScore_onADirectCriterion_inAClosedYear_isRefusedBeforeAnyWrite() {
+        UUID criterionId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+                .thenReturn(Optional.of(directCriterion(criterionId, "Doing")));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> service.setScore(onCriterion(criterionId, "30")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verifyNoInteractions(scoreDomain, academicScoreDomain, events);
+    }
+
+    @Test
+    void setScore_asksTheYearBeforeItWrites() {
+        UUID eventId = UUID.randomUUID();
+        when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
+        sameCourse();
+        when(scoreDomain.upsertForEvent(enrollment, eventId, new BigDecimal("40")))
+                .thenReturn(null);
+        when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of());
+        when(academicScoreDomain.ensureAcademicScore(eq(enrollment), eq(classGroup), eq(1), any()))
+                .thenReturn(UUID.randomUUID());
+
+        service.setScore(onEvent(eventId, "40"));
+
+        InOrder order = inOrder(closedYearGuard, scoreDomain);
+        order.verify(closedYearGuard).requireOpenForClassGroup(classGroup);
+        order.verify(scoreDomain).upsertForEvent(enrollment, eventId, new BigDecimal("40"));
+    }
+
+    @Test
+    void delete_inAClosedYear_isRefusedAndRemovesNothing() {
+        UUID scoreId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        when(scoreDomain.findById(scoreId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentScore(
+                                        scoreId,
+                                        enrollment,
+                                        eventId,
+                                        null,
+                                        new BigDecimal("30"),
+                                        null,
+                                        null)));
+        when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Doing")));
+        yearIsClosed();
+
+        assertThatThrownBy(() -> service.delete(scoreId))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(scoreDomain, never()).deleteById(any());
+        verifyNoInteractions(academicScoreDomain, events);
+    }
+
+    @Test
+    void delete_ofAnUnknownScore_keepsItsOwn404() {
+        UUID scoreId = UUID.randomUUID();
+        when(scoreDomain.findById(scoreId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.delete(scoreId))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(closedYearGuard);
     }
 }

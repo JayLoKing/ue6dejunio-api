@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -37,6 +38,7 @@ public class AssessmentScoreService implements IAssessmentScoreService {
     private final IScoreDomain academicScoreDomain;
     private final IClassGroupDomain classGroupDomain;
     private final IDomainEventPublisher events;
+    private final ClosedYearGuard closedYearGuard;
 
     public AssessmentScoreService(
             IAssessmentScoreDomain scoreDomain,
@@ -44,13 +46,15 @@ public class AssessmentScoreService implements IAssessmentScoreService {
             ICriterionDomain criterionDomain,
             IScoreDomain academicScoreDomain,
             IClassGroupDomain classGroupDomain,
-            IDomainEventPublisher events) {
+            IDomainEventPublisher events,
+            ClosedYearGuard closedYearGuard) {
         this.scoreDomain = scoreDomain;
         this.eventDomain = eventDomain;
         this.criterionDomain = criterionDomain;
         this.academicScoreDomain = academicScoreDomain;
         this.classGroupDomain = classGroupDomain;
         this.events = events;
+        this.closedYearGuard = closedYearGuard;
     }
 
     /**
@@ -67,6 +71,7 @@ public class AssessmentScoreService implements IAssessmentScoreService {
 
         ScoreTarget target =
                 c.targetsEvent() ? resolveEvent(c.eventId()) : resolveCriterion(c.criterionId());
+        closedYearGuard.requireOpenForClassGroup(target.classGroupId());
 
         UUID enrollmentCourse = scoreDomain.courseOfCourseEnrollment(c.courseEnrollmentId());
         UUID classGroupCourse = classGroupDomain.courseIdOfClassGroup(target.classGroupId());
@@ -142,6 +147,7 @@ public class AssessmentScoreService implements IAssessmentScoreService {
                 existing.eventId() != null
                         ? resolveEvent(existing.eventId())
                         : locateCriterion(existing.criterionId());
+        closedYearGuard.requireOpenForClassGroup(target.classGroupId());
         scoreDomain.deleteById(id);
         consolidate(existing.courseEnrollmentId(), target.classGroupId(), target.trimester(), null);
     }

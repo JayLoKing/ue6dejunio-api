@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.assessment;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -20,11 +21,15 @@ public class AssessmentEventService implements IAssessmentEventService {
 
     private final IAssessmentEventDomain eventDomain;
     private final ICriterionDomain criterionDomain;
+    private final ClosedYearGuard closedYearGuard;
 
     public AssessmentEventService(
-            IAssessmentEventDomain eventDomain, ICriterionDomain criterionDomain) {
+            IAssessmentEventDomain eventDomain,
+            ICriterionDomain criterionDomain,
+            ClosedYearGuard closedYearGuard) {
         this.eventDomain = eventDomain;
         this.criterionDomain = criterionDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     /**
@@ -39,6 +44,7 @@ public class AssessmentEventService implements IAssessmentEventService {
                         .findById(c.criterionId())
                         .orElseThrow(
                                 () -> new ResourceNotFoundException("Criterion", c.criterionId()));
+        closedYearGuard.requireOpenForClassGroup(criterion.classGroupId());
         if (!criterion.isActivityBased()) {
             throw new ConflictException(
                     "El criterio no pertenece a una actividad: se califica de forma directa");
@@ -60,6 +66,7 @@ public class AssessmentEventService implements IAssessmentEventService {
     @Transactional
     public void delete(UUID id) {
         AssessmentEvent event = getById(id);
+        closedYearGuard.requireOpenForClassGroup(event.classGroupId());
         if (eventDomain.hasScores(id)) {
             throw new ConflictException(
                     "El criterio de actividad no puede eliminarse porque ya cuenta con"
@@ -85,7 +92,8 @@ public class AssessmentEventService implements IAssessmentEventService {
     @Override
     @Transactional
     public AssessmentEvent update(UUID id, UpdateEventCommand c) {
-        getById(id);
+        AssessmentEvent existing = getById(id);
+        closedYearGuard.requireOpenForClassGroup(existing.classGroupId());
         if (c.title() != null && c.title().isBlank()) {
             throw new ValidationException(
                     "El nombre del criterio de actividad no puede estar vacio");
