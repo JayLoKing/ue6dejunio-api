@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.course.CourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
@@ -38,6 +39,8 @@ class CourseServiceTest {
     @Mock private IAcademicYearDomain academicYearDomain;
     @Mock private IClassGroupService classGroupService;
     @Mock private IClassGroupDomain classGroupDomain;
+    @Mock private ClosedYearGuard closedYearGuard;
+
     @InjectMocks private CourseService courseService;
 
     private Course course(UUID id) {

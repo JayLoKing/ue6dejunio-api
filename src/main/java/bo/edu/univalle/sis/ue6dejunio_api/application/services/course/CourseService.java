@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.course;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -33,18 +34,25 @@ public class CourseService implements ICourseService {
     private final IAcademicYearDomain academicYearDomain;
     private final IClassGroupService classGroupService;
     private final IClassGroupDomain classGroupDomain;
+    private final ClosedYearGuard closedYearGuard;
 
     public CourseService(
             ICourseDomain courseDomain,
             IAcademicYearDomain academicYearDomain,
             IClassGroupService classGroupService,
-            IClassGroupDomain classGroupDomain) {
+            IClassGroupDomain classGroupDomain,
+            ClosedYearGuard closedYearGuard) {
         this.courseDomain = courseDomain;
         this.academicYearDomain = academicYearDomain;
         this.classGroupService = classGroupService;
         this.classGroupDomain = classGroupDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
+    /**
+     * Unguarded on purpose: a course is always created in the active year, and closing a year
+     * deactivates it, so the year it lands in can never be a closed one.
+     */
     @Override
     @Transactional
     public CourseWithSubjects create(CreateCourseCommand c) {
@@ -88,6 +96,7 @@ public class CourseService implements ICourseService {
     @Transactional
     public Course update(UUID id, UpdateCourseCommand c) {
         getById(id);
+        closedYearGuard.requireOpenForCourse(id);
         Course result = null;
         if (c.homeroomTeacherId() != null) {
             result = assignHomeroomTeacher(id, c.homeroomTeacherId());
@@ -101,6 +110,7 @@ public class CourseService implements ICourseService {
     @Override
     @Transactional
     public Course setHomeroomTeacher(UUID id, UUID teacherId) {
+        closedYearGuard.requireOpenForCourse(id);
         return assignHomeroomTeacher(id, teacherId);
     }
 
@@ -173,6 +183,7 @@ public class CourseService implements ICourseService {
         }
         Course courseA = getById(courseAId);
         Course courseB = getById(courseBId);
+        closedYearGuard.requireOpenForCourses(List.of(courseAId, courseBId));
 
         UUID teacherA = courseA.homeroomTeacherId();
         UUID teacherB = courseB.homeroomTeacherId();
@@ -269,6 +280,7 @@ public class CourseService implements ICourseService {
     @Transactional
     public void delete(UUID id) {
         getById(id);
+        closedYearGuard.requireOpenForCourse(id);
         courseDomain.setActive(id, false);
     }
 }

@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.classgroup;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -18,9 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClassGroupService implements IClassGroupService {
 
     private final IClassGroupDomain classGroupDomain;
+    private final ClosedYearGuard closedYearGuard;
 
-    public ClassGroupService(IClassGroupDomain classGroupDomain) {
+    public ClassGroupService(IClassGroupDomain classGroupDomain, ClosedYearGuard closedYearGuard) {
         this.classGroupDomain = classGroupDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -29,6 +32,7 @@ public class ClassGroupService implements IClassGroupService {
         if (!classGroupDomain.courseExists(command.courseId())) {
             throw new ResourceNotFoundException("Course", command.courseId());
         }
+        closedYearGuard.requireOpenForCourse(command.courseId());
         List<ClassGroup> created = new ArrayList<>();
         for (CreateClassGroupCommand.Assignment a : command.assignments()) {
             if (!classGroupDomain.subjectExists(a.subjectId())) {
@@ -71,6 +75,7 @@ public class ClassGroupService implements IClassGroupService {
     @Transactional
     public void delete(UUID id) {
         getById(id);
+        closedYearGuard.requireOpenForClassGroup(id);
         classGroupDomain.setActive(id, false);
     }
 
@@ -85,6 +90,7 @@ public class ClassGroupService implements IClassGroupService {
         if (!cg.courseId().equals(courseId)) {
             throw new ResourceNotFoundException("ClassGroup", classGroupId);
         }
+        closedYearGuard.requireOpenForClassGroup(classGroupId);
         if (!classGroupDomain.userIsTeacher(teacherId)) {
             throw new ResourceNotFoundException("Docente", teacherId);
         }
