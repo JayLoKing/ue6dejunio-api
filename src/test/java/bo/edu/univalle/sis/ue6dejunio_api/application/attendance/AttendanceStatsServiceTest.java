@@ -6,6 +6,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.attendance.AttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -87,6 +88,7 @@ class AttendanceStatsServiceTest {
                         trimesterPeriodDomain,
                         mock(ICourseEnrollmentDomain.class),
                         events,
+                        mock(ClosedYearGuard.class),
                         FIXED_CLOCK);
         courseId = UUID.randomUUID();
         lenient().when(attendanceDomain.courseExists(courseId)).thenReturn(true);

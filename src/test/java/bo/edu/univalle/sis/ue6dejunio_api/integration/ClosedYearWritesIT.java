@@ -8,8 +8,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -254,4 +259,97 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
     private record EventBody(@JsonProperty("id_criterion") UUID criterionId, String title) {}
 
     private record TitleBody(String title) {}
+
+    // ---- attendance ----
+
+    @Test
+    void closedYear_rejectsDailyAttendance_singleAndBatch() throws Exception {
+        closeYear();
+
+        postJson("/api/attendance/daily", new DailyBody(enrollment, editableSchoolDay(), "Present"))
+                .andExpect(status().isConflict());
+        postJson(
+                        "/api/attendance/daily/batch",
+                        new DailyBatchBody(
+                                editableSchoolDay(), List.of(new Mark(enrollment, "Present"))))
+                .andExpect(status().isConflict());
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attendance", Integer.class)).isZero();
+    }
+
+    @Test
+    void closedYear_rejectsSessionAttendance_singleAndBatch() throws Exception {
+        closeYear();
+
+        postJson(
+                        "/api/attendance/session",
+                        new SessionBody(enrollment, classGroup, editableSchoolDay(), "Present"))
+                .andExpect(status().isConflict());
+        postJson(
+                        "/api/attendance/session/batch",
+                        new SessionBatchBody(
+                                classGroup,
+                                editableSchoolDay(),
+                                List.of(new Mark(enrollment, "Present"))))
+                .andExpect(status().isConflict());
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attendance", Integer.class)).isZero();
+    }
+
+    @Test
+    void closedYear_stillServesAttendanceReads() throws Exception {
+        closeYear();
+
+        mvc.perform(
+                        get("/api/attendance")
+                                .param("id_course_enrollment", enrollment.toString())
+                                .header("Authorization", bearer()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void reopeningTheYear_letsAttendanceThrough() throws Exception {
+        closeYear();
+        postJson("/api/attendance/daily", new DailyBody(enrollment, editableSchoolDay(), "Present"))
+                .andExpect(status().isConflict());
+
+        mvc.perform(
+                        put("/api/academic-years/" + academicYearId(2026) + "/reopen")
+                                .header("Authorization", bearer()))
+                .andExpect(status().isOk());
+
+        postJson("/api/attendance/daily", new DailyBody(enrollment, editableSchoolDay(), "Present"))
+                .andExpect(status().is2xxSuccessful());
+    }
+
+    /** Keeps the date inside the editable Mon-Fri window; see AttendanceAuthorizationIT. */
+    private static LocalDate editableSchoolDay() {
+        LocalDate today = LocalDate.now(ZoneId.of("America/La_Paz"));
+        return switch (today.getDayOfWeek()) {
+            case SATURDAY, SUNDAY -> today.with(DayOfWeek.FRIDAY);
+            default -> today;
+        };
+    }
+
+    private record DailyBody(
+            @JsonProperty("id_course_enrollment") UUID courseEnrollmentId,
+            @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date,
+            String status) {}
+
+    private record Mark(
+            @JsonProperty("id_course_enrollment") UUID courseEnrollmentId, String status) {}
+
+    private record DailyBatchBody(
+            @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date, List<Mark> records) {}
+
+    private record SessionBody(
+            @JsonProperty("id_course_enrollment") UUID courseEnrollmentId,
+            @JsonProperty("id_class_group") UUID classGroupId,
+            @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date,
+            String status) {}
+
+    private record SessionBatchBody(
+            @JsonProperty("id_class_group") UUID classGroupId,
+            @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date,
+            List<Mark> records) {}
 }

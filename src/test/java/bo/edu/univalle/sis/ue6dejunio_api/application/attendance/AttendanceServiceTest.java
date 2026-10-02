@@ -4,12 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.attendance.AttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -29,6 +34,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -64,6 +70,7 @@ class AttendanceServiceTest {
     @Mock private IAttendanceDomain attendanceDomain;
     @Mock private ITrimesterPeriodDomain trimesterPeriodDomain;
     @Mock private IDomainEventPublisher events;
+    @Mock private ClosedYearGuard closedYearGuard;
 
     private AttendanceService attendanceService;
 
@@ -80,6 +87,7 @@ class AttendanceServiceTest {
                         trimesterPeriodDomain,
                         mock(ICourseEnrollmentDomain.class),
                         events,
+                        closedYearGuard,
                         clock);
     }
 
@@ -436,5 +444,117 @@ class AttendanceServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessage(MSG_OUT_OF_WEEK);
         verify(attendanceDomain, never()).upsertSession(ceId, cgId, LAST_WEEK_FRIDAY, "P");
+    }
+
+    // ---- closed year: the guard runs before anything is written ----
+
+    private static final String MSG_CLOSED = "La gestión 2026 está cerrada; no admite cambios.";
+
+    @Test
+    void registerDaily_inAClosedYear_isRefusedBeforeAnyWrite() {
+        init();
+        UUID ceId = UUID.randomUUID();
+        doThrow(new ConflictException(MSG_CLOSED))
+                .when(closedYearGuard)
+                .requireOpenForEnrollment(ceId);
+
+        assertThatThrownBy(() -> attendanceService.registerDaily(ceId, TODAY, "Present"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_CLOSED);
+
+        verify(attendanceDomain, never()).upsertDaily(any(), any(), any());
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void registerDailyBatch_inAClosedYear_isRefusedBeforeAnyWrite() {
+        init();
+        UUID ceA = UUID.randomUUID();
+        UUID ceB = UUID.randomUUID();
+        doThrow(new ConflictException(MSG_CLOSED))
+                .when(closedYearGuard)
+                .requireOpenForEnrollments(List.of(ceA, ceB));
+
+        assertThatThrownBy(
+                        () ->
+                                attendanceService.registerDailyBatch(
+                                        TODAY,
+                                        List.of(
+                                                new IAttendanceService.DailyMark(ceA, "Present"),
+                                                new IAttendanceService.DailyMark(ceB, "Absent"))))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_CLOSED);
+
+        verify(attendanceDomain, never()).upsertDailyBatch(any(), anyMap());
+        verifyNoInteractions(events);
+    }
+
+    /** A whole class is one question to the guard, not one per mark. */
+    @Test
+    void registerDailyBatch_asksTheYearOnceForTheWholeBatch() {
+        init();
+        List<UUID> ids = java.util.stream.Stream.generate(UUID::randomUUID).limit(30).toList();
+        when(attendanceDomain.existingCourseEnrollmentIds(ids)).thenReturn(Set.copyOf(ids));
+        List<IAttendanceService.DailyMark> marks =
+                ids.stream().map(id -> new IAttendanceService.DailyMark(id, "Present")).toList();
+
+        attendanceService.registerDailyBatch(TODAY, marks);
+
+        verify(closedYearGuard).requireOpenForEnrollments(ids);
+        verifyNoMoreInteractions(closedYearGuard);
+    }
+
+    @Test
+    void registerSession_inAClosedYear_isRefusedBeforeAnyWrite() {
+        init();
+        UUID ceId = UUID.randomUUID();
+        UUID cgId = UUID.randomUUID();
+        doThrow(new ConflictException(MSG_CLOSED))
+                .when(closedYearGuard)
+                .requireOpenForClassGroup(cgId);
+
+        assertThatThrownBy(() -> attendanceService.registerSession(ceId, cgId, TODAY, "Present"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_CLOSED);
+
+        verify(attendanceDomain, never()).upsertSession(any(), any(), any(), any());
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void registerSessionBatch_inAClosedYear_isRefusedBeforeAnyWrite() {
+        init();
+        UUID cgId = UUID.randomUUID();
+        UUID ceA = UUID.randomUUID();
+        doThrow(new ConflictException(MSG_CLOSED))
+                .when(closedYearGuard)
+                .requireOpenForClassGroup(cgId);
+
+        assertThatThrownBy(
+                        () ->
+                                attendanceService.registerSessionBatch(
+                                        cgId,
+                                        TODAY,
+                                        List.of(new IAttendanceService.DailyMark(ceA, "Present"))))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_CLOSED);
+
+        verify(attendanceDomain, never()).upsertSessionBatch(any(), any(), anyMap());
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void registerDaily_asksTheYearBeforeItWrites() {
+        init();
+        UUID ceId = UUID.randomUUID();
+        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
+        when(attendanceDomain.upsertDaily(ceId, TODAY, "Present"))
+                .thenReturn(new Attendance(UUID.randomUUID(), ceId, null, TODAY, "Present"));
+
+        attendanceService.registerDaily(ceId, TODAY, "Present");
+
+        InOrder order = inOrder(closedYearGuard, attendanceDomain);
+        order.verify(closedYearGuard).requireOpenForEnrollment(ceId);
+        order.verify(attendanceDomain).upsertDaily(ceId, TODAY, "Present");
     }
 }

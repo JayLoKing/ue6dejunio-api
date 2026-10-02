@@ -3,8 +3,10 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.attendance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.attendance.AttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.CourseStudentAttendance;
@@ -88,6 +90,7 @@ class StudentAttendanceReportServiceTest {
                         trimesterPeriodDomain,
                         enrollmentDomain,
                         events,
+                        mock(ClosedYearGuard.class),
                         FIXED_CLOCK);
         courseId = UUID.randomUUID();
         anaEnrollment = UUID.randomUUID();

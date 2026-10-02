@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.attendance;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.attendance.Attendance;
@@ -56,6 +57,7 @@ public class AttendanceService implements IAttendanceService {
     private final ITrimesterPeriodDomain trimesterPeriodDomain;
     private final ICourseEnrollmentDomain enrollmentDomain;
     private final IDomainEventPublisher events;
+    private final ClosedYearGuard closedYearGuard;
     private final Clock clock;
 
     public AttendanceService(
@@ -63,11 +65,13 @@ public class AttendanceService implements IAttendanceService {
             ITrimesterPeriodDomain trimesterPeriodDomain,
             ICourseEnrollmentDomain enrollmentDomain,
             IDomainEventPublisher events,
+            ClosedYearGuard closedYearGuard,
             Clock clock) {
         this.attendanceDomain = attendanceDomain;
         this.trimesterPeriodDomain = trimesterPeriodDomain;
         this.enrollmentDomain = enrollmentDomain;
         this.events = events;
+        this.closedYearGuard = closedYearGuard;
         this.clock = clock;
     }
 
@@ -75,6 +79,7 @@ public class AttendanceService implements IAttendanceService {
     @Transactional
     public Attendance registerDaily(UUID courseEnrollmentId, LocalDate date, String status) {
         requireEditableSchoolDay(date);
+        closedYearGuard.requireOpenForEnrollment(courseEnrollmentId);
         if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
             throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }
@@ -91,8 +96,9 @@ public class AttendanceService implements IAttendanceService {
             return new DailyBatchResult(0, 0);
         }
 
-        // One bounded existence check for the whole batch instead of one query per mark.
+        // A class is one question to the guard, and one bounded existence check, not one per mark.
         List<UUID> courseEnrollmentIds = marks.stream().map(DailyMark::courseEnrollmentId).toList();
+        closedYearGuard.requireOpenForEnrollments(courseEnrollmentIds);
         Set<UUID> existingIds = attendanceDomain.existingCourseEnrollmentIds(courseEnrollmentIds);
         for (DailyMark m : marks) {
             if (!existingIds.contains(m.courseEnrollmentId())) {
@@ -127,6 +133,7 @@ public class AttendanceService implements IAttendanceService {
         if (marks.isEmpty()) {
             return new DailyBatchResult(0, 0);
         }
+        closedYearGuard.requireOpenForClassGroup(classGroupId);
         UUID courseId = attendanceDomain.courseOfClassGroup(classGroupId);
         List<UUID> courseEnrollmentIds = marks.stream().map(DailyMark::courseEnrollmentId).toList();
 
@@ -185,6 +192,7 @@ public class AttendanceService implements IAttendanceService {
     public Attendance registerSession(
             UUID courseEnrollmentId, UUID classGroupId, LocalDate date, String status) {
         requireEditableSchoolDay(date);
+        closedYearGuard.requireOpenForClassGroup(classGroupId);
         if (!attendanceDomain.courseEnrollmentExists(courseEnrollmentId)) {
             throw new ResourceNotFoundException("CourseEnrollment", courseEnrollmentId);
         }
