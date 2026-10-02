@@ -76,6 +76,25 @@ public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity,
     @EntityGraph(attributePaths = {"subject", "subject.area", "teacher"})
     List<ClassGroupEntity> findActiveOfCourseInPlanOrder(@Param("courseId") UUID courseId);
 
+    /**
+     * Course and subject ids of the active class groups of several courses, nothing else: the copy
+     * of a year's structure needs which subjects, not the rows behind them.
+     */
+    @Query(
+            """
+        SELECT cg.course.id AS courseId, cg.subject.id AS subjectId FROM ClassGroupEntity cg
+        WHERE cg.course.id IN :courseIds AND cg.active = true
+        """)
+    List<CourseSubjectRow> findActiveSubjectIdsOfCourses(
+            @Param("courseIds") Collection<UUID> courseIds);
+
+    /** A course and one of its subjects, as the query above hands them back. */
+    interface CourseSubjectRow {
+        UUID getCourseId();
+
+        UUID getSubjectId();
+    }
+
     long countByCourse_IdAndIdInAndActiveTrue(UUID courseId, Collection<UUID> ids);
 
     /**

@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroupField;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,6 +45,20 @@ public interface IClassGroupDomain {
     boolean teachesInAnyCourse(UUID teacherId, Collection<UUID> courseIds);
 
     ClassGroup create(UUID courseId, UUID subjectId, UUID teacherId);
+
+    /**
+     * Opens one active class group per subject of each course, with no teacher, and says how many
+     * it wrote. Only for copying a year's structure into another, where the Director names the
+     * teachers afterwards; every other way of opening a class group still requires one. Writes by
+     * reference, so it reads nothing per row.
+     */
+    int createUnassigned(Map<UUID, ? extends Collection<UUID>> subjectIdsByCourse);
+
+    /**
+     * The subjects each of these courses has an ACTIVE class group for, in one query. A course with
+     * none is absent from the map.
+     */
+    Map<UUID, List<UUID>> activeSubjectIdsByCourse(Collection<UUID> courseIds);
 
     Optional<ClassGroup> findById(UUID id);
 

@@ -12,10 +12,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaClassGr
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -135,6 +138,43 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         }
         e.setActive(true);
         return toDomain(classGroupRepo.save(e));
+    }
+
+    /**
+     * References and not fetches, for the same reason {@code create} cannot be used here: it reads
+     * the course and the subject before every insert, which for a whole school is hundreds of
+     * selects. The ids came out of rows that exist, so a reference is all the foreign key needs.
+     */
+    @Override
+    @Transactional
+    public int createUnassigned(Map<UUID, ? extends Collection<UUID>> subjectIdsByCourse) {
+        List<ClassGroupEntity> entities = new ArrayList<>();
+        subjectIdsByCourse.forEach(
+                (courseId, subjectIds) -> {
+                    CourseEntity course = courseRepo.getReferenceById(courseId);
+                    for (UUID subjectId : subjectIds) {
+                        ClassGroupEntity e = new ClassGroupEntity();
+                        e.setCourse(course);
+                        e.setSubject(subjectRepo.getReferenceById(subjectId));
+                        e.setActive(true);
+                        entities.add(e);
+                    }
+                });
+        return classGroupRepo.saveAll(entities).size();
+    }
+
+    @Override
+    public Map<UUID, List<UUID>> activeSubjectIdsByCourse(Collection<UUID> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return Map.of();
+        }
+        return classGroupRepo.findActiveSubjectIdsOfCourses(courseIds).stream()
+                .collect(
+                        Collectors.groupingBy(
+                                JpaClassGroupRepository.CourseSubjectRow::getCourseId,
+                                Collectors.mapping(
+                                        JpaClassGroupRepository.CourseSubjectRow::getSubjectId,
+                                        Collectors.toList())));
     }
 
     @Override
