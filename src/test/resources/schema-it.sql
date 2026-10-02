@@ -23,7 +23,14 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS academic_years (id_academic_year SERIAL PRIMARY KEY, year integer NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS academic_years (
+    id_academic_year SERIAL PRIMARY KEY,
+    year integer NOT NULL UNIQUE,
+    active boolean NOT NULL DEFAULT false,
+    closed_at timestamptz NULL
+);
+-- Mirrors V22: at most one active year, enforced by the database.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_academic_years_single_active ON academic_years (active) WHERE active;
 CREATE TABLE IF NOT EXISTS levels (id_level SERIAL PRIMARY KEY, name varchar(100) NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS grades (
     id_grade SERIAL PRIMARY KEY,
@@ -338,9 +345,12 @@ INSERT INTO grades (id_level, name)
     ON CONFLICT DO NOTHING;
 INSERT INTO parallels (name) VALUES ('A'), ('B'), ('C') ON CONFLICT DO NOTHING;
 -- Two of them, because the directory is about one gestión at a time and a single year cannot tell
--- a listing that picked the right one from a listing that has no rule at all. 2026 is the current
--- one everywhere: every helper that does not name a year resolves the latest.
-INSERT INTO academic_years (year) VALUES (2025), (2026) ON CONFLICT DO NOTHING;
+-- a listing that picked the right one from a listing that has no rule at all. 2026 is the active
+-- one: every helper that does not name a year resolves the active gestión. On a re-run the rows
+-- conflict and nothing changes, so a year a test activated is not silently reverted.
+INSERT INTO academic_years (year, active)
+    VALUES (2025, false), (2026, NOT EXISTS (SELECT 1 FROM academic_years WHERE active))
+    ON CONFLICT DO NOTHING;
 -- display_order is the order the school's own libreta and centralizador read, opening with
 -- COMUNIDAD Y SOCIEDAD and closing with COSMOS Y PENSAMIENTO. Kept in step with V16 so a test
 -- asserting the sheet's order is asserting what production actually holds.

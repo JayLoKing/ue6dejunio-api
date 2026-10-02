@@ -124,6 +124,10 @@ public abstract class AbstractIntegrationTest {
                         + SEEDED_YEARS
                         + ")");
         jdbc.update("DELETE FROM academic_years WHERE year NOT IN " + SEEDED_YEARS);
+        // A test that activated another year must not leave it active for the next one. Two steps:
+        // the unique index is checked row by row, so one UPDATE could briefly hold two.
+        jdbc.update("UPDATE academic_years SET active = false WHERE year <> 2026");
+        jdbc.update("UPDATE academic_years SET active = true WHERE year = 2026");
         // Same story for the areas of knowledge: a catalogue table nobody truncates, so an area a
         // test invents outlives it and turns up in the next class's listing. Its subjects go first
         // — subjects are catalogue too, and subjects.id_area is ON DELETE RESTRICT, so the area
