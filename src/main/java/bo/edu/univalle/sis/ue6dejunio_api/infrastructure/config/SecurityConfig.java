@@ -121,6 +121,8 @@ public class SecurityConfig {
                                         .hasRole("Director")
                                         .requestMatchers("/api/parallels/**")
                                         .hasRole("Director")
+                                        .requestMatchers("/api/academic-years/**")
+                                        .hasRole("Director")
                                         .requestMatchers("/api/trimester-periods/**")
                                         .hasRole("Director")
                                         .requestMatchers("/api/catalog/**")
