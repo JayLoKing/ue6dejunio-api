@@ -296,7 +296,7 @@ class CourseServiceTest {
         UUID incoming = UUID.randomUUID();
         when(courseDomain.findById(id)).thenReturn(Optional.of(course(id)));
         when(courseDomain.userIsNonTechnicalTeacher(incoming)).thenReturn(true);
-        when(courseDomain.homeroomCourseOf(incoming))
+        when(courseDomain.homeroomCourseOf(incoming, 1))
                 .thenReturn(
                         Optional.of(courseNamed(otherCourseId, "Segundo", "B", incoming, true)));
 
@@ -320,7 +320,7 @@ class CourseServiceTest {
         when(courseDomain.findById(id))
                 .thenReturn(Optional.of(courseWithHomeroom(id, teacher, true)));
         when(courseDomain.userIsNonTechnicalTeacher(teacher)).thenReturn(true);
-        when(courseDomain.homeroomCourseOf(teacher))
+        when(courseDomain.homeroomCourseOf(teacher, 1))
                 .thenReturn(Optional.of(courseWithHomeroom(id, teacher, true)));
         when(courseDomain.setHomeroomTeacher(id, teacher))
                 .thenReturn(courseWithHomeroom(id, teacher, true));
@@ -328,6 +328,27 @@ class CourseServiceTest {
         Course result = courseService.setHomeroomTeacher(id, teacher);
 
         assertThat(result.homeroomTeacherId()).isEqualTo(teacher);
+    }
+
+    /**
+     * A teacher who runs a classroom in another gestión is free here: the lookup is asked about the
+     * year of the course being assigned, and nothing else.
+     */
+    @Test
+    void setHomeroom_askedAboutTheYearOfTheCourseBeingAssigned() {
+        UUID id = UUID.randomUUID();
+        UUID teacher = UUID.randomUUID();
+        Course in2027 = new Course(id, 1, "Primero", 1, "A", 9, 2027, null, null, true, false);
+        when(courseDomain.findById(id)).thenReturn(Optional.of(in2027));
+        when(courseDomain.userIsNonTechnicalTeacher(teacher)).thenReturn(true);
+        when(courseDomain.homeroomCourseOf(teacher, 9)).thenReturn(Optional.empty());
+        when(courseDomain.setHomeroomTeacher(id, teacher))
+                .thenReturn(courseWithHomeroom(id, teacher, true));
+
+        courseService.setHomeroomTeacher(id, teacher);
+
+        verify(courseDomain).setHomeroomTeacher(id, teacher);
+        verify(courseDomain, never()).homeroomCourseOf(any(UUID.class));
     }
 
     /** Same id twice is not a swap; nothing to trade. */

@@ -132,16 +132,18 @@ public class CourseService implements ICourseService {
      * whoever left).
      *
      * <p>{@code id_homeroom_teacher} carries no UNIQUE constraint, so a teacher who is already
-     * homeroom of a different course is refused here too — otherwise they would silently end up
-     * homeroom of both. That case is not an error on its own: it is exactly what {@link
-     * #swapHomeroomTeachers} exists for, and this message points there.
+     * homeroom of a different course in the same gestión is refused here too — otherwise they would
+     * silently end up homeroom of both. A course of another gestión does not count: the same person
+     * runs a classroom in 2026 and another in 2027. That case is not an error on its own: it is
+     * exactly what {@link #swapHomeroomTeachers} exists for, and this message points there.
      */
     private Course assignHomeroomTeacher(UUID id, UUID teacherId) {
         Course current = getById(id);
         if (!courseDomain.userIsNonTechnicalTeacher(teacherId)) {
             throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
         }
-        Optional<Course> teacherHomeroomElsewhere = courseDomain.homeroomCourseOf(teacherId);
+        Optional<Course> teacherHomeroomElsewhere =
+                courseDomain.homeroomCourseOf(teacherId, current.academicYearId());
         if (teacherHomeroomElsewhere.isPresent()
                 && !teacherHomeroomElsewhere.get().id().equals(id)) {
             throw new ConflictException(

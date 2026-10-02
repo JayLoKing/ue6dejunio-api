@@ -29,8 +29,12 @@ public interface JpaCourseRepository extends JpaRepository<CourseEntity, UUID> {
     @EntityGraph(attributePaths = {"grade", "parallel", "academicYear", "homeroomTeacher"})
     Page<CourseEntity> search(@Param("yearId") Integer yearId, Pageable pageable);
 
-    Optional<CourseEntity> findFirstByHomeroomTeacher_IdAndActiveTrueOrderByAcademicYear_YearDesc(
-            UUID teacherId);
+    Optional<CourseEntity>
+            findFirstByHomeroomTeacher_IdAndActiveTrueOrderByAcademicYear_ActiveDescAcademicYear_YearDesc(
+                    UUID teacherId);
+
+    Optional<CourseEntity> findFirstByHomeroomTeacher_IdAndAcademicYear_IdAndActiveTrue(
+            UUID teacherId, Integer yearId);
 
     /**
      * The courses a rotation copies into, read with the to-ones the printed heading names. They are

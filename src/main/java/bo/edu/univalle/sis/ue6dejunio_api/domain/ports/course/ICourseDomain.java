@@ -39,5 +39,16 @@ public interface ICourseDomain {
 
     PageResult<Course> list(Integer academicYearId, PageQuery pageQuery);
 
+    /**
+     * The active course the teacher runs as homeroom, whichever gestión it belongs to. For the
+     * readers that ask "which is this teacher's classroom": when the same person holds one in two
+     * gestiones, the active gestión's wins, then the newest.
+     */
     Optional<Course> homeroomCourseOf(UUID teacherId);
+
+    /**
+     * The active course the teacher runs as homeroom in this one gestión. What decides whether a
+     * second assignment is refused: a teacher is homeroom of one classroom per year, not for life.
+     */
+    Optional<Course> homeroomCourseOf(UUID teacherId, Integer academicYearId);
 }
