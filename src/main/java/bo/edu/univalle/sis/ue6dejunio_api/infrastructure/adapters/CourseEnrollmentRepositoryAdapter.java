@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEnrollmentEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
@@ -11,6 +12,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseE
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaStudentRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,14 +34,17 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     private final JpaCourseEnrollmentRepository enrollmentRepo;
     private final JpaStudentRepository studentRepo;
     private final JpaCourseRepository courseRepo;
+    private final JdbcTemplate jdbc;
 
     public CourseEnrollmentRepositoryAdapter(
             JpaCourseEnrollmentRepository enrollmentRepo,
             JpaStudentRepository studentRepo,
-            JpaCourseRepository courseRepo) {
+            JpaCourseRepository courseRepo,
+            JdbcTemplate jdbc) {
         this.enrollmentRepo = enrollmentRepo;
         this.studentRepo = studentRepo;
         this.courseRepo = courseRepo;
+        this.jdbc = jdbc;
     }
 
     @Override
@@ -167,6 +173,40 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
                         () ->
                                 new ResourceNotFoundException(
                                         "CourseEnrollment", courseEnrollmentId));
+    }
+
+    @Override
+    @Transactional
+    public void closeEnrollmentsOfYear(int academicYearId, LocalDateTime closedAt) {
+        enrollmentRepo.closeOfYear(academicYearId, closedAt, STATUS_WITHDRAWN);
+    }
+
+    @Override
+    @Transactional
+    public void freezeResults(Collection<FrozenResult> results) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+        // One JDBC batch for the whole set: the values differ per enrollment, so no single JPQL
+        // update can carry them, and a save per entity would be a statement per student.
+        List<FrozenResult> rows = List.copyOf(results);
+        jdbc.batchUpdate(
+                "UPDATE course_enrollments SET final_average = ?, final_result = ? "
+                        + "WHERE id_course_enrollment = ? AND status = ?",
+                rows,
+                rows.size(),
+                (ps, r) -> {
+                    ps.setBigDecimal(1, r.finalAverage());
+                    ps.setString(2, r.result() == null ? null : r.result().name());
+                    ps.setObject(3, r.courseEnrollmentId());
+                    ps.setString(4, STATUS_EFFECTIVE);
+                });
+    }
+
+    @Override
+    @Transactional
+    public void reopenEnrollmentsOfYear(int academicYearId) {
+        enrollmentRepo.reopenOfYear(academicYearId);
     }
 
     private CourseStudent toCourseStudent(CourseEnrollmentEntity e) {

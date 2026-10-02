@@ -3,6 +3,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -86,4 +88,24 @@ public interface ICourseEnrollmentDomain {
      * #activeStudentsByCourse}.
      */
     long activeEnrolmentCountOfCourse(UUID courseId);
+
+    /**
+     * Closes every enrollment of the year at once: stamps {@code closedAt} on all of them, the
+     * withdrawn included, and clears any frozen result a withdrawn one still carries from an
+     * earlier close. One statement for the whole school.
+     */
+    void closeEnrollmentsOfYear(int academicYearId, LocalDateTime closedAt);
+
+    /**
+     * Writes the frozen average and result, as one batch however many enrollments there are. Only
+     * enrollments still in force are touched: a withdrawn one never holds a result. A null average
+     * and result overwrite a previous freeze, so a reclose never leaves stale values behind.
+     */
+    void freezeResults(Collection<FrozenResult> results);
+
+    /**
+     * Reopens the enrollments of the year by clearing {@code closedAt}. The frozen average and
+     * result stay: they are overwritten by the next close, never cleared here.
+     */
+    void reopenEnrollmentsOfYear(int academicYearId);
 }

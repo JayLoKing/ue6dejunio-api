@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEnrollmentEntity;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +45,33 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
             @Param("studentIds") Collection<UUID> studentIds,
             @Param("status") String status,
             @Param("enrollmentDate") LocalDate enrollmentDate);
+
+    /**
+     * Closes every enrollment of a year in one statement. A withdrawn enrollment never holds a
+     * result, so any it kept from an earlier close is cleared in the same pass.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+        UPDATE CourseEnrollmentEntity e
+        SET e.closedAt = :at,
+            e.finalAverage = CASE WHEN e.status = :withdrawn THEN NULL ELSE e.finalAverage END,
+            e.finalResult = CASE WHEN e.status = :withdrawn THEN NULL ELSE e.finalResult END
+        WHERE e.course.id IN (SELECT c.id FROM CourseEntity c WHERE c.academicYear.id = :yearId)
+        """)
+    int closeOfYear(
+            @Param("yearId") Integer yearId,
+            @Param("at") LocalDateTime at,
+            @Param("withdrawn") String withdrawn);
+
+    /** Reopens the enrollments of a year; the frozen average and result stay. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+        UPDATE CourseEnrollmentEntity e SET e.closedAt = NULL
+        WHERE e.course.id IN (SELECT c.id FROM CourseEntity c WHERE c.academicYear.id = :yearId)
+        """)
+    int reopenOfYear(@Param("yearId") Integer yearId);
 
     @EntityGraph(attributePaths = "student")
     Page<CourseEnrollmentEntity> findByCourse_Id(UUID courseId, Pageable pageable);
