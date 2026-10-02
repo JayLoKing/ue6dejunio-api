@@ -24,7 +24,12 @@ import java.util.UUID;
  *     screens can never disagree about a student.
  * @param trimester2Average as {@code trimester1Average}, for the second trimester.
  * @param trimester3Average as {@code trimester1Average}, for the third trimester.
- * @param finalAverage the mean of the area averages, or null when nothing is graded yet.
+ * @param finalAverage the mean of the area averages, or null when nothing is graded yet. Once the
+ *     year is closed it is the average frozen then, when there is one.
+ * @param finalResult the result frozen when the year closed; null while the year is open, and for a
+ *     closed year's withdrawn or ungraded student.
+ * @param frozen whether the year is closed, which is when {@code finalAverage} and {@code
+ *     finalResult} come from the freeze rather than from the marks.
  */
 public record StudentAnnualSummary(
         UUID courseEnrollmentId,
@@ -34,4 +39,30 @@ public record StudentAnnualSummary(
         BigDecimal trimester1Average,
         BigDecimal trimester2Average,
         BigDecimal trimester3Average,
-        BigDecimal finalAverage) {}
+        BigDecimal finalAverage,
+        AnnualResult finalResult,
+        boolean frozen) {
+
+    /** A year as the marks alone say it: nothing frozen, no result. */
+    public StudentAnnualSummary(
+            UUID courseEnrollmentId,
+            UUID studentId,
+            String fullName,
+            List<AnnualSubjectScore> subjects,
+            BigDecimal trimester1Average,
+            BigDecimal trimester2Average,
+            BigDecimal trimester3Average,
+            BigDecimal finalAverage) {
+        this(
+                courseEnrollmentId,
+                studentId,
+                fullName,
+                subjects,
+                trimester1Average,
+                trimester2Average,
+                trimester3Average,
+                finalAverage,
+                null,
+                false);
+    }
+}

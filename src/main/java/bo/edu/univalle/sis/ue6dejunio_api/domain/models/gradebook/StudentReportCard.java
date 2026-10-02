@@ -21,6 +21,10 @@ import java.util.UUID;
  * @param finalAverage the mean of the area averages, or null when nothing is graded.
  * @param finalAverageInWords the same number spelled out, blank when there is none. The libreta
  *     carries both and they must never name two different marks.
+ * @param finalResult the result frozen when the year closed; null while the year is open, and for a
+ *     closed year's withdrawn or ungraded student.
+ * @param frozen whether the year is closed, which is when {@code finalAverage} and {@code
+ *     finalResult} come from the freeze rather than from the marks.
  */
 public record StudentReportCard(
         UUID courseEnrollmentId,
@@ -36,4 +40,6 @@ public record StudentReportCard(
         BigDecimal trimester3Average,
         BigDecimal finalAverage,
         String finalAverageInWords,
-        List<TrimesterOutcome> trimesterOutcomes) {}
+        List<TrimesterOutcome> trimesterOutcomes,
+        AnnualResult finalResult,
+        boolean frozen) {}

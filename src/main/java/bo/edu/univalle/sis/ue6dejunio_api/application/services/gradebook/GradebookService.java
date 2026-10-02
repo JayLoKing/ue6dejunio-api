@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualSubjectScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAcademicSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.CourseAttendanceRow;
@@ -112,13 +113,50 @@ public class GradebookService implements IGradebookService {
         // so reading the whole year costs the same single query.
         PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
         Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
+        // One more batched read for the page, for the frozen values: still no query per student.
+        Map<UUID, EnrollmentOutcome> outcomes =
+                enrollmentDomain.outcomesOf(
+                        page.content().stream().map(CourseStudent::courseEnrollmentId).toList());
         return page.map(
                 cs ->
-                        buildAnnualSummary(
-                                cs.courseEnrollmentId(),
-                                cs.studentId(),
-                                cs.fullName(),
-                                grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+                        withFrozenResult(
+                                buildAnnualSummary(
+                                        cs.courseEnrollmentId(),
+                                        cs.studentId(),
+                                        cs.fullName(),
+                                        grouped.getOrDefault(cs.courseEnrollmentId(), List.of())),
+                                outcomes.get(cs.courseEnrollmentId())));
+    }
+
+    /**
+     * Lays a closed year's frozen result over a summary built from the marks.
+     *
+     * <p>Only the final average and the result come from the freeze; the trimester averages stay as
+     * computed, because a closed year takes no more writes and they cannot drift. A null frozen
+     * average (a withdrawn or ungraded student) keeps the recomputed one, which is null as well.
+     * While the year is open — or after a reopen, which leaves the last close's values in place —
+     * the summary is returned untouched.
+     *
+     * <p>Only the two screens call this. {@link #annualSummariesOfCourse} stays on the marks,
+     * because it is what the freeze itself reads, and a freeze that read its own previous output
+     * would never change.
+     */
+    private static StudentAnnualSummary withFrozenResult(
+            StudentAnnualSummary summary, EnrollmentOutcome outcome) {
+        if (outcome == null || !outcome.yearClosed()) {
+            return summary;
+        }
+        return new StudentAnnualSummary(
+                summary.courseEnrollmentId(),
+                summary.studentId(),
+                summary.fullName(),
+                summary.subjects(),
+                summary.trimester1Average(),
+                summary.trimester2Average(),
+                summary.trimester3Average(),
+                outcome.finalAverage() != null ? outcome.finalAverage() : summary.finalAverage(),
+                outcome.result(),
+                true);
     }
 
     /** One batched load for the whole page, then in-memory grouping — never a query per student. */
@@ -593,11 +631,15 @@ public class GradebookService implements IGradebookService {
         UUID courseId = enrollmentDomain.courseOfEnrollment(courseEnrollmentId);
         Course course = courseService.getById(courseId);
         StudentAnnualSummary annual =
-                buildAnnualSummary(
-                        courseEnrollmentId,
-                        cs.studentId(),
-                        cs.fullName(),
-                        scoreDomain.findByCourseEnrollment(courseEnrollmentId));
+                withFrozenResult(
+                        buildAnnualSummary(
+                                courseEnrollmentId,
+                                cs.studentId(),
+                                cs.fullName(),
+                                scoreDomain.findByCourseEnrollment(courseEnrollmentId)),
+                        enrollmentDomain
+                                .outcomesOf(List.of(courseEnrollmentId))
+                                .get(courseEnrollmentId));
 
         Map<UUID, ClassGroupField> fieldOfClassGroup =
                 classGroupDomain.knowledgeFieldsByCourse(courseId).stream()
@@ -621,7 +663,9 @@ public class GradebookService implements IGradebookService {
                 annual.trimester3Average(),
                 annual.finalAverage(),
                 GradeInWords.of(annual.finalAverage()),
-                outcomes(annual.subjects()));
+                outcomes(annual.subjects()),
+                annual.finalResult(),
+                annual.frozen());
     }
 
     /**
