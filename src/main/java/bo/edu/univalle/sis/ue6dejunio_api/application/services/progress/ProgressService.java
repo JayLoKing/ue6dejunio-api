@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.progress;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.CreateProgressCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.PlanProgress;
@@ -14,9 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProgressService implements IProgressService {
 
     private final IProgressDomain progressDomain;
+    private final ClosedYearGuard closedYearGuard;
 
-    public ProgressService(IProgressDomain progressDomain) {
+    public ProgressService(IProgressDomain progressDomain, ClosedYearGuard closedYearGuard) {
         this.progressDomain = progressDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -25,6 +28,7 @@ public class ProgressService implements IProgressService {
         if (!progressDomain.planExists(c.planId())) {
             throw new ResourceNotFoundException("PDC", c.planId());
         }
+        closedYearGuard.requireOpenForPlan(c.planId());
         return progressDomain.create(
                 c.planId(),
                 c.progressDate(),

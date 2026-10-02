@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.pdc;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -39,10 +40,13 @@ public class PdcService implements IPdcService {
 
     private final IPdcDomain pdcDomain;
     private final IDomainEventPublisher events;
+    private final ClosedYearGuard closedYearGuard;
 
-    public PdcService(IPdcDomain pdcDomain, IDomainEventPublisher events) {
+    public PdcService(
+            IPdcDomain pdcDomain, IDomainEventPublisher events, ClosedYearGuard closedYearGuard) {
         this.events = events;
         this.pdcDomain = pdcDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -51,6 +55,7 @@ public class PdcService implements IPdcService {
         if (!pdcDomain.courseExists(c.courseId())) {
             throw new ResourceNotFoundException("Course", c.courseId());
         }
+        closedYearGuard.requireOpenForCourse(c.courseId());
         // The plan is monthly, so what may not repeat is the numbered plan of a course — not the
         // trimester, which legitimately holds three or four of them.
         if (pdcDomain.existsByCoursePlanNumber(c.courseId(), c.trimester(), c.planNumber())) {
@@ -126,6 +131,7 @@ public class PdcService implements IPdcService {
     @Transactional
     public Pdc update(UUID id, UpdatePdcCommand c, UUID currentUserId) {
         Pdc pdc = getById(id);
+        closedYearGuard.requireOpenForCourse(pdc.getCourseId());
         requireEditable(pdc, "editar");
 
         if (c.planNumber() != null && !c.planNumber().equals(pdc.getPlanNumber())) {
@@ -166,6 +172,9 @@ public class PdcService implements IPdcService {
     @Transactional
     public Pdc writeSubject(
             UUID id, UUID planSubjectId, UpsertPdcSubjectCommand c, UUID currentUserId) {
+        // The plan is only known by id here, so the year is asked through it rather than by
+        // loading the plan whole.
+        closedYearGuard.requireOpenForPlan(id);
         // Only the status is read here. The adapter loads the plan whole to write the block, and
         // reading the document a second time just to check one string doubled every subject write.
         String status =
@@ -207,6 +216,7 @@ public class PdcService implements IPdcService {
     @Transactional
     public List<Pdc> copyToSiblingCourses(UUID id, UUID currentUserId) {
         Pdc source = getById(id);
+        closedYearGuard.requireOpenForCourse(source.getCourseId());
         if (!COPYABLE.contains(source.getStatus())) {
             throw new ConflictException(
                     "Solo se copia un PDC publicado, en revision o aprobado. Actual: "
@@ -222,6 +232,9 @@ public class PdcService implements IPdcService {
                                 siblings, source.getTrimester(), source.getPlanNumber());
         List<UUID> targets =
                 siblings.stream().filter(siblingId -> !alreadyPlanned.contains(siblingId)).toList();
+        // Siblings share the source's grade and year, so this normally repeats the answer above;
+        // it is asked once for every target all the same, because the copies are the writes.
+        closedYearGuard.requireOpenForCourses(targets);
         return targets.isEmpty() ? List.of() : pdcDomain.copyTo(id, targets, currentUserId);
     }
 
@@ -229,6 +242,7 @@ public class PdcService implements IPdcService {
     @Transactional
     public Pdc publish(UUID id, UUID currentUserId) {
         Pdc pdc = getById(id);
+        closedYearGuard.requireOpenForCourse(pdc.getCourseId());
         requireEditable(pdc, "publicar");
         pdc.setStatus(PdcStatus.PUBLISHED);
         pdc.setReviewObservations(null);
@@ -239,7 +253,9 @@ public class PdcService implements IPdcService {
     @Override
     @Transactional
     public Pdc approve(UUID id, UUID currentUserId) {
-        Pdc pdc = requireReviewable(getById(id), "aprobar");
+        Pdc loaded = getById(id);
+        closedYearGuard.requireOpenForCourse(loaded.getCourseId());
+        Pdc pdc = requireReviewable(loaded, "aprobar");
         pdc.setStatus(PdcStatus.APPROVED);
         pdc.setReviewObservations(null);
         pdc.setUpdatedById(currentUserId);
@@ -252,7 +268,9 @@ public class PdcService implements IPdcService {
         if (observations == null || observations.isBlank()) {
             throw new ValidationException("Observar un PDC exige decir que hay que corregir");
         }
-        Pdc pdc = requireReviewable(getById(id), "observar");
+        Pdc loaded = getById(id);
+        closedYearGuard.requireOpenForCourse(loaded.getCourseId());
+        Pdc pdc = requireReviewable(loaded, "observar");
         pdc.setStatus(PdcStatus.WITH_OBSERVATIONS);
         pdc.setReviewObservations(observations);
         pdc.setUpdatedById(currentUserId);
@@ -281,6 +299,7 @@ public class PdcService implements IPdcService {
     @Transactional
     public void delete(UUID id) {
         Pdc pdc = getById(id);
+        closedYearGuard.requireOpenForCourse(pdc.getCourseId());
         if (!PdcStatus.DRAFT.equals(pdc.getStatus())) {
             throw new ConflictException(
                     "Solo se puede eliminar un PDC en Draft. Actual: " + pdc.getStatus());

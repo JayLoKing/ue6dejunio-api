@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.pdc.PdcService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
@@ -44,6 +45,8 @@ class PdcServiceTest {
      * mock buys is that these tests keep saying nothing about notifications at all.
      */
     @Mock private IDomainEventPublisher events;
+
+    @Mock private ClosedYearGuard closedYearGuard;
 
     @InjectMocks private PdcService pdcService;
 
