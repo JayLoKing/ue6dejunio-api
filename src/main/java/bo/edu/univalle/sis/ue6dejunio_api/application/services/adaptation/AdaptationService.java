@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.adaptation;
 
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
@@ -17,9 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdaptationService implements IAdaptationService {
 
     private final IAdaptationDomain adaptationDomain;
+    private final ClosedYearGuard closedYearGuard;
 
-    public AdaptationService(IAdaptationDomain adaptationDomain) {
+    public AdaptationService(IAdaptationDomain adaptationDomain, ClosedYearGuard closedYearGuard) {
         this.adaptationDomain = adaptationDomain;
+        this.closedYearGuard = closedYearGuard;
     }
 
     @Override
@@ -28,6 +31,7 @@ public class AdaptationService implements IAdaptationService {
         if (!adaptationDomain.planExists(c.planId())) {
             throw new ResourceNotFoundException("PDC", c.planId());
         }
+        closedYearGuard.requireOpenForPlan(c.planId());
         if (!adaptationDomain.studentExists(c.studentId())) {
             throw new ResourceNotFoundException("Estudiante", c.studentId());
         }
@@ -41,7 +45,7 @@ public class AdaptationService implements IAdaptationService {
     @Override
     @Transactional
     public Adaptation update(UUID id, UpdateAdaptationCommand c) {
-        getById(id);
+        closedYearGuard.requireOpenForPlan(getById(id).planId());
         return adaptationDomain.update(id, c);
     }
 
@@ -62,7 +66,7 @@ public class AdaptationService implements IAdaptationService {
     @Override
     @Transactional
     public void delete(UUID id) {
-        getById(id);
+        closedYearGuard.requireOpenForPlan(getById(id).planId());
         adaptationDomain.deleteById(id);
     }
 }
