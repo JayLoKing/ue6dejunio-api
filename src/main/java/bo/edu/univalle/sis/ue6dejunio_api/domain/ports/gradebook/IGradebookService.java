@@ -26,6 +26,13 @@ public interface IGradebookService {
     PageResult<StudentAnnualSummary> annualCentralizer(UUID courseId, PageQuery pageQuery);
 
     /**
+     * The annual summary of every enrollment of the course, withdrawn included, in a fixed order
+     * and read page by page until nothing is left. The same numbers the annual centralizer shows,
+     * which is what lets a year-end freeze store exactly what the libreta prints.
+     */
+    List<StudentAnnualSummary> annualSummariesOfCourse(UUID courseId);
+
+    /**
      * One student's libreta: their year grouped by field of knowledge, with the annual average in
      * figures and in words, and the areas passed and failed in each trimester.
      */

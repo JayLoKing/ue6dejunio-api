@@ -439,6 +439,12 @@ public class GradebookService implements IGradebookService {
      * still earned the marks they earned, and the libreta and the centralizer both count them; a
      * podium that quietly disagreed with the sheets beside it would be the odd one out.
      */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentAnnualSummary> annualSummariesOfCourse(UUID courseId) {
+        return annualSummariesOf(courseId);
+    }
+
     private List<StudentAnnualSummary> annualSummariesOf(UUID courseId) {
         List<StudentAnnualSummary> all = new ArrayList<>();
         int pageIndex = 0;

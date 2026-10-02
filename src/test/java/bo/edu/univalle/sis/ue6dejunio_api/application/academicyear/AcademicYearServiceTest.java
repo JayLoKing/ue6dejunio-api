@@ -5,14 +5,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.AcademicYearService;
+import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.YearResultFreezer;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -33,12 +37,14 @@ class AcademicYearServiceTest {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 2, 12, 0);
 
     @Mock private IAcademicYearDomain domain;
+    @Mock private YearResultFreezer freezer;
+    @Mock private ICourseEnrollmentDomain enrollments;
 
     private AcademicYearService service;
 
     @BeforeEach
     void setUp() {
-        service = new AcademicYearService(domain, CLOCK);
+        service = new AcademicYearService(domain, freezer, enrollments, CLOCK);
     }
 
     @Test
@@ -100,6 +106,7 @@ class AcademicYearServiceTest {
         AcademicYearItem result = service.close(1);
 
         verify(domain).close(1, NOW);
+        verify(freezer, times(1)).freeze(1, NOW);
         assertThat(result).isEqualTo(new AcademicYearItem(1, 2026, false, true));
     }
 
@@ -111,6 +118,7 @@ class AcademicYearServiceTest {
         assertThat(service.close(2)).isEqualTo(closed);
 
         verify(domain, never()).close(anyInt(), any());
+        verifyNoInteractions(freezer);
     }
 
     @Test
@@ -130,6 +138,7 @@ class AcademicYearServiceTest {
         AcademicYearItem result = service.reopen(2);
 
         verify(domain).reopen(2);
+        verify(enrollments).reopenEnrollmentsOfYear(2);
         verify(domain, never()).setActive(anyInt());
         assertThat(result).isEqualTo(new AcademicYearItem(2, 2025, false, false));
     }
@@ -142,5 +151,6 @@ class AcademicYearServiceTest {
         assertThat(service.reopen(1)).isEqualTo(open);
 
         verify(domain, never()).reopen(anyInt());
+        verify(enrollments, never()).reopenEnrollmentsOfYear(anyInt());
     }
 }

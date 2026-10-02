@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.gradebook;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -279,6 +280,29 @@ class GradebookServiceAnnualTest {
 
         verify(scoreDomain, times(1)).findByCourseEnrollmentIn(anyCollection());
         verify(scoreDomain, never()).findByCourseEnrollment(any());
+    }
+
+    @Test
+    void annualSummariesOfCourse_isTheCentralizersOwnFinalAverage_forEveryEnrollment() {
+        when(enrollmentDomain.studentsByCourse(eq(courseId), any(PageQuery.class)))
+                .thenReturn(
+                        page(
+                                List.of(
+                                        courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"),
+                                        courseStudent(enrollmentB, studentB, "Raul", "Bello"))));
+        batched(
+                score(enrollmentA, classGroupLang, "Lenguaje", 1, "50.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 2, "51.00"),
+                score(enrollmentA, classGroupLang, "Lenguaje", 3, "51.00"));
+
+        List<StudentAnnualSummary> rows = service.annualSummariesOfCourse(courseId);
+
+        assertThat(rows)
+                .extracting(StudentAnnualSummary::courseEnrollmentId)
+                .containsExactly(enrollmentA, enrollmentB);
+        assertThat(rows.get(0).finalAverage()).isEqualByComparingTo("50.67");
+        assertThat(rows.get(1).finalAverage()).isNull();
+        verify(scoreDomain, times(1)).findByCourseEnrollmentIn(anyCollection());
     }
 
     @Test

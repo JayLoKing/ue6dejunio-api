@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
@@ -15,11 +16,21 @@ public class AcademicYearService implements IAcademicYearService {
 
     private final IAcademicYearDomain academicYearDomain;
 
+    private final YearResultFreezer freezer;
+
+    private final ICourseEnrollmentDomain enrollmentDomain;
+
     private final Clock clock;
 
-    public AcademicYearService(IAcademicYearDomain academicYearDomain, Clock clock) {
+    public AcademicYearService(
+            IAcademicYearDomain academicYearDomain,
+            YearResultFreezer freezer,
+            ICourseEnrollmentDomain enrollmentDomain,
+            Clock clock) {
         this.clock = clock;
         this.academicYearDomain = academicYearDomain;
+        this.freezer = freezer;
+        this.enrollmentDomain = enrollmentDomain;
     }
 
     @Override
@@ -49,7 +60,10 @@ public class AcademicYearService implements IAcademicYearService {
         if (year.closed()) {
             return year;
         }
-        academicYearDomain.close(academicYearId, LocalDateTime.now(clock));
+        // One moment for both: the year and its enrollments must carry the same closed_at.
+        LocalDateTime closedAt = LocalDateTime.now(clock);
+        academicYearDomain.close(academicYearId, closedAt);
+        freezer.freeze(academicYearId, closedAt);
         return new AcademicYearItem(year.id(), year.year(), false, true);
     }
 
@@ -60,7 +74,10 @@ public class AcademicYearService implements IAcademicYearService {
         if (!year.closed()) {
             return year;
         }
+        // The enrollments reopen with the year (closed_at cleared). Their frozen average and
+        // result stay as they were; the next close overwrites them, so nothing is cleared here.
         academicYearDomain.reopen(academicYearId);
+        enrollmentDomain.reopenEnrollmentsOfYear(academicYearId);
         return new AcademicYearItem(year.id(), year.year(), year.active(), false);
     }
 
