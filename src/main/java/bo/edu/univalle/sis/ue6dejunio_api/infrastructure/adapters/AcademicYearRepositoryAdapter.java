@@ -45,6 +45,11 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
     }
 
     @Override
+    public boolean yearExists(int year) {
+        return yearRepo.findByYear(year).isPresent();
+    }
+
+    @Override
     @Transactional
     public boolean activateIfNoneActive(int yearId) {
         if (yearRepo.existsByActiveTrue()) {

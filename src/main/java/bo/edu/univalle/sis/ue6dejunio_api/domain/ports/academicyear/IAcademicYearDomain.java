@@ -16,6 +16,9 @@ public interface IAcademicYearDomain {
      */
     Integer ensureYear(int year);
 
+    /** Whether a gestión with these four digits already exists, open or closed. */
+    boolean yearExists(int year);
+
     /** Id of the active academic year. Throws ResourceNotFoundException if none is active. */
     Integer currentYearId();
 

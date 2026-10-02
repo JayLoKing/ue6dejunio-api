@@ -60,6 +60,16 @@ class AcademicYearRepositoryAdapterTest {
     }
 
     @Test
+    void yearExists_reportsWhetherTheRowIsThere() {
+        when(yearRepo.findByYear(2026)).thenReturn(Optional.of(new AcademicYearEntity()));
+        when(yearRepo.findByYear(2027)).thenReturn(Optional.empty());
+
+        assertThat(adapter.yearExists(2026)).isTrue();
+        assertThat(adapter.yearExists(2027)).isFalse();
+        verify(yearRepo, never()).save(any(AcademicYearEntity.class));
+    }
+
+    @Test
     void currentYearId_returnsTheActiveYearNotTheLatest() {
         AcademicYearEntity active = new AcademicYearEntity();
         active.setId(4);
