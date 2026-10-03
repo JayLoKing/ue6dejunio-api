@@ -221,4 +221,16 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
                     + "WHERE cg.course = c AND cg.active = true "
                     + "AND ce.student.id = :studentId AND t.active = true")
     List<UUID> findClassGroupTeacherIdsOfStudent(@Param("studentId") UUID studentId);
+
+    /** The active homeroom teacher of one course, as a list so the caller can merge the two. */
+    @Query(
+            "SELECT t.id FROM CourseEntity c JOIN c.homeroomTeacher t "
+                    + "WHERE c.id = :courseId AND t.active = true")
+    List<UUID> findHomeroomTeacherIdsOfCourse(@Param("courseId") UUID courseId);
+
+    /** The teachers of the active class groups of one course. */
+    @Query(
+            "SELECT DISTINCT t.id FROM ClassGroupEntity cg JOIN cg.teacher t "
+                    + "WHERE cg.course.id = :courseId AND cg.active = true AND t.active = true")
+    List<UUID> findClassGroupTeacherIdsOfCourse(@Param("courseId") UUID courseId);
 }

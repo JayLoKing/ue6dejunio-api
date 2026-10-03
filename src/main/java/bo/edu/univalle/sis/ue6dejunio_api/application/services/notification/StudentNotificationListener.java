@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.notification;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentReinstated;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import java.util.List;
@@ -57,7 +58,29 @@ public class StudentNotificationListener {
         }
         String message = messageFor(event);
         for (UUID teacher : teachers) {
-            send(teacher, event, message);
+            send(teacher, event.studentId(), NotificationType.STUDENT_WITHDRAWN, message);
+        }
+    }
+
+    /**
+     * Runs once the reinstatement is really in the database, for the same reason the withdrawal
+     * waits for its commit: a refused one rolls back and nobody should hear a student came back.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onStudentReinstated(StudentReinstated event) {
+        List<UUID> teachers = notificationDomain.teacherIdsResponsibleForCourse(event.courseId());
+        if (teachers.isEmpty()) {
+            log.info(
+                    "The student {} was reinstated in {} and no active teacher answers for it",
+                    event.studentId(),
+                    event.courseId());
+            return;
+        }
+        String message =
+                "Reincorporación: %s vuelve a %s."
+                        .formatted(event.studentName(), event.courseName());
+        for (UUID teacher : teachers) {
+            send(teacher, event.studentId(), NotificationType.STUDENT_REINSTATED, message);
         }
     }
 
@@ -76,26 +99,22 @@ public class StudentNotificationListener {
      * One recipient, one outcome.
      *
      * <p>Caught here rather than higher up so telling four teachers is four attempts. The student
-     * is already withdrawn and correct; a message that could not be written cannot undo that, and
-     * it must not cost the other teachers theirs.
+     * is already changed and correct; a message that could not be written cannot undo that, and it
+     * must not cost the other teachers theirs.
      */
-    private void send(UUID teacher, StudentWithdrawn event, String message) {
+    private void send(UUID teacher, UUID studentId, NotificationType type, String message) {
         try {
-            // No sender: the withdrawal wrote this, and putting a name on it would credit a person
+            // No sender: the student's change wrote this, and putting a name on it would credit a
+            // person
             // for a line nobody typed.
             dispatcher.deliver(
                     new SendNotificationCommand(
-                            null,
-                            teacher,
-                            NotificationType.STUDENT_WITHDRAWN,
-                            null,
-                            message,
-                            STUDENT_RESOURCE,
-                            event.studentId()));
+                            null, teacher, type, null, message, STUDENT_RESOURCE, studentId));
         } catch (RuntimeException ex) {
             log.error(
-                    "The student {} was withdrawn and {} could not be told",
-                    event.studentId(),
+                    "The student {} had a {} notice and {} could not be told",
+                    studentId,
+                    type,
                     teacher,
                     ex);
         }

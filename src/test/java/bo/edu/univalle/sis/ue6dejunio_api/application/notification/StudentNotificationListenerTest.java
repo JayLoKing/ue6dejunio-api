@@ -12,6 +12,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.Noti
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.notification.StudentNotificationListener;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.SendNotificationCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentReinstated;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.notification.INotificationDomain;
 import java.util.List;
@@ -112,6 +113,60 @@ class StudentNotificationListenerTest {
                 .deliver(any(SendNotificationCommand.class));
 
         listener.onStudentWithdrawn(withdrawn(student, null));
+
+        verify(dispatcher, times(2)).deliver(any(SendNotificationCommand.class));
+    }
+
+    private static StudentReinstated reinstated(UUID studentId, UUID courseId) {
+        return new StudentReinstated(studentId, "Ana Quispe", courseId, "Primero A");
+    }
+
+    /** The roster grows in the reopened course only: its teachers are the ones told. */
+    @Test
+    void onStudentReinstated_tellsTheTeachersOfThatCourseAndNamesTheStudentAndCourse() {
+        UUID student = UUID.randomUUID();
+        UUID course = UUID.randomUUID();
+        UUID homeroom = UUID.randomUUID();
+        UUID technical = UUID.randomUUID();
+        when(notificationDomain.teacherIdsResponsibleForCourse(course))
+                .thenReturn(List.of(homeroom, technical));
+
+        listener.onStudentReinstated(reinstated(student, course));
+
+        ArgumentCaptor<SendNotificationCommand> sent =
+                ArgumentCaptor.forClass(SendNotificationCommand.class);
+        verify(dispatcher, times(2)).deliver(sent.capture());
+        SendNotificationCommand first = sent.getAllValues().getFirst();
+        assertThat(sent.getAllValues())
+                .extracting(SendNotificationCommand::receiverId)
+                .containsExactly(homeroom, technical);
+        assertThat(first.type()).isEqualTo(NotificationType.STUDENT_REINSTATED);
+        assertThat(first.senderId()).isNull();
+        assertThat(first.message()).isEqualTo("Reincorporación: Ana Quispe vuelve a Primero A.");
+        assertThat(first.resourceType()).isEqualTo("STUDENT");
+        assertThat(first.resourceId()).isEqualTo(student);
+    }
+
+    @Test
+    void onStudentReinstated_withNobodyToTell_sendsNothing() {
+        UUID course = UUID.randomUUID();
+        when(notificationDomain.teacherIdsResponsibleForCourse(course)).thenReturn(List.of());
+
+        listener.onStudentReinstated(reinstated(UUID.randomUUID(), course));
+
+        verify(dispatcher, never()).deliver(any());
+    }
+
+    @Test
+    void onStudentReinstated_aFailedSendDoesNotStopTheRest() {
+        UUID course = UUID.randomUUID();
+        when(notificationDomain.teacherIdsResponsibleForCourse(course))
+                .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
+        doThrow(new RuntimeException("boom"))
+                .when(dispatcher)
+                .deliver(any(SendNotificationCommand.class));
+
+        listener.onStudentReinstated(reinstated(UUID.randomUUID(), course));
 
         verify(dispatcher, times(2)).deliver(any(SendNotificationCommand.class));
     }

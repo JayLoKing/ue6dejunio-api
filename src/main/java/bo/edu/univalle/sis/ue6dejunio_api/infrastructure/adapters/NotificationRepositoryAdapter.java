@@ -87,6 +87,15 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
         return List.copyOf(teachers);
     }
 
+    /** Same two questions as above, asked of one course. */
+    @Override
+    public List<UUID> teacherIdsResponsibleForCourse(UUID courseId) {
+        Set<UUID> teachers =
+                new LinkedHashSet<>(enrollmentRepo.findHomeroomTeacherIdsOfCourse(courseId));
+        teachers.addAll(enrollmentRepo.findClassGroupTeacherIdsOfCourse(courseId));
+        return List.copyOf(teachers);
+    }
+
     @Override
     @Transactional
     public Notification send(SendNotificationCommand c) {

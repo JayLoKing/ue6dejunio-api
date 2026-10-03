@@ -245,4 +245,54 @@ class StudentReinstateIT extends AbstractIntegrationTest {
         assertThat(studentStatus()).isEqualTo("Withdrawn");
         assertThat(enrollmentStatus(course)).isEqualTo("Withdrawn");
     }
+
+    private int notificationsOfType(String type) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE type = ?", Integer.class, type);
+    }
+
+    /**
+     * The whole chain: the Director reinstates, and the teachers of the course the student is back
+     * in hear about it. An integration test because what could break is the query that finds them
+     * and the listener running after commit.
+     */
+    @Test
+    void reinstate_tellsTheHomeroomAndTheTechnicalTeacherOfThatCourse() throws Exception {
+        UUID technical = seedUser("Teacher", false);
+        seedClassGroup(course, technical, "Matematicas");
+        withdraw();
+
+        reinstateAs(director, "Director", "{}").andExpect(status().isOk());
+
+        for (UUID receiver : new UUID[] {teacher, technical}) {
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT message FROM notifications WHERE receiver_id = ? AND type = ?",
+                                    String.class,
+                                    receiver,
+                                    "STUDENT_REINSTATED"))
+                    .startsWith("Reincorporación: ")
+                    .contains(" vuelve a ");
+        }
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT resource_id FROM notifications WHERE receiver_id = ? AND type = ?",
+                                UUID.class,
+                                teacher,
+                                "STUDENT_REINSTATED"))
+                .isEqualTo(student);
+        assertThat(notificationsOfType("STUDENT_REINSTATED")).isEqualTo(2);
+    }
+
+    /** A refused reinstatement announces nothing: the student is still off the roll. */
+    @Test
+    void reinstate_refused_tellsNobody() throws Exception {
+        withdraw();
+
+        reinstateAs(director, "Director", "{\"id_course\":\"" + UUID.randomUUID() + "\"}")
+                .andExpect(status().isBadRequest());
+        reinstateAs(teacher, "Teacher", "{}").andExpect(status().isForbidden());
+
+        assertThat(notificationsOfType("STUDENT_REINSTATED")).isZero();
+    }
 }

@@ -34,6 +34,14 @@ public interface INotificationDomain {
     List<UUID> teacherIdsResponsibleForStudent(UUID studentId);
 
     /**
+     * The active homeroom teacher and the active class-group teachers of one course.
+     *
+     * <p>Course-scoped on purpose: a student who comes back is on that roster only, and asking by
+     * student would also reach teachers of past years.
+     */
+    List<UUID> teacherIdsResponsibleForCourse(UUID courseId);
+
+    /**
      * The receiver's role, so the rule about who the Director may write to lives in the service
      * where it can be read, rather than in a query named after the rule.
      *
