@@ -179,19 +179,6 @@ class AttendanceSecretaryAndSessionBatchIT extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** Reads open, writes closed — the same boundary every other secretariat rule keeps. */
-    @Test
-    void secretary_cannotCreateACourse() throws Exception {
-        mvc.perform(
-                        post("/api/courses")
-                                .header(
-                                        "Authorization",
-                                        "Bearer " + tokenFor(secretary, "Secretary"))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}"))
-                .andExpect(status().isForbidden());
-    }
-
     @Test
     void secretary_cannotWithdrawStudent() throws Exception {
         // Reads open, writes closed: /api/students/** only lists Secretary on the GET rule.

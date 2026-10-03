@@ -106,6 +106,27 @@ public class SecurityConfig {
                                         // @PreAuthorize behind it would never run to say so.
                                         .requestMatchers(HttpMethod.GET, "/api/courses/*/risk")
                                         .hasAnyRole("Director", "Teacher", "Secretary")
+                                        // The course lifecycle is shared with the secretariat:
+                                        // create with its subjects and teachers (RF 31), edit
+                                        // and reassign ONE course's homeroom teacher (RF 32),
+                                        // deactivate (RF 33), and copy a year's structure into
+                                        // the next (RF 44). Exact matchers, stated before the
+                                        // Director-only catch-all below; swapping homeroom
+                                        // teachers between courses (RF 49) and reassigning a
+                                        // class group's teacher (RF 50) stay behind it.
+                                        .requestMatchers(HttpMethod.POST, "/api/courses")
+                                        .hasAnyRole("Director", "Secretary")
+                                        .requestMatchers(HttpMethod.PUT, "/api/courses/*")
+                                        .hasAnyRole("Director", "Secretary")
+                                        .requestMatchers(HttpMethod.DELETE, "/api/courses/*")
+                                        .hasAnyRole("Director", "Secretary")
+                                        .requestMatchers(
+                                                HttpMethod.PUT, "/api/courses/*/homeroom-teacher")
+                                        .hasAnyRole("Director", "Secretary")
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/api/academic-years/*/duplicate-structure")
+                                        .hasAnyRole("Director", "Secretary")
                                         .requestMatchers("/api/courses/**")
                                         .hasRole("Director")
                                         .requestMatchers("/api/levels/**")

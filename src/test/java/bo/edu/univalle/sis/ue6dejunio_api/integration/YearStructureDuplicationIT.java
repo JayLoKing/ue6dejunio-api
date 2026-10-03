@@ -219,9 +219,8 @@ class YearStructureDuplicationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void onlyTheDirector_mayDuplicate() throws Exception {
+    void onlyTheDirectorAndTheSecretary_mayDuplicate() throws Exception {
         duplicate(bearer("Teacher"), id2027, id2026).andExpect(status().isForbidden());
-        duplicate(bearer("Secretary"), id2027, id2026).andExpect(status().isForbidden());
         duplicate(null, id2027, id2026).andExpect(status().isUnauthorized());
 
         assertThat(count("SELECT count(*) FROM courses WHERE id_academic_year = ?", id2027))
