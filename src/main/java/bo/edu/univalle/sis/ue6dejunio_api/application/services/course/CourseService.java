@@ -72,6 +72,9 @@ public class CourseService implements ICourseService {
                 && !courseDomain.userIsNonTechnicalTeacher(c.homeroomTeacherId())) {
             throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
         }
+        if (c.homeroomTeacherId() != null) {
+            requireNotHomeroomElsewhere(c.homeroomTeacherId(), yearId, null);
+        }
 
         Course course =
                 courseDomain.create(c.gradeId(), c.parallelId(), yearId, c.homeroomTeacherId());
@@ -104,6 +107,8 @@ public class CourseService implements ICourseService {
         if (c.active() != null) {
             if (!c.active()) {
                 requireNotInUse(id);
+            } else {
+                requireReactivationKeepsHomeroomUnique(id);
             }
             result = courseDomain.setActive(id, c.active());
         }
@@ -134,9 +139,9 @@ public class CourseService implements ICourseService {
      * read rule) but be able to write to none of them (the class-group teacher still points at
      * whoever left).
      *
-     * <p>{@code id_homeroom_teacher} carries no UNIQUE constraint, so a teacher who is already
-     * homeroom of a different course in the same gestión is refused here too — otherwise they would
-     * silently end up homeroom of both. A course of another gestión does not count: the same person
+     * <p>A teacher who is already homeroom of a different course in the same gestión is refused
+     * here with a readable message; the partial unique index of V24 is the backstop behind it,
+     * answering only a generic 409. A course of another gestión does not count: the same person
      * runs a classroom in 2026 and another in 2027. That case is not an error on its own: it is
      * exactly what {@link #swapHomeroomTeachers} exists for, and this message points there.
      */
@@ -145,16 +150,7 @@ public class CourseService implements ICourseService {
         if (!courseDomain.userIsNonTechnicalTeacher(teacherId)) {
             throw new ConflictException("El docente de aula debe ser Teacher NO tecnico");
         }
-        Optional<Course> teacherHomeroomElsewhere =
-                courseDomain.homeroomCourseOf(teacherId, current.academicYearId());
-        if (teacherHomeroomElsewhere.isPresent()
-                && !teacherHomeroomElsewhere.get().id().equals(id)) {
-            throw new ConflictException(
-                    "Ya es docente de aula de "
-                            + courseLabel(teacherHomeroomElsewhere.get())
-                            + ". Para moverlo aqui usa el intercambio de docentes de aula entre"
-                            + " cursos.");
-        }
+        requireNotHomeroomElsewhere(teacherId, current.academicYearId(), id);
         UUID outgoingTeacherId = current.homeroomTeacherId();
         if (outgoingTeacherId != null
                 && current.homeroomTeacherActive()
@@ -172,7 +168,28 @@ public class CourseService implements ICourseService {
     }
 
     /**
-     * See {@link ICourseService#swapHomeroomTeachers} for the rules. The order the two {@link
+     * One teacher, one active course per gestión. {@code exceptCourseId} is the course being
+     * written (null on create, where none exists yet), so re-saving a course's own teacher is not
+     * refused by itself.
+     */
+    private void requireNotHomeroomElsewhere(
+            UUID teacherId, Integer academicYearId, UUID exceptCourseId) {
+        Optional<Course> elsewhere = courseDomain.homeroomCourseOf(teacherId, academicYearId);
+        if (elsewhere.isPresent() && !elsewhere.get().id().equals(exceptCourseId)) {
+            throw new ConflictException(
+                    "Ya es docente de aula de "
+                            + courseLabel(elsewhere.get())
+                            + ". Para moverlo aqui usa el intercambio de docentes de aula entre"
+                            + " cursos.");
+        }
+    }
+
+    /**
+     * See {@link ICourseService#swapHomeroomTeachers} for the rules. The (teacher, gestión) unique
+     * index is checked per statement, so the two homeroom writes cannot simply run back to back:
+     * the first would give a teacher a second active course for an instant. Course A is vacated
+     * first, then B takes A's teacher, then A takes B's former one — no step ever holds a
+     * duplicate, and the use case transaction makes the three one change. The order the two {@link
      * IClassGroupDomain#reassignTeacherInCourse} calls run in is safe precisely because each is
      * scoped to one course: the first call only touches class groups of {@code courseAId}, so by
      * the time the second call runs against {@code courseBId} there is nothing from the first move
@@ -221,13 +238,27 @@ public class CourseService implements ICourseService {
                             + " reasignacion normal.");
         }
 
-        Course updatedA = courseDomain.setHomeroomTeacher(courseAId, teacherB);
+        courseDomain.clearHomeroomTeacher(courseAId);
         courseDomain.setHomeroomTeacher(courseBId, teacherA);
+        Course updatedA = courseDomain.setHomeroomTeacher(courseAId, teacherB);
 
         classGroupDomain.reassignTeacherInCourse(courseAId, teacherA, teacherB);
         classGroupDomain.reassignTeacherInCourse(courseBId, teacherB, teacherA);
 
         return updatedA;
+    }
+
+    /**
+     * An inactive course may keep its homeroom teacher while that teacher takes another course in
+     * the same gestión. Switching the dormant one back on would then make them homeroom of two, so
+     * it is refused here with the same message instead of surfacing as the index's generic 409.
+     */
+    private void requireReactivationKeepsHomeroomUnique(UUID courseId) {
+        Course course = getById(courseId);
+        if (!course.active() && course.homeroomTeacherId() != null) {
+            requireNotHomeroomElsewhere(
+                    course.homeroomTeacherId(), course.academicYearId(), courseId);
+        }
     }
 
     private String courseLabel(Course course) {

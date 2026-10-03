@@ -103,7 +103,17 @@ public class CourseRepositoryAdapter implements ICourseDomain {
                 userRepo.findById(teacherId)
                         .orElseThrow(() -> new ResourceNotFoundException("Docente", teacherId));
         e.setHomeroomTeacher(teacher);
-        return toDomain(courseRepo.save(e));
+        // Flushed on the spot: the (teacher, year) unique index is checked per statement, and a
+        // swap relies on each write reaching the database in the order the use case issued it.
+        return toDomain(courseRepo.saveAndFlush(e));
+    }
+
+    @Override
+    @Transactional
+    public void clearHomeroomTeacher(UUID courseId) {
+        CourseEntity e = load(courseId);
+        e.setHomeroomTeacher(null);
+        courseRepo.saveAndFlush(e);
     }
 
     @Override

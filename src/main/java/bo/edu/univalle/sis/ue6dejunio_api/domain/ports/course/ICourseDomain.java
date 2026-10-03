@@ -25,6 +25,12 @@ public interface ICourseDomain {
 
     Course setHomeroomTeacher(UUID courseId, UUID teacherId);
 
+    /**
+     * Leaves the course with no homeroom teacher. Written through to the store at once, so a swap
+     * can vacate one side before the other takes the teacher without a transient duplicate.
+     */
+    void clearHomeroomTeacher(UUID courseId);
+
     Course setActive(UUID courseId, boolean active);
 
     /** Whether the course has at least one enrolment, whatever its status. */

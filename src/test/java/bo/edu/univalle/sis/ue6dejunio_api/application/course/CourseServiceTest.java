@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -110,6 +112,80 @@ class CourseServiceTest {
         when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(false);
         assertThatThrownBy(() -> courseService.create(cmd(t)))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    /** The rule {@code assignHomeroomTeacher} applies must hold on the create path too. */
+    @Test
+    void create_homeroomAlreadyHomeroomOfAnotherCourseThatYear_throwsConflict() {
+        UUID t = UUID.randomUUID();
+        when(courseDomain.gradeExists(1)).thenReturn(true);
+        when(courseDomain.parallelExists(1)).thenReturn(true);
+        when(academicYearDomain.currentYearId()).thenReturn(1);
+        when(courseDomain.existsByGradeParallelYear(1, 1, 1)).thenReturn(false);
+        when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(true);
+        when(courseDomain.homeroomCourseOf(t, 1))
+                .thenReturn(Optional.of(courseNamed(UUID.randomUUID(), "Segundo", "B", t, true)));
+
+        assertThatThrownBy(() -> courseService.create(cmd(t)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Ya es docente de aula")
+                .hasMessageContaining("Segundo");
+
+        verify(courseDomain, never()).create(any(), any(), any(), any());
+    }
+
+    /** Another gestión does not count: the lookup is asked about the year the course lands in. */
+    @Test
+    void create_homeroomFreeInThisYear_creates() {
+        UUID id = UUID.randomUUID();
+        UUID t = UUID.randomUUID();
+        when(courseDomain.gradeExists(1)).thenReturn(true);
+        when(courseDomain.parallelExists(1)).thenReturn(true);
+        when(academicYearDomain.currentYearId()).thenReturn(7);
+        when(courseDomain.existsByGradeParallelYear(1, 1, 7)).thenReturn(false);
+        when(courseDomain.userIsNonTechnicalTeacher(t)).thenReturn(true);
+        when(courseDomain.homeroomCourseOf(t, 7)).thenReturn(Optional.empty());
+        when(courseDomain.create(1, 1, 7, t)).thenReturn(courseWithHomeroom(id, t, true));
+        when(classGroupService.createForCourse(any())).thenReturn(List.of());
+
+        CourseWithSubjects r = courseService.create(cmd(t));
+
+        assertThat(r.course().id()).isEqualTo(id);
+        verify(courseDomain, never()).homeroomCourseOf(any(UUID.class));
+    }
+
+    /**
+     * Reactivating a course puts its homeroom teacher back on the books. If they took another
+     * course while it was inactive, the reactivation would make them homeroom of two.
+     */
+    @Test
+    void update_reactivateWhoseTeacherIsNowHomeroomElsewhere_throwsConflict() {
+        UUID id = UUID.randomUUID();
+        UUID t = UUID.randomUUID();
+        Course inactive = new Course(id, 1, "Primero", 1, "A", 1, 2026, t, "Nora", false, true);
+        when(courseDomain.findById(id)).thenReturn(Optional.of(inactive));
+        when(courseDomain.homeroomCourseOf(t, 1))
+                .thenReturn(Optional.of(courseNamed(UUID.randomUUID(), "Segundo", "B", t, true)));
+
+        assertThatThrownBy(() -> courseService.update(id, new UpdateCourseCommand(null, true)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Segundo");
+
+        verify(courseDomain, never()).setActive(any(), eq(true));
+    }
+
+    @Test
+    void update_reactivateWhoseTeacherIsFree_reactivates() {
+        UUID id = UUID.randomUUID();
+        UUID t = UUID.randomUUID();
+        Course inactive = new Course(id, 1, "Primero", 1, "A", 1, 2026, t, "Nora", false, true);
+        when(courseDomain.findById(id)).thenReturn(Optional.of(inactive));
+        when(courseDomain.homeroomCourseOf(t, 1)).thenReturn(Optional.empty());
+        when(courseDomain.setActive(id, true)).thenReturn(courseWithHomeroom(id, t, true));
+
+        Course result = courseService.update(id, new UpdateCourseCommand(null, true));
+
+        assertThat(result.active()).isTrue();
     }
 
     @Test
@@ -448,6 +524,8 @@ class CourseServiceTest {
                 .thenReturn(Optional.of(courseWithHomeroom(b, teacherB, true)));
         when(courseDomain.setHomeroomTeacher(a, teacherB))
                 .thenReturn(courseWithHomeroom(a, teacherB, true));
+        when(courseDomain.setHomeroomTeacher(b, teacherA))
+                .thenReturn(courseWithHomeroom(b, teacherA, true));
 
         Course result = courseService.swapHomeroomTeachers(a, b);
 
@@ -456,6 +534,34 @@ class CourseServiceTest {
         verify(courseDomain).setHomeroomTeacher(b, teacherA);
         verify(classGroupDomain).reassignTeacherInCourse(a, teacherA, teacherB);
         verify(classGroupDomain).reassignTeacherInCourse(b, teacherB, teacherA);
+    }
+
+    /**
+     * One unique index per (teacher, year) means no moment of the swap may leave two active courses
+     * of a gestión with the same teacher: A is vacated first, B takes A's teacher, and only then
+     * does A take B's former one.
+     */
+    @Test
+    void swapHomeroom_vacatesOneSideFirstSoNoStepHoldsADuplicate() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        UUID teacherA = UUID.randomUUID();
+        UUID teacherB = UUID.randomUUID();
+        when(courseDomain.findById(a))
+                .thenReturn(Optional.of(courseWithHomeroom(a, teacherA, true)));
+        when(courseDomain.findById(b))
+                .thenReturn(Optional.of(courseWithHomeroom(b, teacherB, true)));
+        when(courseDomain.setHomeroomTeacher(a, teacherB))
+                .thenReturn(courseWithHomeroom(a, teacherB, true));
+        when(courseDomain.setHomeroomTeacher(b, teacherA))
+                .thenReturn(courseWithHomeroom(b, teacherA, true));
+
+        courseService.swapHomeroomTeachers(a, b);
+
+        InOrder order = inOrder(courseDomain);
+        order.verify(courseDomain).clearHomeroomTeacher(a);
+        order.verify(courseDomain).setHomeroomTeacher(b, teacherA);
+        order.verify(courseDomain).setHomeroomTeacher(a, teacherB);
     }
 
     /**
