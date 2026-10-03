@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -26,6 +27,12 @@ public interface ICourseEnrollmentDomain {
      * queries instead of one lookup per name.
      */
     Map<UUID, String> enrollmentStatusByStudent(UUID courseId, Collection<UUID> studentIds);
+
+    /**
+     * Every seat the student holds in the courses of one gestión, whatever its status, newest
+     * first. More than one is possible: the unique key is per course, not per gestión.
+     */
+    List<EnrollmentSeat> seatsOfStudentInYear(UUID studentId, Integer academicYearId);
 
     void saveEnrollment(UUID studentId, UUID courseId);
 

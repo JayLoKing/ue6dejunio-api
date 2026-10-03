@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
@@ -66,6 +67,13 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
             byStudent.put((UUID) row[0], (String) row[1]);
         }
         return byStudent;
+    }
+
+    @Override
+    public List<EnrollmentSeat> seatsOfStudentInYear(UUID studentId, Integer academicYearId) {
+        return enrollmentRepo.seatsOfStudentInYear(studentId, academicYearId).stream()
+                .map(row -> new EnrollmentSeat((UUID) row[0], (String) row[1]))
+                .toList();
     }
 
     @Override

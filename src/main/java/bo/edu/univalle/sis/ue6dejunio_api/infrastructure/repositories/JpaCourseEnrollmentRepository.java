@@ -29,6 +29,16 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     List<Object[]> enrollmentStatuses(
             @Param("courseId") UUID courseId, @Param("studentIds") Collection<UUID> studentIds);
 
+    /** (courseId, status) of every enrolment the student holds in one gestión, newest first. */
+    @Query(
+            """
+        SELECT e.course.id, e.status FROM CourseEnrollmentEntity e
+        WHERE e.student.id = :studentId AND e.course.academicYear.id = :yearId
+        ORDER BY e.enrollmentDate DESC, e.id
+        """)
+    List<Object[]> seatsOfStudentInYear(
+            @Param("studentId") UUID studentId, @Param("yearId") Integer yearId);
+
     /**
      * Reopens closed enrolments in bulk, so a readmission costs one statement for the whole import
      * rather than one per student who came back.
