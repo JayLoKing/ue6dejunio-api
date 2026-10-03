@@ -148,7 +148,7 @@ class TechnicalSubjectReadAuthorizationIT extends AbstractIntegrationTest {
         // The case the Director creates when they put the homeroom teacher in charge of the
         // technical subject too: they own the class group outright, so the write guard lets them
         // through on its own and nothing here is special-cased.
-        UUID ownCourse = seedCourse(homeroomTeacher, "C");
+        UUID ownCourse = seedCourse(seedUser("Teacher", false), "C");
         UUID ownMusic = seedClassGroup(ownCourse, homeroomTeacher, "Educacion Musical");
         String body =
                 """

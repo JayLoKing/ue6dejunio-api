@@ -128,7 +128,7 @@ class StudentNotReenrolledIT extends AbstractIntegrationTest {
     /** Two effective seats last year are one child, reported under their latest seat. */
     @Test
     void aStudentWithTwoSeatsLastYear_isOneRowAtTheLatestSeat() throws Exception {
-        UUID courseB = seedCourse(teacher, "B", year2025);
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B", year2025);
         UUID student = enrolled("Eva", "Traslado", course2025A, "Effective");
         seat(student, courseB, "Effective");
         jdbc.update(
@@ -166,7 +166,7 @@ class StudentNotReenrolledIT extends AbstractIntegrationTest {
     /** Ordered by the course they came from, then by surname and name. */
     @Test
     void rowsAreSortedByLastCourseThenName() throws Exception {
-        UUID courseB = seedCourse(teacher, "B", year2025);
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B", year2025);
         enrolled("Zoe", "Zeta", course2025A, "Effective");
         enrolled("Ana", "Zeta", course2025A, "Effective");
         enrolled("Beto", "Alfa", course2025A, "Effective");

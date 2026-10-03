@@ -62,7 +62,7 @@ class RiskCourseSummaryIT extends AbstractIntegrationTest {
         seedEnrollment(seedStudent("Beto", "Quispe"), courseA);
 
         // Quinto B: one student, safely predicted.
-        UUID courseB = seedCourse(teacher, "B");
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B");
         UUID mathB = seedClassGroup(courseB, teacher, "Matematicas");
         UUID carla = seedStudent("Carla", "Cruz");
         seedEnrollment(carla, courseB);

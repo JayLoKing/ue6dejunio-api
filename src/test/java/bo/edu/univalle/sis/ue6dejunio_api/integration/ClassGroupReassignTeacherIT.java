@@ -33,7 +33,7 @@ class ClassGroupReassignTeacherIT extends AbstractIntegrationTest {
         technicalTeacher = seedUser("Teacher", true);
         aulaTeacher = seedUser("Teacher", false);
         courseA = seedCourse(aulaTeacher, "A");
-        courseB = seedCourse(aulaTeacher, "B");
+        courseB = seedCourse(seedUser("Teacher", false), "B");
 
         UUID technicalSubjectId = UUID.randomUUID();
         // Every subject belongs to a knowledge area since the curriculum plan groups them by it,

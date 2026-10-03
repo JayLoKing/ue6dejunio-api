@@ -54,7 +54,7 @@ class GradebookCourseSummaryIT extends AbstractIntegrationTest {
                 new BigDecimal("2"));
 
         // Quinto B: one student, nobody graded. It has to appear, and without an average.
-        UUID courseB = seedCourse(teacher, "B");
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B");
         seedClassGroup(courseB, teacher, "Lenguaje");
         seedEnrollment(seedStudent("Carla", "Rojas"), courseB);
     }

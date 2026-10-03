@@ -79,6 +79,10 @@ CREATE TABLE IF NOT EXISTS courses (
     is_active boolean DEFAULT true,
     CONSTRAINT uq_course UNIQUE (id_grade, id_parallel, id_academic_year)
 );
+-- Mirrors V24: one active course per homeroom teacher per gestión, enforced by the database.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_courses_homeroom_per_year
+    ON courses (id_homeroom_teacher, id_academic_year)
+    WHERE is_active AND id_homeroom_teacher IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS course_enrollments (
     id_course_enrollment uuid PRIMARY KEY DEFAULT gen_random_uuid(),

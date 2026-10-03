@@ -124,7 +124,7 @@ class CourseOverviewIT extends AbstractIntegrationTest {
 
     @Test
     void studentGradeLoading_isN1Safe_queryCountConstant() throws Exception {
-        UUID courseLarge = seedCourse(homeroomTeacher, "B");
+        UUID courseLarge = seedCourse(seedUser("Teacher", false), "B");
         UUID classGroupLarge = seedClassGroup(courseLarge, homeroomTeacher, "Lenguaje");
         seedStudentWithScore(courseA, classGroupMath, new BigDecimal("90.00"));
         for (int i = 0; i < 50; i++) {

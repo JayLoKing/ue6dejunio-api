@@ -60,7 +60,7 @@ class RiskInstitutionIT extends AbstractIntegrationTest {
         seedEnrollment(ana, courseA);
 
         // Another classroom of the same gestión, holding the worst prediction in the building.
-        UUID courseB = seedCourse(teacher, "B");
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B");
         UUID mathB = seedClassGroup(courseB, teacher, "Matematicas");
         UUID carla = seedStudent("Carla", "Cruz");
         seedEnrollment(carla, courseB);

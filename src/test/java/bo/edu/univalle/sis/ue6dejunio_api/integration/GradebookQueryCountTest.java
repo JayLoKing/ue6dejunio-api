@@ -43,7 +43,7 @@ class GradebookQueryCountTest extends AbstractIntegrationTest {
         director = seedUser("Director", false);
         teacher = seedUser("Teacher", false);
         courseSmall = seedCourse(teacher, "A");
-        courseLarge = seedCourse(teacher, "B");
+        courseLarge = seedCourse(seedUser("Teacher", false), "B");
 
         seedStudentsWithScores(courseSmall, 1);
         seedStudentsWithScores(courseLarge, 50);

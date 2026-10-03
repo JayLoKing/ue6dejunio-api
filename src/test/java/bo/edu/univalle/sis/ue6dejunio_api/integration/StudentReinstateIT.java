@@ -134,7 +134,7 @@ class StudentReinstateIT extends AbstractIntegrationTest {
 
     @Test
     void reinstate_namingAnotherCourseThanTheSeat_returns400() throws Exception {
-        UUID other = seedCourse(teacher, "B");
+        UUID other = seedCourse(seedUser("Teacher", false), "B");
         withdraw();
 
         reinstateAs(director, "Director", "{\"id_course\":\"" + other + "\"}")

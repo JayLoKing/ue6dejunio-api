@@ -129,7 +129,7 @@ class StudentMovementSummaryIT extends AbstractIntegrationTest {
     @Test
     void movementSummary_countsAWithdrawnStudentOnceAcrossTwoEnrolments() throws Exception {
         UUID ana = enrolledOn("2026-02-10", "Ana", "Perez");
-        UUID courseB = seedCourse(teacher, "B");
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B");
         seedEnrollment(ana, courseB);
         withdrewOn(ana, "2026-05-14 10:00:00", "Transferencia");
 

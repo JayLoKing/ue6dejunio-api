@@ -61,7 +61,7 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
                 new BigDecimal("2"));
 
         // Another classroom of the same gestión, holding the best mark in the building.
-        UUID courseB = seedCourse(teacher, "B");
+        UUID courseB = seedCourse(seedUser("Teacher", false), "B");
         UUID langB = seedClassGroup(courseB, teacher, "Lenguaje");
         gradeOneArea(
                 seedEnrollment(seedStudent("Dario", "Soto"), courseB),

@@ -191,7 +191,7 @@ class FrozenResultReadIT extends AbstractIntegrationTest {
 
     @Test
     void closedYear_annualCentralizer_statementCountDoesNotScaleWithTheRoster() throws Exception {
-        UUID big = seedCourse(teacher, "B", academicYearId(2026));
+        UUID big = seedCourse(seedUser("Teacher", false), "B", academicYearId(2026));
         for (int i = 0; i < 25; i++) {
             seedEnrollment(seedStudent(), big);
         }

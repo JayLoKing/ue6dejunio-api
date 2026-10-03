@@ -47,7 +47,7 @@ class EnrollSummarySplitIT extends AbstractIntegrationTest {
                                 parallel)
                         .stream()
                         .findFirst()
-                        .orElseGet(() -> seedCourse(teacher, parallel, yearId));
+                        .orElseGet(() -> seedCourse(seedUser("Teacher", false), parallel, yearId));
         UUID enrolment = seedEnrollment(student, course);
         jdbc.update(
                 "UPDATE course_enrollments SET status = ? WHERE id_course_enrollment = ?",
