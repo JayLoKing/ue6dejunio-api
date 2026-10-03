@@ -111,10 +111,15 @@ public class SecurityConfig {
                                         // create with its subjects and teachers (RF 31), edit
                                         // and reassign ONE course's homeroom teacher (RF 32),
                                         // deactivate (RF 33), and copy a year's structure into
-                                        // the next (RF 44). Exact matchers, stated before the
-                                        // Director-only catch-all below; swapping homeroom
-                                        // teachers between courses (RF 49) and reassigning a
-                                        // class group's teacher (RF 50) stay behind it.
+                                        // the next (RF 44), which starts by creating the year
+                                        // (POST /api/academic-years, exact: activate, close and
+                                        // reopen are other paths and stay the Director's).
+                                        // Exact matchers, stated before the Director-only
+                                        // catch-all below; swapping homeroom teachers between
+                                        // courses (RF 49) and reassigning a class group's
+                                        // teacher (RF 50) stay behind it.
+                                        .requestMatchers(HttpMethod.POST, "/api/academic-years")
+                                        .hasAnyRole("Director", "Secretary")
                                         .requestMatchers(HttpMethod.POST, "/api/courses")
                                         .hasAnyRole("Director", "Secretary")
                                         .requestMatchers(HttpMethod.PUT, "/api/courses/*")

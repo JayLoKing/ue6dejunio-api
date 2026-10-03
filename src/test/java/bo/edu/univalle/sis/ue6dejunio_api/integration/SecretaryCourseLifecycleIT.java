@@ -161,8 +161,7 @@ class SecretaryCourseLifecycleIT extends AbstractIntegrationTest {
                         "/api/levels",
                         "/api/grades",
                         "/api/parallels",
-                        "/api/users",
-                        "/api/academic-years")) {
+                        "/api/users")) {
             send(post(path), secretary, Map.of()).andExpect(status().isForbidden());
         }
         UUID id = UUID.randomUUID();
@@ -171,6 +170,16 @@ class SecretaryCourseLifecycleIT extends AbstractIntegrationTest {
         send(put("/api/academic-years/1/activate"), secretary, null)
                 .andExpect(status().isForbidden());
         send(put("/api/academic-years/1/close"), secretary, null).andExpect(status().isForbidden());
+        send(put("/api/academic-years/1/reopen"), secretary, null)
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void secretary_createsAnAcademicYear_andRepeatingItReturnsTheExistingOne() throws Exception {
+        send(post("/api/academic-years"), secretary, Map.of("year", 2031))
+                .andExpect(status().isCreated());
+        send(post("/api/academic-years"), secretary, Map.of("year", 2031))
+                .andExpect(status().isOk());
     }
 
     @Test

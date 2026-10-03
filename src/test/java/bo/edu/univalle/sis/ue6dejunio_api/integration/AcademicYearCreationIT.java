@@ -93,11 +93,17 @@ class AcademicYearCreationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void teacherAndSecretary_forbidden_anonymous_unauthorized() throws Exception {
+    void teacher_forbidden_anonymous_unauthorized() throws Exception {
         create(bearer("Teacher"), 2027).andExpect(status().isForbidden());
-        create(bearer("Secretary"), 2027).andExpect(status().isForbidden());
         create(null, 2027).andExpect(status().isUnauthorized());
 
         assertThat(countOf(2027)).isZero();
+    }
+
+    @Test
+    void secretary_createsTheYear() throws Exception {
+        create(bearer("Secretary"), 2027).andExpect(status().isCreated());
+
+        assertThat(countOf(2027)).isEqualTo(1);
     }
 }
