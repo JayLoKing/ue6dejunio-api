@@ -28,11 +28,9 @@ public class GradeService implements IGradeService {
     @Override
     @Transactional
     public Grade create(CreateGradeCommand c) {
-        if (gradeDomain.countTotal() >= MAX_GRADES) {
-            throw new ConflictException(
-                    "Limite alcanzado: solo se permiten "
-                            + MAX_GRADES
-                            + " grados (nivel primaria)");
+        // Counted per level: a full level must not stop another level from getting its grades.
+        if (gradeDomain.countByLevel(c.levelId()) >= MAX_GRADES) {
+            throw limitReached();
         }
         if (!gradeDomain.levelExists(c.levelId())) {
             throw new ResourceNotFoundException("Level", c.levelId());
@@ -51,6 +49,11 @@ public class GradeService implements IGradeService {
             throw new ResourceNotFoundException("Level", c.levelId());
         }
         // A grade can carry a null level, so comparing it directly turned an edit into a 500.
+        // Moving a grade into another level adds one to it, so it is bound by the same limit.
+        if (!Objects.equals(current.levelId(), c.levelId())
+                && gradeDomain.countByLevel(c.levelId()) >= MAX_GRADES) {
+            throw limitReached();
+        }
         boolean changed =
                 !Objects.equals(current.name(), c.name())
                         || !Objects.equals(current.levelId(), c.levelId());
@@ -78,10 +81,14 @@ public class GradeService implements IGradeService {
     @Transactional
     public void delete(Integer id) {
         getById(id);
-        if (gradeDomain.hasClassGroups(id)) {
-            throw new ConflictException(
-                    "No se puede eliminar: el grado tiene class_groups asociados");
+        if (gradeDomain.hasCourses(id)) {
+            throw new ConflictException("No se puede eliminar: el grado tiene cursos asociados");
         }
         gradeDomain.deleteById(id);
+    }
+
+    private static ConflictException limitReached() {
+        return new ConflictException(
+                "Limite alcanzado: solo se permiten " + MAX_GRADES + " grados por nivel");
     }
 }

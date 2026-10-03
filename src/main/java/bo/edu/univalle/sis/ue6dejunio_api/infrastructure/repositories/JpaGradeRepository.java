@@ -7,4 +7,6 @@ public interface JpaGradeRepository extends JpaRepository<GradeEntity, Integer> 
     boolean existsByLevel_Id(Integer levelId);
 
     boolean existsByNameAndLevel_Id(String name, Integer levelId);
+
+    long countByLevel_Id(Integer levelId);
 }

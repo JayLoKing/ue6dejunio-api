@@ -81,13 +81,13 @@ public class GradeRepositoryAdapter implements IGradeDomain {
     }
 
     @Override
-    public boolean hasClassGroups(Integer gradeId) {
+    public boolean hasCourses(Integer gradeId) {
         return courseRepo.existsByGrade_Id(gradeId);
     }
 
     @Override
-    public long countTotal() {
-        return gradeRepo.count();
+    public long countByLevel(Integer levelId) {
+        return gradeRepo.countByLevel_Id(levelId);
     }
 
     @Override

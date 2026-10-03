@@ -16,9 +16,9 @@ public interface IGradeDomain {
 
     boolean existsByNameAndLevel(String name, Integer levelId);
 
-    boolean hasClassGroups(Integer gradeId);
+    boolean hasCourses(Integer gradeId);
 
-    long countTotal();
+    long countByLevel(Integer levelId);
 
     PageResult<Grade> list(PageQuery pageQuery);
 
