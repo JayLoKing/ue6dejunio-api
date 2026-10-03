@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
@@ -31,14 +32,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class StudentRepositoryAdapter implements IStudentDomain {
 
+    private static final String STATUS_EFFECTIVE = "Effective";
+
     private final JpaStudentRepository repo;
     private final JpaUserRepository userRepo;
     private final StudentMapper mapper;
 
     /**
-     * Only {@link #movementSummary} uses it, and only for two {@code GROUP BY} counts. Through
-     * entities those would be a read of every enrolment of the gestión to end up with a dozen
-     * numbers — this is the one place where the answer really is what the database computes.
+     * Only {@link #movementSummary} (two {@code GROUP BY} counts) and {@link #notReenrolled} (an
+     * anti-join) use it. Through entities those would be a read of every enrolment of the gestión
+     * to end up with a dozen numbers — this is the one place where the answer really is what the
+     * database computes.
      */
     private final JdbcClient jdbc;
 
@@ -215,6 +219,65 @@ public class StudentRepositoryAdapter implements IStudentDomain {
                         .toList();
 
         return new StudentMovementSummary(months, byReason);
+    }
+
+    /**
+     * One anti-join, no rows compared in memory.
+     *
+     * <p>{@code prev} collapses last year's Effective seats to one per student: {@code
+     * course_enrollments} is unique on student and course, not on student and gestión, so a child
+     * who changed parallel holds two. {@code DISTINCT ON} keeps the latest enrolment date (a null
+     * date last) and breaks a tie by course id, so the same data always gives the same row.
+     *
+     * <p>The {@code NOT EXISTS} takes a seat of any status in the reference gestión as an answer:
+     * somebody who enrolled and was withdrawn this year did come back, and is the movement table's
+     * business, not this list's. A student whose only seat last year was already Withdrawn never
+     * enters {@code prev}.
+     */
+    @Override
+    public List<NotReenrolledStudent> notReenrolled(
+            Integer academicYearId, Integer previousYearId) {
+        return jdbc.sql(
+                        """
+                WITH prev AS (
+                    SELECT DISTINCT ON (ce.id_student)
+                           ce.id_student, c.id_course, g.id_grade, g.name AS grade, p.name AS parallel
+                      FROM course_enrollments ce
+                      JOIN courses c   ON c.id_course = ce.id_course
+                      JOIN grades g    ON g.id_grade = c.id_grade
+                      JOIN parallels p ON p.id_parallel = c.id_parallel
+                     WHERE c.id_academic_year = :previous
+                       AND ce.status = :effective
+                     ORDER BY ce.id_student, ce.enrollment_date DESC NULLS LAST, c.id_course
+                )
+                SELECT s.id_student, s.rude_code, s.identity_card, s.names, s.last_names, s.status,
+                       prev.id_course, prev.grade, prev.parallel
+                  FROM prev
+                  JOIN students s ON s.id_student = prev.id_student
+                 WHERE NOT EXISTS (
+                        SELECT 1
+                          FROM course_enrollments ce2
+                          JOIN courses c2 ON c2.id_course = ce2.id_course
+                         WHERE ce2.id_student = prev.id_student
+                           AND c2.id_academic_year = :year)
+                 ORDER BY prev.id_grade, prev.parallel, s.last_names, s.names, s.id_student
+                """)
+                .param("previous", previousYearId)
+                .param("year", academicYearId)
+                .param("effective", STATUS_EFFECTIVE)
+                .query(
+                        (rs, rowNum) ->
+                                new NotReenrolledStudent(
+                                        rs.getObject("id_student", UUID.class),
+                                        rs.getString("rude_code"),
+                                        rs.getString("identity_card"),
+                                        rs.getString("names") + " " + rs.getString("last_names"),
+                                        rs.getString("status"),
+                                        new NotReenrolledStudent.LastCourse(
+                                                rs.getObject("id_course", UUID.class),
+                                                rs.getString("grade"),
+                                                rs.getString("parallel"))))
+                .list();
     }
 
     @Override

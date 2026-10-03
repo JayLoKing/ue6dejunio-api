@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
@@ -26,6 +27,13 @@ public interface IStudentDomain {
      * that costs.
      */
     StudentMovementSummary movementSummary(Integer academicYearId);
+
+    /**
+     * Students with an Effective enrolment in {@code previousYearId} and none, of any status, in
+     * {@code academicYearId}, one row each, sorted by last course then name. A single query: the
+     * answer is an anti-join and loading either roll to compare in memory would read the school.
+     */
+    List<NotReenrolledStudent> notReenrolled(Integer academicYearId, Integer previousYearId);
 
     Optional<Student> findById(UUID id);
 
