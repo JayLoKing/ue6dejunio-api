@@ -10,4 +10,5 @@ public record UsersList(
         String phone,
         String email,
         String role,
-        boolean active) {}
+        boolean active,
+        boolean mustChangePassword) {}

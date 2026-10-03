@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.user.PasswordGenerator;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.user.UserService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -223,6 +224,72 @@ class UserServiceTest {
         when(userDomain.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.activate(id))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    private User pendingUser(java.util.UUID id) {
+        return User.builder()
+                .id(id)
+                .names("Ana")
+                .lastNames("Quispe")
+                .email("ana@ue6.bo")
+                .password("$old$")
+                .mustChangePassword(true)
+                .active(true)
+                .build();
+    }
+
+    @Test
+    void resendCredentials_pendingUser_storesTheHashAndMailsTheRawPassword() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(passwordGenerator.generate()).thenReturn("N3wTemp!");
+        when(passwordEncoder.encode("N3wTemp!")).thenReturn("$new$");
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.resendCredentials(id);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userDomain).save(captor.capture());
+        assertThat(captor.getValue().getPassword()).isEqualTo("$new$");
+        assertThat(captor.getValue().isMustChangePassword()).isTrue();
+        verify(emailService).sendWelcomeCredentials("ana@ue6.bo", "Ana Quispe", "N3wTemp!");
+    }
+
+    @Test
+    void resendCredentials_userAlreadyChangedPassword_isConflict() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        user.setMustChangePassword(false);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.resendCredentials(id))
+                .isInstanceOf(ConflictException.class);
+
+        verify(userDomain, never()).save(any(User.class));
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    @Test
+    void resendCredentials_inactiveUser_isConflict() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        user.setActive(false);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.resendCredentials(id))
+                .isInstanceOf(ConflictException.class);
+
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    @Test
+    void resendCredentials_unknownUser_throwsResourceNotFound() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.resendCredentials(id))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

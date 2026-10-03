@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.user;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
@@ -146,6 +147,29 @@ public class UserService implements IUserService {
     @Override
     public void deactivate(UUID id) {
         userDomain.deactivate(id);
+    }
+
+    @Override
+    public void resendCredentials(UUID id) {
+        User user =
+                userDomain
+                        .findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+        if (!user.isActive()) {
+            throw new ConflictException(
+                    "El usuario está dado de baja; actívalo antes de reenviar las credenciales");
+        }
+        if (!user.isMustChangePassword()) {
+            throw new ConflictException(
+                    "El usuario ya cambió su contraseña temporal; "
+                            + "las credenciales no se pueden reenviar");
+        }
+        String temporaryPassword = passwordGenerator.generate();
+        user.setPassword(passwordEncoder.encode(temporaryPassword));
+        // Already true, but it is the invariant this method stands on, so it is stated.
+        user.setMustChangePassword(true);
+        User saved = userDomain.save(user);
+        emailService.sendWelcomeCredentials(saved.getEmail(), saved.fullName(), temporaryPassword);
     }
 
     @Override

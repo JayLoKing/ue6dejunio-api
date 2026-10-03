@@ -118,6 +118,15 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/resend-credentials")
+    @Operation(
+            summary =
+                    "Reenviar credenciales temporales (solo si el usuario no cambió su contraseña)")
+    public ResponseEntity<Void> resendCredentials(@PathVariable UUID id) {
+        userService.resendCredentials(id);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{id}/activate")
     @Operation(summary = "Activar usuario (idempotente)")
     public ResponseEntity<UserResponse> activate(@PathVariable UUID id) {

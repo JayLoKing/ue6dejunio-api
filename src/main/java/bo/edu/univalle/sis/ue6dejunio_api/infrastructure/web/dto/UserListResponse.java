@@ -15,7 +15,8 @@ public record UserListResponse(
         String phone,
         String email,
         String role,
-        boolean active) {
+        boolean active,
+        boolean mustChangePassword) {
     public static UserListResponse from(UsersList u) {
         return new UserListResponse(
                 u.id(),
@@ -25,6 +26,7 @@ public record UserListResponse(
                 u.phone(),
                 u.email(),
                 u.role(),
-                u.active());
+                u.active(),
+                u.mustChangePassword());
     }
 }

@@ -20,4 +20,16 @@ public interface IUserService {
     void deactivate(UUID id);
 
     User activate(UUID id);
+
+    /**
+     * Mints a new temporary password for an account whose owner never got past the first one, and
+     * mails it. Refused once the user has set a password of their own: from then on a reset goes
+     * through the forgot-password flow, not through the Director.
+     *
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException if the
+     *     user does not exist
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException if the account
+     *     is closed or the user already changed the temporary password
+     */
+    void resendCredentials(UUID id);
 }
