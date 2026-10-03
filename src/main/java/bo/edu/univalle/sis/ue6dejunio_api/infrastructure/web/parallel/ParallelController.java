@@ -77,7 +77,7 @@ public class ParallelController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar paralelo (falla si tiene class_groups)")
+    @Operation(summary = "Eliminar paralelo (falla si tiene cursos asociados)")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         parallelService.delete(id);
         return ResponseEntity.noContent().build();

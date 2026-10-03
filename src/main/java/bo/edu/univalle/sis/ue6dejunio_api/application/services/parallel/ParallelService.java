@@ -59,9 +59,8 @@ public class ParallelService implements IParallelService {
     @Transactional
     public void delete(Integer id) {
         getById(id);
-        if (parallelDomain.hasClassGroups(id)) {
-            throw new ConflictException(
-                    "No se puede eliminar: el paralelo tiene class_groups asociados");
+        if (parallelDomain.hasCourses(id)) {
+            throw new ConflictException("No se puede eliminar: el paralelo tiene cursos asociados");
         }
         parallelDomain.deleteById(id);
     }

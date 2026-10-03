@@ -40,9 +40,11 @@ class ParallelServiceTest {
     }
 
     @Test
-    void delete_withClassGroups_throws() {
+    void delete_withCourses_throws() {
         when(parallelDomain.findById(1)).thenReturn(Optional.of(new Parallel(1, "A")));
-        when(parallelDomain.hasClassGroups(1)).thenReturn(true);
-        assertThatThrownBy(() -> parallelService.delete(1)).isInstanceOf(ConflictException.class);
+        when(parallelDomain.hasCourses(1)).thenReturn(true);
+        assertThatThrownBy(() -> parallelService.delete(1))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("cursos asociados");
     }
 }

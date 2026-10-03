@@ -12,7 +12,7 @@ public interface IParallelDomain {
 
     boolean existsByName(String name);
 
-    boolean hasClassGroups(Integer parallelId);
+    boolean hasCourses(Integer parallelId);
 
     PageResult<Parallel> list(PageQuery pageQuery);
 

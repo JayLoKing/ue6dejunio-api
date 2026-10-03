@@ -53,7 +53,7 @@ public class ParallelRepositoryAdapter implements IParallelDomain {
     }
 
     @Override
-    public boolean hasClassGroups(Integer parallelId) {
+    public boolean hasCourses(Integer parallelId) {
         return courseRepo.existsByParallel_Id(parallelId);
     }
 

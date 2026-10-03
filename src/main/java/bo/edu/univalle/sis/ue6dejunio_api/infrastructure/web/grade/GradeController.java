@@ -76,7 +76,7 @@ public class GradeController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar grado (falla si tiene class_groups)")
+    @Operation(summary = "Eliminar grado (falla si tiene cursos asociados)")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         gradeService.delete(id);
         return ResponseEntity.noContent().build();
