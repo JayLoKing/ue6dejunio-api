@@ -26,6 +26,14 @@ public enum NotificationType {
      */
     STUDENT_WITHDRAWN,
 
+    /**
+     * A withdrawn student came back, and the teachers of the course they returned to are being
+     * told.
+     *
+     * <p>Written by the reinstatement itself, for the same reason as {@link #STUDENT_WITHDRAWN}.
+     */
+    STUDENT_REINSTATED,
+
     /** The Director's own, about the work he supervises. */
     NOTEBOOK,
     ATTENDANCE,
@@ -55,7 +63,8 @@ public enum NotificationType {
      */
     public boolean writtenByHand() {
         return switch (this) {
-            case PDC_PUBLISHED, PDC_APPROVED, PDC_OBSERVED, STUDENT_WITHDRAWN -> false;
+            case PDC_PUBLISHED, PDC_APPROVED, PDC_OBSERVED, STUDENT_WITHDRAWN, STUDENT_REINSTATED ->
+                    false;
             case NOTEBOOK, ATTENDANCE, PDC_PROGRESS, SUMMONS, CUSTOM -> true;
         };
     }

@@ -15,6 +15,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentReinstated;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawn;
@@ -206,6 +207,11 @@ public class StudentService implements IStudentService {
         studentDomain.updateStatus(
                 command.studentId(),
                 new StudentStatusChange(STATUS_EFFECTIVE, null, null, command.actorId()));
+        // Only the fact leaves here; the teachers of that course are found on the notification
+        // side.
+        events.publish(
+                new StudentReinstated(
+                        command.studentId(), student.fullName(), courseId, courseLabel(courseId)));
         return new ReinstateResult(command.studentId(), STATUS_EFFECTIVE, courseId, reactivated);
     }
 

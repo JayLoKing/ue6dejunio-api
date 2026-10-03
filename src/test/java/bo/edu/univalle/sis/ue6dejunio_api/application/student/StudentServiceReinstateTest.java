@@ -20,6 +20,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.Enrollm
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentReinstated;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
@@ -214,5 +215,40 @@ class StudentServiceReinstateTest {
         verify(courseEnrollmentDomain, never()).saveEnrollment(any(), any());
         assertThat(result.enrollmentReactivated()).isTrue();
         verify(closedYearGuard).requireOpenForYear(anyInt());
+    }
+
+    /** The fact leaves with the name and the course, so the notice reads without a lookup. */
+    @Test
+    void reinstate_statesTheStudentAndTheCourseTheyAreBackIn() {
+        UUID courseId = UUID.randomUUID();
+        when(studentDomain.findById(studentId))
+                .thenReturn(
+                        Optional.of(
+                                Student.builder()
+                                        .id(studentId)
+                                        .status("Withdrawn")
+                                        .names("Ana")
+                                        .lastNames("Quispe")
+                                        .build()));
+        when(academicYearDomain.currentYearId()).thenReturn(YEAR);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, YEAR)).thenReturn(List.of());
+        when(courseDomain.findById(courseId)).thenReturn(Optional.of(courseOf(courseId, YEAR)));
+        when(courseEnrollmentDomain.enrollmentStatusByStudent(courseId, Set.of(studentId)))
+                .thenReturn(Map.of());
+
+        reinstate(courseId);
+
+        verify(events)
+                .publish(new StudentReinstated(studentId, "Ana Quispe", courseId, "Primero A"));
+    }
+
+    /** Nothing was written, so there is nothing to tell anybody about. */
+    @Test
+    void reinstate_refused_statesNothing() {
+        studentIs("Effective");
+
+        assertThatThrownBy(() -> reinstate(null)).isInstanceOf(ConflictException.class);
+
+        verify(events, never()).publish(any());
     }
 }
