@@ -14,7 +14,18 @@ import java.util.List;
 import java.util.UUID;
 
 public interface IGradebookService {
-    StudentTrimesterSummary studentSummary(UUID courseEnrollmentId, Integer trimester);
+    /**
+     * One student's trimester: a total per subject and the general average.
+     *
+     * <p>The general average is always the student's own, computed over every subject; narrowing
+     * the rows a reader may see never changes it.
+     *
+     * @param teacherScopeId {@code null} for a reader with no ownership scope (Director,
+     *     secretariat): every subject. Otherwise the teacher asking: every subject if they are the
+     *     course's homeroom teacher, only the class groups they teach in it if they are not.
+     */
+    StudentTrimesterSummary studentSummary(
+            UUID courseEnrollmentId, Integer trimester, UUID teacherScopeId);
 
     PageResult<StudentTrimesterSummary> centralizer(
             UUID courseId, Integer trimester, PageQuery pageQuery);

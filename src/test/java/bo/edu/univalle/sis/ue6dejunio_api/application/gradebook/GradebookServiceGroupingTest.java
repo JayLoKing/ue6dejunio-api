@@ -365,7 +365,7 @@ class GradebookServiceGroupingTest {
                                         1,
                                         new BigDecimal("90.00"))));
 
-        StudentTrimesterSummary result = service.studentSummary(enrollmentA, 1);
+        StudentTrimesterSummary result = service.studentSummary(enrollmentA, 1, null);
 
         assertThat(result.generalAverage()).isEqualByComparingTo("90.00");
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());

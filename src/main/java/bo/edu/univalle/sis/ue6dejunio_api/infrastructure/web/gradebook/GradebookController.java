@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.gradebook;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAcademicSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HonorRollEntryResponse;
@@ -21,6 +22,7 @@ import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,21 +39,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class GradebookController {
 
     private final IGradebookService gradebookService;
+    private final AuthorizationComponent authz;
 
-    public GradebookController(IGradebookService gradebookService) {
+    public GradebookController(IGradebookService gradebookService, AuthorizationComponent authz) {
         this.gradebookService = gradebookService;
+        this.authz = authz;
     }
 
     @GetMapping("/student-summary")
-    @PreAuthorize("@authz.canReadEnrollmentScope(authentication, #courseEnrollmentId)")
+    @PreAuthorize("@authz.canReadStudentSummary(authentication, #courseEnrollmentId)")
     @Operation(
-            summary = "Resumen del estudiante: total por materia + promedio general del trimestre")
+            summary =
+                    "Resumen del estudiante: total por materia + promedio general del trimestre."
+                            + " Un docente que no es el asesor ve solo las materias que dicta; el"
+                            + " promedio general es siempre el del estudiante")
     public ResponseEntity<StudentSummaryResponse> studentSummary(
             @RequestParam("id_course_enrollment") UUID courseEnrollmentId,
-            @RequestParam @Min(1) @Max(3) Integer trimester) {
+            @RequestParam @Min(1) @Max(3) Integer trimester,
+            Authentication authentication) {
+        UUID scope = authz.subjectScopeTeacherId(authentication);
         return ResponseEntity.ok(
                 StudentSummaryResponse.from(
-                        gradebookService.studentSummary(courseEnrollmentId, trimester)));
+                        gradebookService.studentSummary(courseEnrollmentId, trimester, scope)));
     }
 
     @GetMapping("/centralizer")

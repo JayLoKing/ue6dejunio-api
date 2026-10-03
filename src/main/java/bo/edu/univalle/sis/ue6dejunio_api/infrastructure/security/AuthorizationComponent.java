@@ -312,6 +312,37 @@ public class AuthorizationComponent {
     }
 
     /**
+     * Who may open one student's trimester summary. Wider than {@link #canReadEnrollmentScope} on
+     * purpose, and for this read only: a teacher who runs at least one class group of the
+     * enrollment's course grades that student, so refusing them their own subject's row sent a
+     * technical teacher to a 403 on the very child they grade.
+     *
+     * <p>What they get back is narrower than what the homeroom teacher gets — the service keeps
+     * them to the subjects they teach, from {@link #subjectScopeTeacherId}. The libreta, the
+     * centralizers and every other reader of {@link #canReadEnrollmentScope} are left homeroom and
+     * Director only.
+     */
+    public boolean canReadStudentSummary(Authentication authentication, UUID courseEnrollmentId) {
+        if (authentication == null || courseEnrollmentId == null) {
+            return false;
+        }
+        if (isReadOnlyStaff(authentication) || hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        UUID teacherId = userId(authentication);
+        UUID courseId = courseOfEnrollmentOrNull(courseEnrollmentId);
+        if (teacherId == null || courseId == null) {
+            return false;
+        }
+        Optional<Course> course = courseDomain.findById(courseId);
+        if (course.isEmpty()) {
+            return false;
+        }
+        return teacherId.equals(course.get().homeroomTeacherId())
+                || classGroupDomain.teachesInCourse(teacherId, courseId);
+    }
+
+    /**
      * The secretariat is a school-wide READ actor: it consults any course's records without owning
      * one. It is deliberately checked here, at the read entry points, and never inside {@link
      * #ownsEnrollmentCourse} — that helper also backs the write predicates, so widening it would
@@ -661,13 +692,14 @@ public class AuthorizationComponent {
     }
 
     /**
-     * Whose rows a course-wide risk listing may show. Director and the secretariat read every
-     * subject, which is what {@code null} means; a teacher is scoped to themselves, and the service
-     * then decides between the whole course (homeroom) and only their own subjects. A token with no
-     * usable subject resolves to an id that owns nothing, never to {@code null}: widening on a
-     * broken token is the failure this closes.
+     * Whose subject rows a per-subject listing or view may show: the course risk panel, one
+     * student's risk list and one student's trimester summary. Director and the secretariat read
+     * every subject, which is what {@code null} means; a teacher is scoped to themselves, and the
+     * service then decides between the whole course (homeroom) and only their own subjects. A token
+     * with no usable subject resolves to an id that owns nothing, never to {@code null}: widening
+     * on a broken token is the failure this closes.
      */
-    public UUID courseRiskScopeTeacherId(Authentication authentication) {
+    public UUID subjectScopeTeacherId(Authentication authentication) {
         return pdcListScopeTeacherId(authentication);
     }
 
@@ -731,14 +763,7 @@ public class AuthorizationComponent {
         if (authentication == null || courseEnrollmentId == null) {
             return false;
         }
-        UUID courseId;
-        try {
-            courseId = courseEnrollmentDomain.courseOfEnrollment(courseEnrollmentId);
-        } catch (ResourceNotFoundException ignored) {
-            // An id that resolves to nothing is a denial, not an error. Anything else — a dropped
-            // connection, say — must keep propagating instead of being reported as "not owner".
-            return false;
-        }
+        UUID courseId = courseOfEnrollmentOrNull(courseEnrollmentId);
         if (courseId == null) {
             return false;
         }
@@ -748,6 +773,19 @@ public class AuthorizationComponent {
         }
         UUID userId = userId(authentication);
         return userId != null && userId.equals(course.get().homeroomTeacherId());
+    }
+
+    /**
+     * The course an enrollment belongs to, or {@code null} when the id resolves to nothing. An id
+     * that resolves to nothing is a denial, not an error. Anything else — a dropped connection, say
+     * — must keep propagating instead of being reported as "not owner".
+     */
+    private UUID courseOfEnrollmentOrNull(UUID courseEnrollmentId) {
+        try {
+            return courseEnrollmentDomain.courseOfEnrollment(courseEnrollmentId);
+        } catch (ResourceNotFoundException ignored) {
+            return null;
+        }
     }
 
     private boolean hasRole(Authentication auth, String role) {

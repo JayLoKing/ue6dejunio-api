@@ -1400,24 +1400,112 @@ class AuthorizationComponentTest {
         assertThat(authz.pdcListScopeTeacherId(null)).isEqualTo(new UUID(0L, 0L));
     }
 
-    // ---- courseRiskScopeTeacherId ----
+    // ---- subjectScopeTeacherId ----
 
     @Test
-    void courseRiskScope_teacher_isNarrowedToTheirOwnId() {
+    void subjectScope_teacher_isNarrowedToTheirOwnId() {
         UUID teacher = UUID.randomUUID();
 
-        assertThat(authz.courseRiskScopeTeacherId(token(teacher, "Teacher"))).isEqualTo(teacher);
+        assertThat(authz.subjectScopeTeacherId(token(teacher, "Teacher"))).isEqualTo(teacher);
     }
 
     @Test
-    void courseRiskScope_directorAndSecretary_areUnscoped() {
-        assertThat(authz.courseRiskScopeTeacherId(token(UUID.randomUUID(), "Director"))).isNull();
-        assertThat(authz.courseRiskScopeTeacherId(token(UUID.randomUUID(), "Secretary"))).isNull();
+    void subjectScope_directorAndSecretary_areUnscoped() {
+        assertThat(authz.subjectScopeTeacherId(token(UUID.randomUUID(), "Director"))).isNull();
+        assertThat(authz.subjectScopeTeacherId(token(UUID.randomUUID(), "Secretary"))).isNull();
     }
 
     @Test
-    void courseRiskScope_noUsableToken_matchesNothingInsteadOfWidening() {
-        assertThat(authz.courseRiskScopeTeacherId(null)).isEqualTo(new UUID(0L, 0L));
+    void subjectScope_noUsableToken_matchesNothingInsteadOfWidening() {
+        assertThat(authz.subjectScopeTeacherId(null)).isEqualTo(new UUID(0L, 0L));
+    }
+
+    // ---- canReadStudentSummary ----
+
+    private Course courseOf(UUID courseId, UUID homeroomTeacherId) {
+        return new Course(
+                courseId, 1, "Primero", 1, "A", 1, 2026, homeroomTeacherId, "X", true, true);
+    }
+
+    @Test
+    void canReadStudentSummary_homeroomTeacher_true() {
+        UUID homeroomTeacher = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseOf(courseId, homeroomTeacher)));
+
+        assertThat(authz.canReadStudentSummary(token(homeroomTeacher, "Teacher"), ceId)).isTrue();
+    }
+
+    @Test
+    void canReadStudentSummary_subjectTeacherOfTheCourse_true() {
+        UUID technical = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseOf(courseId, UUID.randomUUID())));
+        when(classGroupDomain.teachesInCourse(technical, courseId)).thenReturn(true);
+
+        assertThat(authz.canReadStudentSummary(token(technical, "Teacher"), ceId)).isTrue();
+    }
+
+    @Test
+    void canReadStudentSummary_teacherWithNothingInTheCourse_false() {
+        UUID stranger = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseOf(courseId, UUID.randomUUID())));
+        when(classGroupDomain.teachesInCourse(stranger, courseId)).thenReturn(false);
+
+        assertThat(authz.canReadStudentSummary(token(stranger, "Teacher"), ceId)).isFalse();
+    }
+
+    @Test
+    void canReadStudentSummary_directorAndSecretary_true_withoutAnyLookup() {
+        UUID ceId = UUID.randomUUID();
+
+        assertThat(authz.canReadStudentSummary(token(UUID.randomUUID(), "Director"), ceId))
+                .isTrue();
+        assertThat(authz.canReadStudentSummary(token(UUID.randomUUID(), "Secretary"), ceId))
+                .isTrue();
+        verify(courseEnrollmentDomain, never()).courseOfEnrollment(any());
+    }
+
+    @Test
+    void canReadStudentSummary_unknownEnrollment_deniesNotThrows() {
+        UUID teacher = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId))
+                .thenThrow(
+                        new bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions
+                                .ResourceNotFoundException("CourseEnrollment", ceId));
+
+        assertThat(authz.canReadStudentSummary(token(teacher, "Teacher"), ceId)).isFalse();
+    }
+
+    @Test
+    void canReadStudentSummary_noAuthenticationOrId_false() {
+        assertThat(authz.canReadStudentSummary(null, UUID.randomUUID())).isFalse();
+        assertThat(authz.canReadStudentSummary(token(UUID.randomUUID(), "Teacher"), null))
+                .isFalse();
+    }
+
+    @Test
+    void canReadEnrollmentScope_subjectTeacher_stillFalse_theOtherCallersStayHomeroomOnly() {
+        UUID technical = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseOf(courseId, UUID.randomUUID())));
+
+        assertThat(authz.canReadEnrollmentScope(token(technical, "Teacher"), ceId)).isFalse();
+        verify(classGroupDomain, never()).teachesInCourse(any(), any());
     }
 
     // ---- canReadAdaptation / canWriteAdaptation ----

@@ -103,7 +103,7 @@ public class RiskPredictionController {
             @PathVariable UUID courseId,
             @RequestParam @Min(1) @Max(3) int trimester,
             Authentication authentication) {
-        UUID scope = authz.courseRiskScopeTeacherId(authentication);
+        UUID scope = authz.subjectScopeTeacherId(authentication);
         return ResponseEntity.ok(
                 toResponses(predictionService.byCourse(courseId, trimester, scope)));
     }

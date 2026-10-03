@@ -39,6 +39,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -77,7 +78,8 @@ public class GradebookService implements IGradebookService {
 
     @Override
     @Transactional(readOnly = true)
-    public StudentTrimesterSummary studentSummary(UUID courseEnrollmentId, Integer trimester) {
+    public StudentTrimesterSummary studentSummary(
+            UUID courseEnrollmentId, Integer trimester, UUID teacherScopeId) {
         CourseStudent cs =
                 enrollmentDomain
                         .courseStudentById(courseEnrollmentId)
@@ -85,7 +87,25 @@ public class GradebookService implements IGradebookService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "CourseEnrollment", courseEnrollmentId));
-        return buildSummary(courseEnrollmentId, cs.studentId(), cs.fullName(), trimester);
+        StudentTrimesterSummary summary =
+                buildSummary(courseEnrollmentId, cs.studentId(), cs.fullName(), trimester);
+        if (teacherScopeId == null) {
+            return summary;
+        }
+        UUID courseId = enrollmentDomain.courseOfEnrollment(courseEnrollmentId);
+        if (teacherScopeId.equals(courseService.getById(courseId).homeroomTeacherId())) {
+            return summary;
+        }
+        // Only the rows are narrowed. The general average stays the one the school computes over
+        // every subject, so it matches what the homeroom teacher and the libreta show.
+        Set<UUID> taught = classGroupDomain.classGroupIdsTaughtInCourse(teacherScopeId, courseId);
+        return new StudentTrimesterSummary(
+                summary.courseEnrollmentId(),
+                summary.studentId(),
+                summary.fullName(),
+                summary.trimester(),
+                summary.subjects().stream().filter(s -> taught.contains(s.classGroupId())).toList(),
+                summary.generalAverage());
     }
 
     @Override
