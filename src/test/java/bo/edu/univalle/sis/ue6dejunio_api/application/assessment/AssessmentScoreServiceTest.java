@@ -104,6 +104,8 @@ class AssessmentScoreServiceTest {
                                 null,
                                 new BigDecimal("40"),
                                 null,
+                                null,
+                                null,
                                 null));
         when(scoreDomain.dimensionAverages(enrollment, classGroup, 1))
                 .thenReturn(List.of(new DimensionAvg("Knowing", new BigDecimal("21.6666"))));
@@ -133,6 +135,8 @@ class AssessmentScoreServiceTest {
                                 null,
                                 criterionId,
                                 new BigDecimal("35"),
+                                null,
+                                null,
                                 null,
                                 null));
         when(scoreDomain.dimensionAverages(enrollment, classGroup, 1))
@@ -169,6 +173,8 @@ class AssessmentScoreServiceTest {
                                 null,
                                 criterionId,
                                 new BigDecimal("35"),
+                                null,
+                                null,
                                 null,
                                 null));
         when(scoreDomain.dimensionAverages(enrollment, classGroup, 1))
@@ -331,6 +337,8 @@ class AssessmentScoreServiceTest {
                                         criterionId,
                                         new BigDecimal("30"),
                                         null,
+                                        null,
+                                        null,
                                         null)));
         when(criterionDomain.findById(criterionId))
                 .thenReturn(Optional.of(activityCriterion(criterionId, "Doing")));
@@ -359,6 +367,8 @@ class AssessmentScoreServiceTest {
                                 eventId,
                                 null,
                                 new BigDecimal("40"),
+                                null,
+                                null,
                                 null,
                                 null));
         when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of());
@@ -390,6 +400,8 @@ class AssessmentScoreServiceTest {
                                         null,
                                         new BigDecimal("30"),
                                         null,
+                                        null,
+                                        null,
                                         null)));
         when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
         when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of());
@@ -415,6 +427,8 @@ class AssessmentScoreServiceTest {
                                         null,
                                         criterionId,
                                         new BigDecimal("35"),
+                                        null,
+                                        null,
                                         null,
                                         null)));
         when(criterionDomain.findById(criterionId))
@@ -501,6 +515,8 @@ class AssessmentScoreServiceTest {
                                         eventId,
                                         null,
                                         new BigDecimal("30"),
+                                        null,
+                                        null,
                                         null,
                                         null)));
         when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Doing")));

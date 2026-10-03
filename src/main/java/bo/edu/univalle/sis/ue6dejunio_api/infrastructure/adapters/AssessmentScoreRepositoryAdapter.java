@@ -3,16 +3,23 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.DimensionAvg;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.ScoreAuthor;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AssessmentScoreEntity;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.UserEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentEventRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaCourseEnrollmentRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaEvaluationCriterionRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,16 +33,19 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
     private final JpaAssessmentEventRepository eventRepo;
     private final JpaEvaluationCriterionRepository criterionRepo;
     private final JpaCourseEnrollmentRepository enrollmentRepo;
+    private final JpaUserRepository userRepo;
 
     public AssessmentScoreRepositoryAdapter(
             JpaAssessmentScoreRepository scoreRepo,
             JpaAssessmentEventRepository eventRepo,
             JpaEvaluationCriterionRepository criterionRepo,
-            JpaCourseEnrollmentRepository enrollmentRepo) {
+            JpaCourseEnrollmentRepository enrollmentRepo,
+            JpaUserRepository userRepo) {
         this.scoreRepo = scoreRepo;
         this.eventRepo = eventRepo;
         this.criterionRepo = criterionRepo;
         this.enrollmentRepo = enrollmentRepo;
+        this.userRepo = userRepo;
     }
 
     @Override
@@ -55,7 +65,7 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
                                 });
         e.setScore(score);
         stampAuthor(e, actorId);
-        return toDomain(scoreRepo.saveAndFlush(e));
+        return one(scoreRepo.saveAndFlush(e));
     }
 
     @Override
@@ -75,29 +85,27 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
                                 });
         e.setScore(score);
         stampAuthor(e, actorId);
-        return toDomain(scoreRepo.saveAndFlush(e));
+        return one(scoreRepo.saveAndFlush(e));
     }
 
     @Override
     public Optional<AssessmentScore> findById(UUID id) {
-        return scoreRepo.findById(id).map(this::toDomain);
+        return scoreRepo.findById(id).map(this::one);
     }
 
     @Override
     public List<AssessmentScore> listByEvent(UUID eventId) {
-        return scoreRepo.findByEvent_Id(eventId).stream().map(this::toDomain).toList();
+        return toDomains(scoreRepo.findByEvent_Id(eventId));
     }
 
     @Override
     public List<AssessmentScore> listByCriterion(UUID criterionId) {
-        return scoreRepo.findByCriterion_Id(criterionId).stream().map(this::toDomain).toList();
+        return toDomains(scoreRepo.findByCriterion_Id(criterionId));
     }
 
     @Override
     public List<AssessmentScore> listByCourseEnrollment(UUID courseEnrollmentId) {
-        return scoreRepo.findByCourseEnrollment_Id(courseEnrollmentId).stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomains(scoreRepo.findByCourseEnrollment_Id(courseEnrollmentId));
     }
 
     @Override
@@ -158,7 +166,47 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
         e.setUpdatedBy(actorId);
     }
 
-    private AssessmentScore toDomain(AssessmentScoreEntity e) {
+    private AssessmentScore one(AssessmentScoreEntity e) {
+        return toDomains(List.of(e)).getFirst();
+    }
+
+    /**
+     * Maps a whole result with one extra query for the names of every author in it, never one per
+     * row: a roster of N scores costs the same two statements as a roster of one.
+     */
+    private List<AssessmentScore> toDomains(List<AssessmentScoreEntity> rows) {
+        Map<UUID, ScoreAuthor> authors = authorsOf(rows);
+        return rows.stream().map(e -> toDomain(e, authors)).toList();
+    }
+
+    private Map<UUID, ScoreAuthor> authorsOf(List<AssessmentScoreEntity> rows) {
+        Set<UUID> ids = new HashSet<>();
+        for (AssessmentScoreEntity e : rows) {
+            if (e.getCreatedBy() != null) {
+                ids.add(e.getCreatedBy());
+            }
+            if (e.getUpdatedBy() != null) {
+                ids.add(e.getUpdatedBy());
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return userRepo.findAllById(ids).stream()
+                .collect(
+                        Collectors.toMap(
+                                UserEntity::getId, AssessmentScoreRepositoryAdapter::author));
+    }
+
+    private static ScoreAuthor author(UserEntity u) {
+        return new ScoreAuthor(u.getId(), u.getNames() + " " + u.getLastNames());
+    }
+
+    private static ScoreAuthor authorOf(UUID id, Map<UUID, ScoreAuthor> authors) {
+        return id == null ? null : authors.getOrDefault(id, new ScoreAuthor(id, null));
+    }
+
+    private AssessmentScore toDomain(AssessmentScoreEntity e, Map<UUID, ScoreAuthor> authors) {
         return new AssessmentScore(
                 e.getId(),
                 e.getCourseEnrollment().getId(),
@@ -166,6 +214,8 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
                 e.getCriterion() != null ? e.getCriterion().getId() : null,
                 e.getScore(),
                 e.getCreatedAt(),
-                e.getUpdatedAt());
+                e.getUpdatedAt(),
+                authorOf(e.getCreatedBy(), authors),
+                authorOf(e.getUpdatedBy(), authors));
     }
 }

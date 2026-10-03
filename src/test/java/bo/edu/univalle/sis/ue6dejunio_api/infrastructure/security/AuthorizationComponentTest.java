@@ -203,6 +203,8 @@ class AuthorizationComponentTest {
                                         criterionId,
                                         BigDecimal.TEN,
                                         null,
+                                        null,
+                                        null,
                                         null)));
         when(criterionDomain.findById(criterionId))
                 .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
@@ -227,6 +229,8 @@ class AuthorizationComponentTest {
                                         eventId,
                                         null,
                                         BigDecimal.TEN,
+                                        null,
+                                        null,
                                         null,
                                         null)));
         when(assessmentEventDomain.findById(eventId))
