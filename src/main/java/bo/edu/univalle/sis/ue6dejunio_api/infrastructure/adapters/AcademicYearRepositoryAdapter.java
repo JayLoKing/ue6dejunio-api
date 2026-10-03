@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEn
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,6 +94,16 @@ public class AcademicYearRepositoryAdapter implements IAcademicYearDomain {
     @Transactional
     public void reopen(int academicYearId) {
         yearRepo.reopen(academicYearId);
+    }
+
+    @Override
+    public Optional<Integer> previousYearIdOf(Integer yearId) {
+        return yearRepo.previousYearId(yearId);
+    }
+
+    @Override
+    public Optional<Integer> previousYearIdOfCourse(UUID courseId) {
+        return yearRepo.previousYearIdOfCourse(courseId);
     }
 
     @Override

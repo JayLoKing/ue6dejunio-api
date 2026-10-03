@@ -19,6 +19,29 @@ public interface JpaAcademicYearRepository extends JpaRepository<AcademicYearEnt
     boolean existsByActiveTrue();
 
     /**
+     * Id of the gestión with the greatest year below the given one's. {@code MAX} over no rows is
+     * NULL and {@code year = NULL} matches nothing, so a first year answers empty.
+     */
+    @Query(
+            """
+        SELECT y.id FROM AcademicYearEntity y
+        WHERE y.year = (
+            SELECT MAX(p.year) FROM AcademicYearEntity p
+            WHERE p.year < (SELECT r.year FROM AcademicYearEntity r WHERE r.id = :yearId))
+        """)
+    Optional<Integer> previousYearId(@Param("yearId") Integer yearId);
+
+    /** The same, starting from a course instead of a year id. */
+    @Query(
+            """
+        SELECT y.id FROM AcademicYearEntity y
+        WHERE y.year = (
+            SELECT MAX(p.year) FROM AcademicYearEntity p
+            WHERE p.year < (SELECT c.academicYear.year FROM CourseEntity c WHERE c.id = :courseId))
+        """)
+    Optional<Integer> previousYearIdOfCourse(@Param("courseId") UUID courseId);
+
+    /**
      * Newest first: the gestión a school works in is the one it opens a picker to select, and every
      * year before it is history somebody scrolls back to.
      */

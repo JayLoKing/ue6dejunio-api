@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Auto-provisioning and "current academic year" resolution. The current academic year is the one
@@ -21,6 +22,16 @@ public interface IAcademicYearDomain {
 
     /** Id of the active academic year. Throws ResourceNotFoundException if none is active. */
     Integer currentYearId();
+
+    /**
+     * The gestión with the greatest {@code year} strictly below that of {@code yearId}, or empty
+     * when there is none (the first year on record, or an id that does not exist). Ordered by the
+     * four-digit year, never by id: ids are creation order and a past year can be added later.
+     */
+    Optional<Integer> previousYearIdOf(Integer yearId);
+
+    /** {@link #previousYearIdOf} for the gestión the course belongs to, in one query. */
+    Optional<Integer> previousYearIdOfCourse(UUID courseId);
 
     /**
      * Fresh-install bootstrap: marks {@code yearId} active only when no year is active at all, so
