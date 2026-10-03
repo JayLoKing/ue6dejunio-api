@@ -69,11 +69,8 @@ class CourseEnrollmentServiceEnrollTest {
                 .build();
     }
 
-    /** Whoever is importing the roster. */
-    private final UUID actor = UUID.randomUUID();
-
     private EnrollToCourseCommand cmd(UUID course, List<CreateStudentCommand> students) {
-        return new EnrollToCourseCommand(course, students, actor);
+        return new EnrollToCourseCommand(course, students);
     }
 
     private static final String STATUS_EFFECTIVE = "Effective";

@@ -113,23 +113,6 @@ public class StudentRepositoryAdapter implements IStudentDomain {
                         pageable));
     }
 
-    @Override
-    @Transactional
-    public void updateStatusIn(Collection<UUID> studentIds, StudentStatusChange change) {
-        if (studentIds == null || studentIds.isEmpty()) {
-            return;
-        }
-        // Stamped here for the same reason as the single-student path: a clock the caller passes in
-        // is a clock the caller can be wrong about. Bulk JPQL means naming it explicitly.
-        repo.updateStatusIn(
-                studentIds,
-                change.status(),
-                change.reason(),
-                change.note(),
-                LocalDateTime.now(),
-                change.changedBy() == null ? null : userRepo.getReferenceById(change.changedBy()));
-    }
-
     /**
      * Two aggregate queries, no rows in memory.
      *
