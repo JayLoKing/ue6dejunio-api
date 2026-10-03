@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.auth;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AuthResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ChangePasswordRequest;
@@ -11,6 +12,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordR
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.LoginRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.MeResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ResetPasswordRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateProfileRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +23,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -83,6 +86,34 @@ public class AuthController {
                         technical != null && !technical.isBlank()
                                 ? Boolean.valueOf(technical)
                                 : null));
+    }
+
+    /**
+     * Edits the caller's own names and phone. No id anywhere in the request: the subject is the one
+     * the resource server verified, so nobody can edit somebody else's profile through here.
+     */
+    @PutMapping("/profile")
+    @Operation(
+            summary = "Actualizar nombres y teléfono del usuario autenticado",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<MeResponse> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request, JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getToken().getSubject());
+        AuthenticatedUser updated =
+                authService.updateProfile(
+                        new UpdateProfileCommand(
+                                userId, request.names(), request.lastNames(), request.phone()));
+        return ResponseEntity.ok(
+                new MeResponse(
+                        updated.userId(),
+                        updated.email(),
+                        updated.fullName(),
+                        updated.role(),
+                        updated.mustChangePassword(),
+                        updated.gradeName(),
+                        updated.parallelName(),
+                        updated.courseId(),
+                        updated.technical()));
     }
 
     @PostMapping("/change-password")

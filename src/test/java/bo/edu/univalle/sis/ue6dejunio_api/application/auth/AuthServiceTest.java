@@ -15,6 +15,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
@@ -286,5 +287,69 @@ class AuthServiceTest {
                 .isInstanceOf(InvalidResetTokenException.class);
 
         verify(userDomain, never()).save(any(User.class));
+    }
+
+    @Test
+    void updateProfile_changesOnlyNamesLastNamesAndPhone() {
+        activeUser.setCi("1234567");
+        activeUser.setPhone("70000000");
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        AuthenticatedUser reissued =
+                new AuthenticatedUser(
+                        activeUser.getId(),
+                        activeUser.getEmail(),
+                        "Maria Lopez",
+                        "DIRECTOR",
+                        "fresh-jwt",
+                        Instant.now(),
+                        Instant.now().plusSeconds(900),
+                        false,
+                        null,
+                        null,
+                        null,
+                        null);
+        when(jwtService.issueToken(any(User.class), any(), any(), any(), any()))
+                .thenReturn(reissued);
+
+        AuthenticatedUser result =
+                authService.updateProfile(
+                        new UpdateProfileCommand(activeUser.getId(), "Maria", "Lopez", "71111111"));
+
+        assertThat(activeUser.getNames()).isEqualTo("Maria");
+        assertThat(activeUser.getLastNames()).isEqualTo("Lopez");
+        assertThat(activeUser.getPhone()).isEqualTo("71111111");
+        assertThat(activeUser.getEmail()).isEqualTo("director@ue6.bo");
+        assertThat(activeUser.getCi()).isEqualTo("1234567");
+        assertThat(activeUser.getRole().name()).isEqualTo("DIRECTOR");
+        assertThat(result.fullName()).isEqualTo("Maria Lopez");
+        verify(userDomain).save(activeUser);
+    }
+
+    @Test
+    void updateProfile_deactivatedUser_throwsUserInactiveAndSavesNothing() {
+        activeUser.setActive(false);
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+
+        assertThatThrownBy(
+                        () ->
+                                authService.updateProfile(
+                                        new UpdateProfileCommand(
+                                                activeUser.getId(), "Maria", "Lopez", null)))
+                .isInstanceOf(UserInactiveException.class);
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    @Test
+    void updateProfile_unknownUser_throwsResourceNotFound() {
+        UUID ghost = UUID.randomUUID();
+        when(userDomain.findById(ghost)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(
+                        () ->
+                                authService.updateProfile(
+                                        new UpdateProfileCommand(ghost, "Maria", "Lopez", null)))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

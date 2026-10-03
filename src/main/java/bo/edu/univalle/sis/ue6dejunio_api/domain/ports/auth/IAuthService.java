@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import java.util.UUID;
 
 public interface IAuthService {
@@ -26,6 +27,20 @@ public interface IAuthService {
     AuthenticatedUser refresh(UUID userId);
 
     void changePassword(ChangePasswordCommand command);
+
+    /**
+     * Lets a user correct their own names, last names and phone, and answers with the session as it
+     * now reads: the token's name claim is stale after an edit, so the caller gets the fresh values
+     * the same way a refresh would.
+     *
+     * <p>CI, email, role and active are not parameters on purpose; the school owns those.
+     *
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException if the
+     *     account is closed
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException if the
+     *     user behind the token no longer exists
+     */
+    AuthenticatedUser updateProfile(UpdateProfileCommand command);
 
     void forgotPassword(String email);
 

@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveExceptio
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
@@ -130,6 +131,23 @@ public class AuthService implements IAuthService {
         user.setPassword(passwordEncoder.encode(command.newPassword()));
         user.setMustChangePassword(false);
         userDomain.save(user);
+    }
+
+    @Override
+    @Transactional
+    public AuthenticatedUser updateProfile(UpdateProfileCommand command) {
+        User user =
+                userDomain
+                        .findById(command.userId())
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Usuario", command.userId()));
+        if (!user.isActive()) {
+            throw new UserInactiveException();
+        }
+        user.setNames(command.names());
+        user.setLastNames(command.lastNames());
+        user.setPhone(command.phone());
+        return issueFor(userDomain.save(user));
     }
 
     @Override
