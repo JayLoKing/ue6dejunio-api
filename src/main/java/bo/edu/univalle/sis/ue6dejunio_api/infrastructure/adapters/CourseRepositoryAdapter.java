@@ -120,6 +120,16 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     }
 
     @Override
+    public boolean hasEnrollments(UUID courseId) {
+        return courseRepo.hasEnrollments(courseId);
+    }
+
+    @Override
+    public boolean hasAcademicRecords(UUID courseId) {
+        return courseRepo.hasAcademicRecords(courseId);
+    }
+
+    @Override
     public boolean isHomeroomTeacherOfAny(UUID teacherId, Collection<UUID> courseIds) {
         // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
         if (teacherId == null || courseIds == null || courseIds.isEmpty()) {

@@ -102,6 +102,9 @@ public class CourseService implements ICourseService {
             result = assignHomeroomTeacher(id, c.homeroomTeacherId());
         }
         if (c.active() != null) {
+            if (!c.active()) {
+                requireNotInUse(id);
+            }
             result = courseDomain.setActive(id, c.active());
         }
         return result != null ? result : getById(id);
@@ -283,6 +286,22 @@ public class CourseService implements ICourseService {
     public void delete(UUID id) {
         getById(id);
         closedYearGuard.requireOpenForCourse(id);
+        requireNotInUse(id);
         courseDomain.setActive(id, false);
+    }
+
+    /**
+     * A course that holds students or teacher-authored content is history, not a mistake to take
+     * back. Bare class groups do not count: duplicating a gestión creates them for every course.
+     */
+    private void requireNotInUse(UUID id) {
+        if (courseDomain.hasEnrollments(id)) {
+            throw new ConflictException(
+                    "No se puede dar de baja el curso: tiene estudiantes inscritos");
+        }
+        if (courseDomain.hasAcademicRecords(id)) {
+            throw new ConflictException(
+                    "No se puede dar de baja el curso: tiene registros académicos");
+        }
     }
 }

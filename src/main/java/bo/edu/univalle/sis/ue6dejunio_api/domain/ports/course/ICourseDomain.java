@@ -27,6 +27,16 @@ public interface ICourseDomain {
 
     Course setActive(UUID courseId, boolean active);
 
+    /** Whether the course has at least one enrolment, whatever its status. */
+    boolean hasEnrollments(UUID courseId);
+
+    /**
+     * Whether teacher-authored content hangs off the course or its class groups: criteria,
+     * curriculum plans, pedagogical reports, scores or attendance. A bare class group is not
+     * content, so a freshly duplicated course carries none. One existence query, no rows loaded.
+     */
+    boolean hasAcademicRecords(UUID courseId);
+
     Optional<Course> findById(UUID id);
 
     /**

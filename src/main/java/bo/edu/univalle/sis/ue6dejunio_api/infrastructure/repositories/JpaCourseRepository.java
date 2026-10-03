@@ -41,6 +41,37 @@ public interface JpaCourseRepository extends JpaRepository<CourseEntity, UUID> {
         Integer getParallelId();
     }
 
+    /** Any enrolment of the course, whatever its status. */
+    @Query(
+            value =
+                    "SELECT EXISTS (SELECT 1 FROM course_enrollments e WHERE e.id_course ="
+                            + " :courseId)",
+            nativeQuery = true)
+    boolean hasEnrollments(@Param("courseId") UUID courseId);
+
+    /**
+     * Teacher-authored content on the course or on any of its class groups, in one statement.
+     * Scores and attendance cannot exist without an enrolment, but they are checked anyway so the
+     * answer does not depend on that invariant.
+     */
+    @Query(
+            value =
+                    """
+        SELECT EXISTS (SELECT 1 FROM curriculum_plans p WHERE p.id_course = :courseId)
+            OR EXISTS (SELECT 1 FROM pedagogical_reports r WHERE r.id_course = :courseId)
+            OR EXISTS (SELECT 1 FROM class_groups g
+                       JOIN evaluation_criteria ec ON ec.id_class_group = g.id_class_group
+                       WHERE g.id_course = :courseId)
+            OR EXISTS (SELECT 1 FROM class_groups g
+                       JOIN academic_scores s ON s.id_class_group = g.id_class_group
+                       WHERE g.id_course = :courseId)
+            OR EXISTS (SELECT 1 FROM class_groups g
+                       JOIN attendance a ON a.id_class_group = g.id_class_group
+                       WHERE g.id_course = :courseId)
+        """,
+            nativeQuery = true)
+    boolean hasAcademicRecords(@Param("courseId") UUID courseId);
+
     boolean existsByGrade_Id(Integer gradeId);
 
     boolean existsByParallel_Id(Integer parallelId);
