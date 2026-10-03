@@ -40,7 +40,8 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
 
     @Override
     @Transactional
-    public AssessmentScore upsertForEvent(UUID courseEnrollmentId, UUID eventId, BigDecimal score) {
+    public AssessmentScore upsertForEvent(
+            UUID courseEnrollmentId, UUID eventId, BigDecimal score, UUID actorId) {
         AssessmentScoreEntity e =
                 scoreRepo
                         .findByCourseEnrollment_IdAndEvent_Id(courseEnrollmentId, eventId)
@@ -53,13 +54,14 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
                                     return n;
                                 });
         e.setScore(score);
+        stampAuthor(e, actorId);
         return toDomain(scoreRepo.saveAndFlush(e));
     }
 
     @Override
     @Transactional
     public AssessmentScore upsertForCriterion(
-            UUID courseEnrollmentId, UUID criterionId, BigDecimal score) {
+            UUID courseEnrollmentId, UUID criterionId, BigDecimal score, UUID actorId) {
         AssessmentScoreEntity e =
                 scoreRepo
                         .findByCourseEnrollment_IdAndCriterion_Id(courseEnrollmentId, criterionId)
@@ -72,6 +74,7 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
                                     return n;
                                 });
         e.setScore(score);
+        stampAuthor(e, actorId);
         return toDomain(scoreRepo.saveAndFlush(e));
     }
 
@@ -142,6 +145,17 @@ public class AssessmentScoreRepositoryAdapter implements IAssessmentScoreDomain 
         // The caller reconsolidates right after, through a native query. Flush here so that query
         // reads the row as gone instead of relying on Hibernate to infer it from raw SQL.
         scoreRepo.flush();
+    }
+
+    /**
+     * A new row names the actor as creator and last editor; an existing one only moves the last
+     * editor, so the first author survives a later edit by someone else.
+     */
+    private static void stampAuthor(AssessmentScoreEntity e, UUID actorId) {
+        if (e.getId() == null) {
+            e.setCreatedBy(actorId);
+        }
+        e.setUpdatedBy(actorId);
     }
 
     private AssessmentScore toDomain(AssessmentScoreEntity e) {

@@ -108,8 +108,8 @@ public class AssessmentScoreController {
     @DeleteMapping("/{id}")
     @PreAuthorize("@authz.canWriteScore(authentication, #id)")
     @Operation(summary = "Eliminar nota (consolida)")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        scoreService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable UUID id, JwtAuthenticationToken token) {
+        scoreService.delete(id, currentUserId(token));
         return ResponseEntity.noContent().build();
     }
 }

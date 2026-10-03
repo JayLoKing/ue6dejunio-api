@@ -8,9 +8,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface IAssessmentScoreDomain {
-    AssessmentScore upsertForEvent(UUID courseEnrollmentId, UUID eventId, BigDecimal score);
+    AssessmentScore upsertForEvent(
+            UUID courseEnrollmentId, UUID eventId, BigDecimal score, UUID actorId);
 
-    AssessmentScore upsertForCriterion(UUID courseEnrollmentId, UUID criterionId, BigDecimal score);
+    AssessmentScore upsertForCriterion(
+            UUID courseEnrollmentId, UUID criterionId, BigDecimal score, UUID actorId);
 
     Optional<AssessmentScore> findById(UUID id);
 

@@ -14,5 +14,5 @@ public interface IAssessmentScoreService {
 
     List<AssessmentScore> listByCourseEnrollment(UUID courseEnrollmentId);
 
-    void delete(UUID id);
+    void delete(UUID id, UUID actorId);
 }

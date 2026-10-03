@@ -106,9 +106,10 @@ public class AssessmentScoreService implements IAssessmentScoreService {
 
         AssessmentScore saved =
                 c.targetsEvent()
-                        ? scoreDomain.upsertForEvent(c.courseEnrollmentId(), c.eventId(), c.score())
+                        ? scoreDomain.upsertForEvent(
+                                c.courseEnrollmentId(), c.eventId(), c.score(), c.createdBy())
                         : scoreDomain.upsertForCriterion(
-                                c.courseEnrollmentId(), c.criterionId(), c.score());
+                                c.courseEnrollmentId(), c.criterionId(), c.score(), c.createdBy());
 
         consolidate(
                 c.courseEnrollmentId(), target.classGroupId(), target.trimester(), c.createdBy());
@@ -135,7 +136,7 @@ public class AssessmentScoreService implements IAssessmentScoreService {
 
     @Override
     @Transactional
-    public void delete(UUID id) {
+    public void delete(UUID id, UUID actorId) {
         AssessmentScore existing =
                 scoreDomain
                         .findById(id)
@@ -149,7 +150,8 @@ public class AssessmentScoreService implements IAssessmentScoreService {
                         : locateCriterion(existing.criterionId());
         closedYearGuard.requireOpenForClassGroup(target.classGroupId());
         scoreDomain.deleteById(id);
-        consolidate(existing.courseEnrollmentId(), target.classGroupId(), target.trimester(), null);
+        consolidate(
+                existing.courseEnrollmentId(), target.classGroupId(), target.trimester(), actorId);
     }
 
     private ScoreTarget resolveEvent(UUID eventId) {
@@ -205,7 +207,7 @@ public class AssessmentScoreService implements IAssessmentScoreService {
     // already averaged from the query, so it weighs the same as one scored directly.
     // total_score = sum of the four (GENERATED column in the database).
     private void consolidate(
-            UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID createdBy) {
+            UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID actorId) {
         List<DimensionAvg> avgs =
                 scoreDomain.dimensionAverages(courseEnrollmentId, classGroupId, trimester);
         BigDecimal being = BigDecimal.ZERO;
@@ -236,7 +238,7 @@ public class AssessmentScoreService implements IAssessmentScoreService {
 
         UUID academicScoreId =
                 academicScoreDomain.ensureAcademicScore(
-                        courseEnrollmentId, classGroupId, trimester, createdBy);
+                        courseEnrollmentId, classGroupId, trimester, actorId);
         academicScoreDomain.setDimensions(academicScoreId, being, knowing, doing, deciding);
 
         // Every path that writes, corrects or removes a mark ends here, which is why the risk model

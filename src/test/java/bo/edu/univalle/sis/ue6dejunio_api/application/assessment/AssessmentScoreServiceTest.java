@@ -95,7 +95,7 @@ class AssessmentScoreServiceTest {
         UUID academicScoreId = UUID.randomUUID();
         when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
         sameCourse();
-        when(scoreDomain.upsertForEvent(enrollment, eventId, new BigDecimal("40")))
+        when(scoreDomain.upsertForEvent(enrollment, eventId, new BigDecimal("40"), author))
                 .thenReturn(
                         new AssessmentScore(
                                 UUID.randomUUID(),
@@ -125,7 +125,7 @@ class AssessmentScoreServiceTest {
         when(criterionDomain.findById(criterionId))
                 .thenReturn(Optional.of(directCriterion(criterionId, "Doing")));
         sameCourse();
-        when(scoreDomain.upsertForCriterion(enrollment, criterionId, new BigDecimal("35")))
+        when(scoreDomain.upsertForCriterion(enrollment, criterionId, new BigDecimal("35"), author))
                 .thenReturn(
                         new AssessmentScore(
                                 UUID.randomUUID(),
@@ -146,7 +146,7 @@ class AssessmentScoreServiceTest {
         verify(academicScoreDomain)
                 .setDimensions(eq(academicScoreId), any(), any(), doing.capture(), any());
         assertThat(doing.getValue()).isEqualByComparingTo("33.5");
-        verify(scoreDomain, never()).upsertForEvent(any(), any(), any());
+        verify(scoreDomain, never()).upsertForEvent(any(), any(), any(), any());
     }
 
     /**
@@ -161,7 +161,7 @@ class AssessmentScoreServiceTest {
         when(criterionDomain.findById(criterionId))
                 .thenReturn(Optional.of(directCriterion(criterionId, "Doing")));
         sameCourse();
-        when(scoreDomain.upsertForCriterion(enrollment, criterionId, new BigDecimal("35")))
+        when(scoreDomain.upsertForCriterion(enrollment, criterionId, new BigDecimal("35"), author))
                 .thenReturn(
                         new AssessmentScore(
                                 UUID.randomUUID(),
@@ -203,7 +203,7 @@ class AssessmentScoreServiceTest {
         assertThatThrownBy(() -> service.setScore(onCriterion(criterionId, "35")))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Revision de Cuadernos");
-        verify(scoreDomain, never()).upsertForCriterion(any(), any(), any());
+        verify(scoreDomain, never()).upsertForCriterion(any(), any(), any(), any());
     }
 
     /**
@@ -221,7 +221,7 @@ class AssessmentScoreServiceTest {
         assertThatThrownBy(() -> service.setScore(onCriterion(criterionId, "35")))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("ya tiene criterios de actividad");
-        verify(scoreDomain, never()).upsertForCriterion(any(), any(), any());
+        verify(scoreDomain, never()).upsertForCriterion(any(), any(), any(), any());
     }
 
     @Test
@@ -297,7 +297,7 @@ class AssessmentScoreServiceTest {
 
         assertThatThrownBy(() -> service.setScore(onEvent(eventId, "30")))
                 .isInstanceOf(ConflictException.class);
-        verify(scoreDomain, never()).upsertForEvent(any(), any(), any());
+        verify(scoreDomain, never()).upsertForEvent(any(), any(), any(), any());
     }
 
     @Test
@@ -338,9 +338,67 @@ class AssessmentScoreServiceTest {
         when(academicScoreDomain.ensureAcademicScore(eq(enrollment), eq(classGroup), eq(1), any()))
                 .thenReturn(academicScoreId);
 
-        service.delete(scoreId);
+        service.delete(scoreId, author);
 
         verify(scoreDomain).deleteById(scoreId);
+    }
+
+    /**
+     * The author is whoever acted: the same teacher reaches the score row and the consolidation.
+     */
+    @Test
+    void setScore_recordsTheActingTeacherOnTheScoreAndOnTheConsolidationRow() {
+        UUID eventId = UUID.randomUUID();
+        when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
+        sameCourse();
+        when(scoreDomain.upsertForEvent(enrollment, eventId, new BigDecimal("40"), author))
+                .thenReturn(
+                        new AssessmentScore(
+                                UUID.randomUUID(),
+                                enrollment,
+                                eventId,
+                                null,
+                                new BigDecimal("40"),
+                                null,
+                                null));
+        when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of());
+        when(academicScoreDomain.ensureAcademicScore(enrollment, classGroup, 1, author))
+                .thenReturn(UUID.randomUUID());
+
+        service.setScore(onEvent(eventId, "40"));
+
+        verify(scoreDomain).upsertForEvent(enrollment, eventId, new BigDecimal("40"), author);
+        verify(academicScoreDomain).ensureAcademicScore(enrollment, classGroup, 1, author);
+    }
+
+    /**
+     * Deleting a mark can leave the consolidation row standing (its other criteria still count),
+     * and that row changed because of this person, so it must not keep naming the previous author.
+     */
+    @Test
+    void delete_recordsTheActorOnTheSurvivingConsolidationRow() {
+        UUID scoreId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        when(scoreDomain.findById(scoreId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentScore(
+                                        scoreId,
+                                        enrollment,
+                                        eventId,
+                                        null,
+                                        new BigDecimal("30"),
+                                        null,
+                                        null)));
+        when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
+        when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of());
+        when(academicScoreDomain.ensureAcademicScore(enrollment, classGroup, 1, actor))
+                .thenReturn(UUID.randomUUID());
+
+        service.delete(scoreId, actor);
+
+        verify(academicScoreDomain).ensureAcademicScore(enrollment, classGroup, 1, actor);
     }
 
     @Test
@@ -365,7 +423,7 @@ class AssessmentScoreServiceTest {
         when(academicScoreDomain.ensureAcademicScore(eq(enrollment), eq(classGroup), eq(1), any()))
                 .thenReturn(academicScoreId);
 
-        service.delete(scoreId);
+        service.delete(scoreId, author);
 
         verify(scoreDomain).deleteById(scoreId);
         verify(academicScoreDomain)
@@ -417,7 +475,7 @@ class AssessmentScoreServiceTest {
         UUID eventId = UUID.randomUUID();
         when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Knowing")));
         sameCourse();
-        when(scoreDomain.upsertForEvent(enrollment, eventId, new BigDecimal("40")))
+        when(scoreDomain.upsertForEvent(enrollment, eventId, new BigDecimal("40"), author))
                 .thenReturn(null);
         when(scoreDomain.dimensionAverages(enrollment, classGroup, 1)).thenReturn(List.of());
         when(academicScoreDomain.ensureAcademicScore(eq(enrollment), eq(classGroup), eq(1), any()))
@@ -427,7 +485,7 @@ class AssessmentScoreServiceTest {
 
         InOrder order = inOrder(closedYearGuard, scoreDomain);
         order.verify(closedYearGuard).requireOpenForClassGroup(classGroup);
-        order.verify(scoreDomain).upsertForEvent(enrollment, eventId, new BigDecimal("40"));
+        order.verify(scoreDomain).upsertForEvent(enrollment, eventId, new BigDecimal("40"), author);
     }
 
     @Test
@@ -448,7 +506,7 @@ class AssessmentScoreServiceTest {
         when(eventDomain.findById(eventId)).thenReturn(Optional.of(event(eventId, "Doing")));
         yearIsClosed();
 
-        assertThatThrownBy(() -> service.delete(scoreId))
+        assertThatThrownBy(() -> service.delete(scoreId, author))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("cerrada");
 
@@ -461,7 +519,7 @@ class AssessmentScoreServiceTest {
         UUID scoreId = UUID.randomUUID();
         when(scoreDomain.findById(scoreId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(scoreId))
+        assertThatThrownBy(() -> service.delete(scoreId, author))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(closedYearGuard);

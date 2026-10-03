@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface IScoreDomain {
     UUID ensureAcademicScore(
-            UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID createdBy);
+            UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID actorId);
 
     void setDimensions(
             UUID academicScoreId,

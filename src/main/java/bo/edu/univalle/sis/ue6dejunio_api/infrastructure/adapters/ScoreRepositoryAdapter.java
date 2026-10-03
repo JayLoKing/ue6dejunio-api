@@ -36,7 +36,7 @@ public class ScoreRepositoryAdapter implements IScoreDomain {
     @Override
     @Transactional
     public UUID ensureAcademicScore(
-            UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID createdBy) {
+            UUID courseEnrollmentId, UUID classGroupId, Integer trimester, UUID actorId) {
         AcademicScoreEntity e =
                 scoreRepo
                         .findByCourseEnrollment_IdAndClassGroup_IdAndTrimester(
@@ -48,7 +48,8 @@ public class ScoreRepositoryAdapter implements IScoreDomain {
                                             enrollmentRepo.getReferenceById(courseEnrollmentId));
                                     n.setClassGroup(classGroupRepo.getReferenceById(classGroupId));
                                     n.setTrimester(trimester);
-                                    n.setCreatedBy(createdBy);
+                                    n.setCreatedBy(actorId);
+                                    n.setUpdatedBy(actorId);
                                     n.setScoreBeing(BigDecimal.ZERO);
                                     n.setScoreKnowing(BigDecimal.ZERO);
                                     n.setScoreDoing(BigDecimal.ZERO);
@@ -56,6 +57,10 @@ public class ScoreRepositoryAdapter implements IScoreDomain {
                                     n.setUpdatedAt(LocalDateTime.now());
                                     return scoreRepo.saveAndFlush(n);
                                 });
+        // Whoever reaches an existing row is the one who last changed it, even when the figures end
+        // up the same: the consolidation was theirs to redo. created_by stays with the first
+        // author.
+        e.setUpdatedBy(actorId);
         return e.getId();
     }
 
