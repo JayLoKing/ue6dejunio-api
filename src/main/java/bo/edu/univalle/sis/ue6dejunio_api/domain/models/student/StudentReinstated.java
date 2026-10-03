@@ -10,6 +10,7 @@ import java.util.UUID;
  * handles it runs after the transaction committed. Which teachers hear about it is answered on the
  * notification side, from the course named here.
  *
+ * @param studentId the reinstated student
  * @param studentName the full name, so the notice reads as a sentence rather than as a lookup
  * @param courseId the course whose seat was reopened or created
  * @param courseName the course as people call it, e.g. "Primero A"

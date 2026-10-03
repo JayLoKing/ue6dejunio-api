@@ -59,7 +59,7 @@ public enum NotificationType {
      * is what makes them true. Posted by hand they become a claim nobody checked: a teacher would
      * read that their plan was approved while it still sat unreviewed, with the inbox saying one
      * thing and the plan another and no way to tell which. A withdrawal is the same shape — the
-     * student's row is what makes it true.
+     * student's row is what makes it true, and so is a reinstatement.
      */
     public boolean writtenByHand() {
         return switch (this) {
