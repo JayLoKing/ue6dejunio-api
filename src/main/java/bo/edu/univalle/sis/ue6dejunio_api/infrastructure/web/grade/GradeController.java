@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Validated
 @RequestMapping("/api/grades")
-@Tag(name = "Grades", description = "Grados (Director). Max 6 (primaria)")
+@Tag(name = "Grades", description = "Grados (Director). Max 6 por nivel")
 @SecurityRequirement(name = "bearerAuth")
 public class GradeController {
 
@@ -44,7 +44,7 @@ public class GradeController {
     }
 
     @PostMapping
-    @Operation(summary = "Crear grado (max 6 total)")
+    @Operation(summary = "Crear grado (max 6 por nivel)")
     public ResponseEntity<GradeResponse> create(@Valid @RequestBody CreateGradeRequest r) {
         Grade g = gradeService.create(new CreateGradeCommand(r.name(), r.levelId()));
         return ResponseEntity.ok(GradeResponse.from(g));
