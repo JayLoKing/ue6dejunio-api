@@ -2,6 +2,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
@@ -29,4 +31,10 @@ public interface IStudentService {
      * Takes a student off the roll, recording under which category, in whose words, and by whom.
      */
     void withdraw(WithdrawStudentCommand command);
+
+    /**
+     * Puts a withdrawn student back on the roll, the only way back now that a roster load leaves
+     * them alone. Reopens the seat they still hold this gestión, or seats them in the course named.
+     */
+    ReinstateResult reinstate(ReinstateStudentCommand command);
 }
