@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Spec: Daily attendance homeroom ownership guard, dailyBatch atomicity, attendance read guard, and
- * session() regression (unchanged @authz.canWriteClassGroup guard).
+ * session() ownership (@authz.canWriteNotebookOfClassGroup). The Director writes none of it.
  */
 class AttendanceAuthorizationIT extends AbstractIntegrationTest {
 
@@ -110,7 +110,7 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void director_dailyAndBatch_ok() throws Exception {
+    void director_dailyAndBatch_forbidden_theNotebookIsTheTeachers() throws Exception {
         String dailyBody =
                 json.writeValueAsString(
                         new DailyBody(enrollmentInB, editableSchoolDay(), "Present"));
@@ -119,11 +119,8 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
                                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(dailyBody))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
 
-        // Same school day as the daily post above: the batch simply upserts over it. A distinct
-        // earlier day cannot be used here, because on a Monday run no earlier school day exists
-        // inside the editable week.
         String batchBody =
                 json.writeValueAsString(
                         new DailyBatchBody(
@@ -136,7 +133,15 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
                                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(batchBody))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
+
+        Integer count =
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM attendance WHERE id_course_enrollment IN (?, ?)",
+                        Integer.class,
+                        enrollmentInA,
+                        enrollmentInB);
+        assertThat(count).isZero();
     }
 
     @Test
@@ -151,7 +156,7 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void session_regression_nonOwnerForbidden_ownerAndDirectorOk() throws Exception {
+    void session_regression_nonOwnerAndDirectorForbidden_ownerOk() throws Exception {
         String body =
                 json.writeValueAsString(
                         new SessionBody(

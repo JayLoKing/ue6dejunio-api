@@ -57,8 +57,7 @@ public class AssessmentScoreController {
     }
 
     /**
-     * Author of the score, parsed defensively. A Director clears {@code @PreAuthorize} before the
-     * subject is ever read, so a malformed one reaches this point: parsing it raw would report the
+     * Author of the score, parsed defensively: parsing a malformed subject raw would report the
      * caller's bad token as a server failure.
      */
     private UUID currentUserId(JwtAuthenticationToken token) {

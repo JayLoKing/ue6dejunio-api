@@ -116,11 +116,64 @@ class AuthorizationComponentTest {
     }
 
     @Test
-    void canWriteScoreEvent_director_bypassesWithoutLookup() {
+    void canWriteScoreEvent_director_false_evenForTheOwnersSubject() {
+        // The notebook is the teacher's. The Director reads it, never writes it.
         UUID director = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(assessmentEventDomain.findById(eventId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentEvent(
+                                        eventId,
+                                        UUID.randomUUID(),
+                                        classGroupId,
+                                        1,
+                                        "Knowing",
+                                        "t")));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
 
-        assertThat(authz.canWriteScoreEvent(token(director, "Director"), eventId)).isTrue();
+        assertThat(authz.canWriteScoreEvent(token(director, "Director"), eventId)).isFalse();
+    }
+
+    @Test
+    void canWriteScoreCriterion_director_false() {
+        UUID director = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(criterionDomain.findById(criterionId))
+                .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
+
+        assertThat(authz.canWriteScoreCriterion(token(director, "Director"), criterionId))
+                .isFalse();
+    }
+
+    @Test
+    void canWriteNotebookOfClassGroup_owner_true_otherTeacher_false_director_false() {
+        UUID owner = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(owner);
+
+        assertThat(authz.canWriteNotebookOfClassGroup(token(owner, "Teacher"), classGroupId))
+                .isTrue();
+        assertThat(
+                        authz.canWriteNotebookOfClassGroup(
+                                token(UUID.randomUUID(), "Teacher"), classGroupId))
+                .isFalse();
+        assertThat(
+                        authz.canWriteNotebookOfClassGroup(
+                                token(UUID.randomUUID(), "Director"), classGroupId))
+                .isFalse();
+    }
+
+    @Test
+    void canWriteClassGroup_director_stillTrue_forNonNotebookWork() {
+        // Running the risk model on a subject is not a notebook write; the Director keeps it.
+        assertThat(
+                        authz.canWriteClassGroup(
+                                token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
     }
 
     @Test
@@ -135,11 +188,27 @@ class AuthorizationComponentTest {
     // ---- canWriteScore (delete) ----
 
     @Test
-    void canWriteScore_director_bypass() {
+    void canWriteScore_director_false() {
         UUID director = UUID.randomUUID();
         UUID scoreId = UUID.randomUUID();
+        UUID criterionId = UUID.randomUUID();
+        UUID classGroupId = UUID.randomUUID();
+        when(assessmentScoreDomain.findById(scoreId))
+                .thenReturn(
+                        Optional.of(
+                                new AssessmentScore(
+                                        scoreId,
+                                        UUID.randomUUID(),
+                                        null,
+                                        criterionId,
+                                        BigDecimal.TEN,
+                                        null,
+                                        null)));
+        when(criterionDomain.findById(criterionId))
+                .thenReturn(Optional.of(criterion(criterionId, classGroupId)));
+        when(classGroupDomain.teacherIdOfClassGroup(classGroupId)).thenReturn(UUID.randomUUID());
 
-        assertThat(authz.canWriteScore(token(director, "Director"), scoreId)).isTrue();
+        assertThat(authz.canWriteScore(token(director, "Director"), scoreId)).isFalse();
     }
 
     @Test
@@ -309,11 +378,12 @@ class AuthorizationComponentTest {
     }
 
     @Test
-    void canWriteDailyAttendance_director_bypassesWithoutLookup() {
+    void canWriteDailyAttendance_director_false_butStillReadsTheEnrollmentScope() {
         UUID director = UUID.randomUUID();
         UUID ceId = UUID.randomUUID();
 
-        assertThat(authz.canWriteDailyAttendance(token(director, "Director"), ceId)).isTrue();
+        assertThat(authz.canWriteDailyAttendance(token(director, "Director"), ceId)).isFalse();
+        assertThat(authz.canReadEnrollmentScope(token(director, "Director"), ceId)).isTrue();
     }
 
     @Test
@@ -819,13 +889,13 @@ class AuthorizationComponentTest {
     }
 
     @Test
-    void canWriteDailyBatch_director_bypassesWithoutLookup() {
+    void canWriteDailyBatch_director_false() {
         UUID director = UUID.randomUUID();
         assertThat(
                         authz.canWriteDailyBatch(
                                 token(director, "Director"),
                                 List.of(UUID.randomUUID(), UUID.randomUUID())))
-                .isTrue();
+                .isFalse();
     }
 
     // ---- canReadTeacherRoster ----

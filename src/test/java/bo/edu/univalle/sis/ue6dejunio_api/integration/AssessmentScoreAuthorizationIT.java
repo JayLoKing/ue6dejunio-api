@@ -74,7 +74,7 @@ class AssessmentScoreAuthorizationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void director_deletesScore_regardlessOfOwnership() throws Exception {
+    void director_deletesScore_forbidden_theNotebookIsTheTeachers() throws Exception {
         jdbc.update(
                 "INSERT INTO assessment_scores (id_assessment_score, id_course_enrollment, id_assessment_event, score) "
                         + "VALUES (?,?,?,?)",
@@ -89,7 +89,7 @@ class AssessmentScoreAuthorizationIT extends AbstractIntegrationTest {
                                 .header(
                                         "Authorization",
                                         "Bearer " + tokenFor(director, "Director")))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isForbidden());
     }
 
     @Test

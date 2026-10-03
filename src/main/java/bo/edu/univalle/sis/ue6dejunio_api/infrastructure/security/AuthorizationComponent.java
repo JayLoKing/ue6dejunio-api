@@ -31,9 +31,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 
 /**
- * Ownership-based authorization. Director reads and writes everything; Teacher only their own class
- * groups (subject) or their homeroom course, depending on the resource; Secretary reads across the
- * school and writes nothing.
+ * Ownership-based authorization. Director reads everything and administers the school, but does not
+ * write the pedagogical notebook (criteria, activities, scores, attendance): that belongs to the
+ * teacher who owns it, by class group or homeroom course depending on the resource. Secretary reads
+ * across the school and writes nothing.
  *
  * <p>Used from {@code @PreAuthorize}, e.g. {@code @authz.canWriteClassGroup(authentication, #id)}.
  */
@@ -109,6 +110,11 @@ public class AuthorizationComponent {
                 .orElse(false);
     }
 
+    /**
+     * Class-group work that is not the notebook, such as running the risk model on a subject: the
+     * Director, or the teacher in charge. Notebook writes use {@link
+     * #canWriteNotebookOfClassGroup}, which excludes the Director.
+     */
     public boolean canWriteClassGroup(Authentication authentication, UUID classGroupId) {
         if (authentication == null || classGroupId == null) {
             return false;
@@ -116,6 +122,27 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
+        return isOwnerOfClassGroup(authentication, classGroupId);
+    }
+
+    /**
+     * Who may write a class group's pedagogical notebook: criteria, activities, scores and session
+     * attendance. Only the teacher the Director put in charge of the class group.
+     *
+     * <p>The Director is not here, and that is the rule, not an omission: the notebook is the
+     * teacher's record of their own classroom and the office reads it. Reading is {@link
+     * #canReadClassGroup}, which the Director keeps. {@link #canWriteClassGroup} stays wider
+     * because it also guards work that is not the notebook, such as running the risk model on a
+     * subject.
+     */
+    public boolean canWriteNotebookOfClassGroup(Authentication authentication, UUID classGroupId) {
+        if (authentication == null || classGroupId == null) {
+            return false;
+        }
+        return isOwnerOfClassGroup(authentication, classGroupId);
+    }
+
+    private boolean isOwnerOfClassGroup(Authentication authentication, UUID classGroupId) {
         UUID userId = userId(authentication);
         UUID owner;
         try {
@@ -128,36 +155,32 @@ public class AuthorizationComponent {
         return userId != null && userId.equals(owner);
     }
 
+    /** Notebook write: the owning teacher only, see {@link #canWriteNotebookOfClassGroup}. */
     public boolean canWriteScoreEvent(Authentication authentication, UUID eventId) {
         if (authentication == null || eventId == null) {
             return false;
-        }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
         }
         Optional<AssessmentEvent> event = assessmentEventDomain.findById(eventId);
         if (event.isEmpty() || event.get().classGroupId() == null) {
             return false;
         }
-        return canWriteClassGroup(authentication, event.get().classGroupId());
+        return canWriteNotebookOfClassGroup(authentication, event.get().classGroupId());
     }
 
     /**
      * Ownership of a criterion scored directly. It resolves through the criterion's own class
-     * group, because such a score has no activity item to walk through.
+     * group, because such a score has no activity item to walk through. Notebook write: the owning
+     * teacher only, see {@link #canWriteNotebookOfClassGroup}.
      */
     public boolean canWriteScoreCriterion(Authentication authentication, UUID criterionId) {
         if (authentication == null || criterionId == null) {
             return false;
         }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
-        }
         Optional<EvaluationCriterion> criterion = criterionDomain.findById(criterionId);
         if (criterion.isEmpty() || criterion.get().classGroupId() == null) {
             return false;
         }
-        return canWriteClassGroup(authentication, criterion.get().classGroupId());
+        return canWriteNotebookOfClassGroup(authentication, criterion.get().classGroupId());
     }
 
     /**
@@ -176,12 +199,10 @@ public class AuthorizationComponent {
                 : canWriteScoreCriterion(authentication, criterionId);
     }
 
+    /** Notebook write: the owning teacher only, see {@link #canWriteNotebookOfClassGroup}. */
     public boolean canWriteScore(Authentication authentication, UUID scoreId) {
         if (authentication == null || scoreId == null) {
             return false;
-        }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
         }
         Optional<AssessmentScore> score = assessmentScoreDomain.findById(scoreId);
         if (score.isEmpty()) {
@@ -300,19 +321,22 @@ public class AuthorizationComponent {
         return authentication != null && hasRole(authentication, ROLE_SECRETARY);
     }
 
+    /**
+     * Daily attendance is the homeroom teacher's to record, and nobody else's: the Director reads
+     * it ({@link #canReadEnrollmentScope}) but does not write it. A course with no homeroom teacher
+     * has nobody to record it until the Director assigns one.
+     */
     public boolean canWriteDailyAttendance(Authentication authentication, UUID courseEnrollmentId) {
-        return ownsEnrollmentCourse(authentication, courseEnrollmentId);
+        return isHomeroomOfEnrollmentCourse(authentication, courseEnrollmentId);
     }
 
+    /** Batch form of {@link #canWriteDailyAttendance}: the homeroom teacher only. */
     public boolean canWriteDailyBatch(
             Authentication authentication, Collection<UUID> courseEnrollmentIds) {
         if (authentication == null
                 || courseEnrollmentIds == null
                 || courseEnrollmentIds.isEmpty()) {
             return false;
-        }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
         }
         UUID teacherId = userId(authentication);
         if (teacherId == null) {
@@ -680,12 +704,21 @@ public class AuthorizationComponent {
                 .orElse(false);
     }
 
+    /** Read scope of an enrollment's course: the Director, or its homeroom teacher. */
     private boolean ownsEnrollmentCourse(Authentication authentication, UUID courseEnrollmentId) {
         if (authentication == null || courseEnrollmentId == null) {
             return false;
         }
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
+        }
+        return isHomeroomOfEnrollmentCourse(authentication, courseEnrollmentId);
+    }
+
+    private boolean isHomeroomOfEnrollmentCourse(
+            Authentication authentication, UUID courseEnrollmentId) {
+        if (authentication == null || courseEnrollmentId == null) {
+            return false;
         }
         UUID courseId;
         try {

@@ -62,7 +62,7 @@ public class AttendanceController {
     }
 
     @PostMapping("/session")
-    @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
+    @PreAuthorize("@authz.canWriteNotebookOfClassGroup(authentication, #r.classGroupId())")
     @Operation(summary = "Asistencia de sesion de materia (docente tecnico)")
     public ResponseEntity<AttendanceResponse> session(
             @Valid @RequestBody SessionAttendanceRequest r) {
@@ -73,7 +73,7 @@ public class AttendanceController {
     }
 
     @PostMapping("/session/batch")
-    @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
+    @PreAuthorize("@authz.canWriteNotebookOfClassGroup(authentication, #r.classGroupId())")
     @Operation(summary = "Asistencia de sesion de toda la materia en una fecha")
     public ResponseEntity<BatchResultResponse> sessionBatch(
             @Valid @RequestBody SessionBatchRequest r) {

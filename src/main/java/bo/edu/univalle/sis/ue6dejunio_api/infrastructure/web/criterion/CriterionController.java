@@ -44,7 +44,7 @@ public class CriterionController {
     }
 
     @PostMapping
-    @PreAuthorize("@authz.canWriteClassGroup(authentication, #r.classGroupId())")
+    @PreAuthorize("@authz.canWriteNotebookOfClassGroup(authentication, #r.classGroupId())")
     @Operation(
             summary =
                     "Crear criterio. Con 'activity' crea tambien sus criterios en la misma transaccion")

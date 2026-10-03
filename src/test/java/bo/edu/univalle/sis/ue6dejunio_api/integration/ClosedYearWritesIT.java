@@ -25,8 +25,9 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * A closed gestión rejects every academic write with a 409 and keeps serving reads; reopening lets
- * writes through again. The Director drives every call: the refusal has to hold even for the role
- * that bypasses ownership, which is why it is a 409 from the use case and not a 403 from authz.
+ * writes through again. The owning teacher drives every notebook write (the Director cannot write
+ * it), so the refusal is a 409 from the use case and not a 403 from authz; the Director opens and
+ * closes the year and reads.
  */
 class ClosedYearWritesIT extends AbstractIntegrationTest {
 
@@ -59,7 +60,12 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
                 "UPDATE academic_years SET closed_at = now(), active = false WHERE year = 2026");
     }
 
+    /** The teacher who owns the course and its class group: the notebook's only writer. */
     private String bearer() {
+        return "Bearer " + tokenFor(teacher, "Teacher");
+    }
+
+    private String directorBearer() {
         return "Bearer " + tokenFor(director, "Director");
     }
 
@@ -199,12 +205,12 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
 
         mvc.perform(
                         get("/api/assessment-scores/criterion/" + criterion)
-                                .header("Authorization", bearer()))
+                                .header("Authorization", directorBearer()))
                 .andExpect(status().isOk());
         mvc.perform(
                         get("/api/gradebook/report-card")
                                 .param("id_course_enrollment", enrollment.toString())
-                                .header("Authorization", bearer()))
+                                .header("Authorization", directorBearer()))
                 .andExpect(status().isOk());
     }
 
@@ -215,7 +221,7 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
 
         mvc.perform(
                         put("/api/academic-years/" + academicYearId(2026) + "/reopen")
-                                .header("Authorization", bearer()))
+                                .header("Authorization", directorBearer()))
                 .andExpect(status().isOk());
 
         score(criterion, false, "30").andExpect(status().isOk());
@@ -226,7 +232,7 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
     void closingThroughTheEndpoint_alsoStopsWrites() throws Exception {
         mvc.perform(
                         put("/api/academic-years/" + academicYearId(2026) + "/close")
-                                .header("Authorization", bearer()))
+                                .header("Authorization", directorBearer()))
                 .andExpect(status().isOk());
 
         score(criterion, false, "30").andExpect(status().isConflict());
@@ -303,7 +309,7 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
         mvc.perform(
                         get("/api/attendance")
                                 .param("id_course_enrollment", enrollment.toString())
-                                .header("Authorization", bearer()))
+                                .header("Authorization", directorBearer()))
                 .andExpect(status().isOk());
     }
 
@@ -315,7 +321,7 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
 
         mvc.perform(
                         put("/api/academic-years/" + academicYearId(2026) + "/reopen")
-                                .header("Authorization", bearer()))
+                                .header("Authorization", directorBearer()))
                 .andExpect(status().isOk());
 
         postJson("/api/attendance/daily", new DailyBody(enrollment, editableSchoolDay(), "Present"))

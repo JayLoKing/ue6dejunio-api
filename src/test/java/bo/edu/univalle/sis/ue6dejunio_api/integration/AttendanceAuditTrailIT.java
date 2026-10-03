@@ -28,14 +28,15 @@ class AttendanceAuditTrailIT extends AbstractIntegrationTest {
     @Autowired private MockMvc mvc;
 
     private UUID homeroomTeacher;
-    private UUID director;
+    private UUID course;
+    private UUID replacementTeacher;
     private UUID enrollment;
 
     @BeforeEach
     void seed() {
         homeroomTeacher = seedUser("Teacher", false);
-        director = seedUser("Director", false);
-        UUID course = seedCourse(homeroomTeacher, "A");
+        replacementTeacher = seedUser("Teacher", false);
+        course = seedCourse(homeroomTeacher, "A");
         enrollment = seedEnrollment(seedStudent(), course);
     }
 
@@ -55,16 +56,20 @@ class AttendanceAuditTrailIT extends AbstractIntegrationTest {
         postDaily(homeroomTeacher, "Teacher", "Present");
         Map<String, Object> afterCreate = auditRow();
 
-        // Director corrects the same (enrollment, date) row: the unique index makes this an update,
-        // not a second row.
-        postDaily(director, "Director", "Absent");
+        // The homeroom passes to another teacher, who corrects the same (enrollment, date) row: the
+        // unique index makes this an update, not a second row. The Director no longer writes it.
+        jdbc.update(
+                "UPDATE courses SET id_homeroom_teacher = ? WHERE id_course = ?",
+                replacementTeacher,
+                course);
+        postDaily(replacementTeacher, "Teacher", "Absent");
 
         Map<String, Object> afterEdit = auditRow();
         assertThat(afterEdit.get("status")).isEqualTo("Absent");
         assertThat(afterEdit.get("created_by"))
                 .as("original author must survive the correction")
                 .isEqualTo(homeroomTeacher);
-        assertThat(afterEdit.get("updated_by")).isEqualTo(director);
+        assertThat(afterEdit.get("updated_by")).isEqualTo(replacementTeacher);
         assertThat(afterEdit.get("created_at")).isEqualTo(afterCreate.get("created_at"));
         assertThat((Timestamp) afterEdit.get("updated_at"))
                 .isAfterOrEqualTo((Timestamp) afterCreate.get("updated_at"));
