@@ -151,6 +151,10 @@ public class SecurityConfig {
                                         .requestMatchers(
                                                 HttpMethod.POST, "/api/students/*/withdraw")
                                         .hasRole("Director")
+                                        // The way back from that withdrawal is the Director's too.
+                                        .requestMatchers(
+                                                HttpMethod.POST, "/api/students/*/reinstate")
+                                        .hasRole("Director")
                                         .requestMatchers("/api/students/**")
                                         .hasAnyRole("Director", "Teacher")
                                         .requestMatchers("/api/criteria/**")

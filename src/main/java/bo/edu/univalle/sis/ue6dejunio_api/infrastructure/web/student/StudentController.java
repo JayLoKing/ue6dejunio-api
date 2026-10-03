@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawalReason;
@@ -10,6 +11,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentC
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReinstateStudentRequest;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReinstateStudentResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentDirectoryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentMovementSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentResponse;
@@ -146,6 +149,25 @@ public class StudentController {
         studentService.withdraw(
                 new WithdrawStudentCommand(id, reason, request.note(), currentUser(token)));
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/reinstate")
+    // The Director's, like the withdrawal it undoes: a roster load leaves a withdrawn student
+    // alone, so this is the one way back and the one place the decision is recorded.
+    @PreAuthorize("hasRole('Director')")
+    @Operation(
+            summary =
+                    "Reincorpora a un estudiante dado de baja, solo Director. Reabre su lugar de "
+                            + "esta gestion o lo inscribe en el curso indicado")
+    public ResponseEntity<ReinstateStudentResponse> reinstate(
+            @PathVariable UUID id,
+            @RequestBody(required = false) ReinstateStudentRequest request,
+            JwtAuthenticationToken token) {
+        UUID courseId = request == null ? null : request.courseId();
+        return ResponseEntity.ok(
+                ReinstateStudentResponse.from(
+                        studentService.reinstate(
+                                new ReinstateStudentCommand(id, courseId, currentUser(token)))));
     }
 
     /**
