@@ -19,11 +19,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollT
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,7 @@ class CourseEnrollmentServiceEnrollTest {
     @Mock private IStudentDomain studentDomain;
     @Mock private ICourseEnrollmentDomain enrollmentDomain;
 
+    @Mock private IAcademicYearDomain academicYearDomain;
     @Mock private ClosedYearGuard closedYearGuard;
 
     @InjectMocks private CourseEnrollmentService service;
@@ -339,5 +342,132 @@ class CourseEnrollmentServiceEnrollTest {
         verify(studentDomain, times(1)).findByRudeCodeIn(anyCollection());
         verify(studentDomain, times(1)).findByIdentityCardIn(anyCollection());
         verify(enrollmentDomain, times(1)).enrollmentStatusByStudent(eq(courseId), anyCollection());
+    }
+
+    private static final Integer PREVIOUS_YEAR = 7;
+
+    private void rosterOf(Student... known) {
+        when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of(known));
+        when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+    }
+
+    /**
+     * Existing students split by what the previous year says about them. The question is asked once
+     * for the whole load, about the year before the course's own, never per row.
+     */
+    @Test
+    void existingStudents_splitIntoFromPreviousYearAndReentering() {
+        UUID continuing = UUID.randomUUID();
+        UUID returning = UUID.randomUUID();
+        rosterOf(student(continuing, "R1", "C1"), student(returning, "R2", "C2"));
+        when(academicYearDomain.previousYearIdOfCourse(courseId))
+                .thenReturn(Optional.of(PREVIOUS_YEAR));
+        when(enrollmentDomain.studentsEffectiveInYear(eq(PREVIOUS_YEAR), anyCollection()))
+                .thenReturn(Set.of(continuing));
+
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R2", "C2"))));
+
+        assertThat(result.studentsFromPreviousYear()).isEqualTo(1);
+        assertThat(result.studentsReentering()).isEqualTo(1);
+        assertThat(result.studentsCreated()).isZero();
+        verify(enrollmentDomain, times(1))
+                .studentsEffectiveInYear(eq(PREVIOUS_YEAR), anyCollection());
+    }
+
+    /** With no earlier gestión on record nobody can have come from it. */
+    @Test
+    void noPreviousYear_makesEveryExistingStudentReentering() {
+        rosterOf(student(UUID.randomUUID(), "R1", "C1"));
+        when(academicYearDomain.previousYearIdOfCourse(courseId)).thenReturn(Optional.empty());
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
+
+        assertThat(result.studentsFromPreviousYear()).isZero();
+        assertThat(result.studentsReentering()).isEqualTo(1);
+        verify(enrollmentDomain, never()).studentsEffectiveInYear(any(), anyCollection());
+    }
+
+    /**
+     * A student created by this very load has no past: they count as created and in neither bucket,
+     * and a repeated row of theirs must not slip into "reentering".
+     */
+    @Test
+    void createdStudent_isInNeitherBucket_evenWhenTheRowRepeats() {
+        when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of());
+        when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+        when(studentDomain.save(any())).thenReturn(student(UUID.randomUUID(), "R1", "C1"));
+
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
+
+        assertThat(result.studentsCreated()).isEqualTo(1);
+        assertThat(result.studentsFromPreviousYear()).isZero();
+        assertThat(result.studentsReentering()).isZero();
+    }
+
+    /**
+     * The four groups partition the distinct students of the request: created, from the previous
+     * year, re-entering, and withdrawn (skipped). A repeated row counts once in every group.
+     */
+    @Test
+    void theGroupsPartitionTheDistinctStudentsOfTheRequest() {
+        UUID continuing = UUID.randomUUID();
+        UUID returning = UUID.randomUUID();
+        UUID gone = UUID.randomUUID();
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(
+                        List.of(
+                                student(continuing, "R1", "C1"),
+                                student(returning, "R2", "C2"),
+                                withdrawn(gone, "R3", "C3")));
+        when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+        when(studentDomain.save(any())).thenReturn(student(UUID.randomUUID(), "R4", "C4"));
+        when(academicYearDomain.previousYearIdOfCourse(courseId))
+                .thenReturn(Optional.of(PREVIOUS_YEAR));
+        when(enrollmentDomain.studentsEffectiveInYear(eq(PREVIOUS_YEAR), anyCollection()))
+                .thenReturn(Set.of(continuing));
+
+        EnrollResult result =
+                service.enroll(
+                        cmd(
+                                courseId,
+                                List.of(
+                                        row("R1", "C1"),
+                                        row("R1", "C1"),
+                                        row("R2", "C2"),
+                                        row("R3", "C3"),
+                                        row("R3", "C3"),
+                                        row("R4", "C4"))));
+
+        assertThat(result.studentsCreated()).isEqualTo(1);
+        assertThat(result.studentsFromPreviousYear()).isEqualTo(1);
+        assertThat(result.studentsReentering()).isEqualTo(1);
+        assertThat(result.skippedWithdrawn()).hasSize(1);
+        assertThat(
+                        result.studentsCreated()
+                                + result.studentsFromPreviousYear()
+                                + result.studentsReentering()
+                                + result.skippedWithdrawn().size())
+                .isEqualTo(4);
+    }
+
+    /** A withdrawn student is reported as skipped and kept out of both buckets. */
+    @Test
+    void withdrawnStudent_isNotCountedAsFromPreviousYearNorReentering() {
+        UUID gone = UUID.randomUUID();
+        rosterOf(withdrawn(gone, "R1", "C1"));
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
+
+        assertThat(result.studentsFromPreviousYear()).isZero();
+        assertThat(result.studentsReentering()).isZero();
+        verify(enrollmentDomain, never()).studentsEffectiveInYear(any(), anyCollection());
     }
 }

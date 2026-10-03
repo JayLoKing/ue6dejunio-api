@@ -13,6 +13,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ class CourseEnrollmentServiceClosedYearTest {
 
     @Mock private IStudentDomain studentDomain;
     @Mock private ICourseEnrollmentDomain enrollmentDomain;
+    @Mock private IAcademicYearDomain academicYearDomain;
     @Mock private ClosedYearGuard closedYearGuard;
 
     @Test
@@ -53,7 +55,10 @@ class CourseEnrollmentServiceClosedYearTest {
         assertThatThrownBy(
                         () ->
                                 new CourseEnrollmentService(
-                                                studentDomain, enrollmentDomain, closedYearGuard)
+                                                studentDomain,
+                                                enrollmentDomain,
+                                                academicYearDomain,
+                                                closedYearGuard)
                                         .enroll(command))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("cerrada");

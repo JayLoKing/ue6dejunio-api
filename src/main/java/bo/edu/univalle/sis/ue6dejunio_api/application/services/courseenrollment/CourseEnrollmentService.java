@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollT
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
@@ -35,14 +36,17 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
 
     private final IStudentDomain studentDomain;
     private final ICourseEnrollmentDomain enrollmentDomain;
+    private final IAcademicYearDomain academicYearDomain;
     private final ClosedYearGuard closedYearGuard;
 
     public CourseEnrollmentService(
             IStudentDomain studentDomain,
             ICourseEnrollmentDomain enrollmentDomain,
+            IAcademicYearDomain academicYearDomain,
             ClosedYearGuard closedYearGuard) {
         this.studentDomain = studentDomain;
         this.enrollmentDomain = enrollmentDomain;
+        this.academicYearDomain = academicYearDomain;
         this.closedYearGuard = closedYearGuard;
     }
 
@@ -93,11 +97,16 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         // the load leaves them alone and reports them. Keyed by id so a file that repeats a name
         // lists them once; the name comes from the row already loaded, not from another query.
         Map<UUID, SkippedStudent> skippedWithdrawn = new LinkedHashMap<>();
+        // Existing students, not withdrawn, that this load did not create: the ones whose past the
+        // summary has something to say about. A set, so a repeated row counts once.
+        Set<UUID> carriedOver = new HashSet<>();
+        Set<UUID> createdNow = new HashSet<>();
 
         for (CreateStudentCommand sc : command.students()) {
             Student student = resolve(sc, byRude, byIdentityCard);
             if (student == null) {
                 student = studentDomain.save(buildStudent(sc));
+                createdNow.add(student.getId());
                 created++;
                 // Index what was just created: a PDF that repeats a row must not create it twice.
                 index(byRude, student.getRudeCode(), student);
@@ -109,6 +118,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                             student.getId(),
                             new SkippedStudent(student.getId(), student.fullName()));
                     continue;
+                }
+                if (!createdNow.contains(student.getId())) {
+                    carriedOver.add(student.getId());
                 }
             }
             // add() is false when the id is already there, which covers both a seat still held from
@@ -127,13 +139,30 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
             }
         }
         enrollmentDomain.reactivateEnrollments(command.courseId(), toReactivate);
+        int fromPreviousYear = fromPreviousYear(command.courseId(), carriedOver);
         return new EnrollResult(
                 command.students().size(),
                 created,
                 existing,
+                fromPreviousYear,
+                carriedOver.size() - fromPreviousYear,
                 enrolled,
                 skipped,
                 List.copyOf(skippedWithdrawn.values()));
+    }
+
+    /**
+     * How many of these students sat an Effective seat in the gestión before the course's own: one
+     * query for the whole set, and none when there is nobody to ask about or nothing before.
+     */
+    private int fromPreviousYear(UUID courseId, Set<UUID> studentIds) {
+        if (studentIds.isEmpty()) {
+            return 0;
+        }
+        return academicYearDomain
+                .previousYearIdOfCourse(courseId)
+                .map(year -> enrollmentDomain.studentsEffectiveInYear(year, studentIds).size())
+                .orElse(0);
     }
 
     @Override
