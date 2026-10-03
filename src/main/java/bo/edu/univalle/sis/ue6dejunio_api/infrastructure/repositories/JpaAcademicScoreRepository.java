@@ -7,8 +7,19 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface JpaAcademicScoreRepository extends JpaRepository<AcademicScoreEntity, UUID> {
+    @Query(
+            """
+        SELECT COUNT(a) > 0 FROM AcademicScoreEntity a
+        WHERE a.courseEnrollment.course.academicYear.id = :yearId
+          AND a.trimester = :trimester
+        """)
+    boolean existsInYearAndTrimester(
+            @Param("yearId") Integer yearId, @Param("trimester") Integer trimester);
+
     Optional<AcademicScoreEntity> findByCourseEnrollment_IdAndClassGroup_IdAndTrimester(
             UUID courseEnrollmentId, UUID classGroupId, Integer trimester);
 

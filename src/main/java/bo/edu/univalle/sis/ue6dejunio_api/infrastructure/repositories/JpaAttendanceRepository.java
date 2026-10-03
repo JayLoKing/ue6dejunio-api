@@ -11,6 +11,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity, UUID> {
+    @Query(
+            """
+        SELECT COUNT(a) > 0 FROM AttendanceEntity a
+        WHERE a.courseEnrollment.course.academicYear.id = :yearId
+          AND a.date BETWEEN :start AND :end
+        """)
+    boolean existsInYearBetween(
+            @Param("yearId") Integer yearId,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
     Optional<AttendanceEntity> findByCourseEnrollment_IdAndDateAndClassGroupIsNull(
             UUID courseEnrollmentId, LocalDate date);
 

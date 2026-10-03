@@ -22,4 +22,12 @@ public interface ITrimesterPeriodDomain {
     boolean academicYearExists(Integer academicYearId);
 
     boolean existsByAcademicYearAndTrimester(Integer academicYearId, int trimester);
+
+    /**
+     * Whether the gestión holds any attendance dated inside {@code [start, end]} or any score of
+     * that trimester. Scores have no date of their own, only a trimester number, so they are
+     * matched on it. A cheap EXISTS probe: no rows are loaded.
+     */
+    boolean hasRecordedActivity(
+            Integer academicYearId, int trimester, LocalDate start, LocalDate end);
 }

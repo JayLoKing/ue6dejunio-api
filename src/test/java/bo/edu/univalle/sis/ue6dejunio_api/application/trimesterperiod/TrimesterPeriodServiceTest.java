@@ -3,6 +3,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.trimesterperiod;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
@@ -188,5 +190,30 @@ class TrimesterPeriodServiceTest {
 
         assertThatThrownBy(() -> service.delete(UUID.randomUUID()))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void delete_withRecordsInThePeriod_isRefusedAndRemovesNothing() {
+        UUID id = UUID.randomUUID();
+        TrimesterPeriod p = period(id, 1, "2026-02-01", "2026-05-31");
+        when(domain.findById(id)).thenReturn(Optional.of(p));
+        when(domain.hasRecordedActivity(YEAR_ID, 1, p.startDate(), p.endDate())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.delete(id))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("asistencias o calificaciones");
+        verify(domain, never()).delete(any());
+    }
+
+    @Test
+    void delete_withNoRecords_removesThePeriod() {
+        UUID id = UUID.randomUUID();
+        TrimesterPeriod p = period(id, 2, "2026-06-01", "2026-08-31");
+        when(domain.findById(id)).thenReturn(Optional.of(p));
+        when(domain.hasRecordedActivity(YEAR_ID, 2, p.startDate(), p.endDate())).thenReturn(false);
+
+        service.delete(id);
+
+        verify(domain).delete(id);
     }
 }

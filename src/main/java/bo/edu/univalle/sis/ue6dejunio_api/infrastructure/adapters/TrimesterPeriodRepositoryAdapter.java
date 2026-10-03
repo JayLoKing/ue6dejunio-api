@@ -6,7 +6,10 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.trimesterperiod.ITrimeste
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.AcademicYearEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.TrimesterPeriodEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.TrimesterPeriodMapper;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicScoreRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAcademicYearRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAssessmentScoreRepository;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaAttendanceRepository;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaTrimesterPeriodRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -21,14 +24,23 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
 
     private final JpaTrimesterPeriodRepository trimesterPeriodRepo;
     private final JpaAcademicYearRepository academicYearRepo;
+    private final JpaAttendanceRepository attendanceRepo;
+    private final JpaAssessmentScoreRepository assessmentScoreRepo;
+    private final JpaAcademicScoreRepository academicScoreRepo;
     private final TrimesterPeriodMapper mapper;
 
     public TrimesterPeriodRepositoryAdapter(
             JpaTrimesterPeriodRepository trimesterPeriodRepo,
             JpaAcademicYearRepository academicYearRepo,
+            JpaAttendanceRepository attendanceRepo,
+            JpaAssessmentScoreRepository assessmentScoreRepo,
+            JpaAcademicScoreRepository academicScoreRepo,
             TrimesterPeriodMapper mapper) {
         this.trimesterPeriodRepo = trimesterPeriodRepo;
         this.academicYearRepo = academicYearRepo;
+        this.attendanceRepo = attendanceRepo;
+        this.assessmentScoreRepo = assessmentScoreRepo;
+        this.academicScoreRepo = academicScoreRepo;
         this.mapper = mapper;
     }
 
@@ -89,5 +101,13 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
     @Override
     public boolean existsByAcademicYearAndTrimester(Integer academicYearId, int trimester) {
         return trimesterPeriodRepo.existsByAcademicYear_IdAndTrimester(academicYearId, trimester);
+    }
+
+    @Override
+    public boolean hasRecordedActivity(
+            Integer academicYearId, int trimester, LocalDate start, LocalDate end) {
+        return attendanceRepo.existsInYearBetween(academicYearId, start, end)
+                || assessmentScoreRepo.existsInYearAndTrimester(academicYearId, trimester)
+                || academicScoreRepo.existsInYearAndTrimester(academicYearId, trimester);
     }
 }

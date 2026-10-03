@@ -77,7 +77,19 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
     @Override
     @Transactional
     public void delete(UUID id) {
-        closedYearGuard.requireOpenForYear(getById(id).academicYearId());
+        TrimesterPeriod period = getById(id);
+        closedYearGuard.requireOpenForYear(period.academicYearId());
+        // The course panel and the attendance report resolve their scope from this row, so
+        // dropping it under recorded data would orphan that data from every report.
+        if (trimesterPeriodDomain.hasRecordedActivity(
+                period.academicYearId(),
+                period.trimester(),
+                period.startDate(),
+                period.endDate())) {
+            throw new ConflictException(
+                    "No se puede eliminar el trimestre: tiene asistencias o calificaciones"
+                            + " registradas");
+        }
         trimesterPeriodDomain.delete(id);
     }
 

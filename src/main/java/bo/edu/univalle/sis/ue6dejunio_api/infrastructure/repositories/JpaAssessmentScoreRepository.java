@@ -10,6 +10,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface JpaAssessmentScoreRepository extends JpaRepository<AssessmentScoreEntity, UUID> {
+    @Query(
+            """
+        SELECT COUNT(s) > 0 FROM AssessmentScoreEntity s
+        LEFT JOIN s.event ev
+        LEFT JOIN ev.criterion evc
+        LEFT JOIN s.criterion dc
+        WHERE s.courseEnrollment.course.academicYear.id = :yearId
+          AND COALESCE(evc.trimester, dc.trimester) = :trimester
+        """)
+    boolean existsInYearAndTrimester(
+            @Param("yearId") Integer yearId, @Param("trimester") Integer trimester);
 
     Optional<AssessmentScoreEntity> findByCourseEnrollment_IdAndEvent_Id(
             UUID courseEnrollmentId, UUID eventId);
