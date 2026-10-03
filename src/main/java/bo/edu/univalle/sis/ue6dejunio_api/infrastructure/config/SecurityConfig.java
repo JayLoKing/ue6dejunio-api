@@ -56,8 +56,9 @@ public class SecurityConfig {
                                         // The secretariat is a school-wide READ actor. Every rule
                                         // that includes it below is
                                         // GET-only and precedes the broader rule for the same path,
-                                        // so Secretary never
-                                        // matches a write rule. These rules only decide which roles
+                                        // except the course-lifecycle writes stated further down
+                                        // (create, edit, deactivate, one homeroom teacher, copy a
+                                        // year's structure). These rules only decide which roles
                                         // reach the handler;
                                         // row-level scope is enforced by @PreAuthorize on each
                                         // read.
@@ -94,7 +95,7 @@ public class SecurityConfig {
                                         .hasAnyRole("Director", "Teacher", "Secretary")
                                         // The secretariat's "ver curso": the same consolidated view
                                         // the Director reads, and the screen its student directory
-                                        // links into. Read-only like every rule that names it —
+                                        // links into. Read-only —
                                         // withdrawing a student stays the Director's alone, and it
                                         // is a different route.
                                         .requestMatchers(HttpMethod.GET, "/api/courses/*/overview")
