@@ -47,6 +47,15 @@ public class AssessmentScoreEntity {
     @Column(name = "score", nullable = false)
     private BigDecimal score;
 
+    // Set explicitly from the acting teacher, not through JPA auditing: the delete path and the
+    // consolidation row carry the actor through the use case too, and one mechanism keeps them
+    // honest. created_by is updatable=false so an edit by another teacher never rewrites it.
+    @Column(name = "created_by", updatable = false)
+    private UUID createdBy;
+
+    @Column(name = "updated_by")
+    private UUID updatedBy;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -200,6 +200,8 @@ CREATE TABLE IF NOT EXISTS assessment_scores (
     id_assessment_event uuid REFERENCES assessment_events(id_assessment_event) ON DELETE CASCADE,
     id_criterion uuid REFERENCES evaluation_criteria(id_criterion) ON DELETE CASCADE,
     score numeric(5,2) NOT NULL DEFAULT 0,
+    created_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP, updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_score_target CHECK (
         (id_criterion IS NOT NULL AND id_assessment_event IS NULL)
@@ -228,6 +230,7 @@ CREATE TABLE IF NOT EXISTS academic_scores (
     score_deciding numeric(5,2) DEFAULT 0 CHECK (score_deciding <= 5),
     total_score numeric(5,2) GENERATED ALWAYS AS (score_being + score_knowing + score_doing + score_deciding) STORED,
     created_by uuid REFERENCES users(id_user) ON DELETE RESTRICT,
+    updated_by uuid REFERENCES users(id_user) ON DELETE SET NULL,
     updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_academic_score UNIQUE (id_course_enrollment, id_class_group, trimester)
 );

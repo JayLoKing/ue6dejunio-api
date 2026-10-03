@@ -57,6 +57,9 @@ public class AcademicScoreEntity {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    @Column(name = "updated_by")
+    private UUID updatedBy;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
