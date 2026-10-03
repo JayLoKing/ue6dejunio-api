@@ -14,9 +14,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubject
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaUserRepository;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
@@ -108,6 +110,14 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     @Override
     public boolean teachesInCourse(UUID teacherId, UUID courseId) {
         return classGroupRepo.existsByCourse_IdAndTeacher_Id(courseId, teacherId);
+    }
+
+    @Override
+    public Set<UUID> classGroupIdsTaughtInCourse(UUID teacherId, UUID courseId) {
+        if (teacherId == null || courseId == null) {
+            return Set.of();
+        }
+        return new HashSet<>(classGroupRepo.findIdsByCourseAndTeacher(courseId, teacherId));
     }
 
     @Override

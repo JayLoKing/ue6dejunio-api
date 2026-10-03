@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface IClassGroupDomain {
@@ -37,6 +38,12 @@ public interface IClassGroupDomain {
      * homeroom, so this is what ties them to the course's roster.
      */
     boolean teachesInCourse(UUID teacherId, UUID courseId);
+
+    /**
+     * The ids of the class groups the teacher runs in the course, in one query. What a panel that
+     * spans every subject of a course needs to keep a teacher to their own rows.
+     */
+    Set<UUID> classGroupIdsTaughtInCourse(UUID teacherId, UUID courseId);
 
     /**
      * Same tie as {@link #teachesInCourse}, asked once for a whole set of courses. An ownership
