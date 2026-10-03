@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.risk;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseRiskSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.InstitutionRiskEntryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.RiskPredictionResponse;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,9 +47,12 @@ public class RiskPredictionController {
     private static final int LAST_YEAR_ON_RECORD = 2100;
 
     private final IRiskPredictionService predictionService;
+    private final AuthorizationComponent authz;
 
-    public RiskPredictionController(IRiskPredictionService predictionService) {
+    public RiskPredictionController(
+            IRiskPredictionService predictionService, AuthorizationComponent authz) {
         this.predictionService = predictionService;
+        this.authz = authz;
     }
 
     /** The sweep, by hand. The Director's, because it runs the model over the whole school. */
@@ -81,16 +86,26 @@ public class RiskPredictionController {
 
     /**
      * {@code canReadCourseRoster} and not {@code canReadCourse}: the latter is homeroom-only, and a
-     * technical teacher has no homeroom. This panel spans every subject of the course, so the
-     * teacher who runs one of them belongs in it — gated on homeroom they would be refused a list
-     * about the students they teach.
+     * technical teacher has no homeroom, so the gate lets in whoever runs a subject of the course.
+     *
+     * <p>What each of them then reads is narrower than the gate. The homeroom teacher, the Director
+     * and the secretariat read every subject; any other teacher reads only the subjects they teach,
+     * not the predictions of subjects they do not run. The service applies that rule from the scope
+     * resolved here.
      */
     @GetMapping("/courses/{courseId}/risk")
     @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
-    @Operation(summary = "Predicciones vigentes de todas las materias de un curso")
+    @Operation(
+            summary =
+                    "Predicciones vigentes de las materias de un curso: todas para la direccion, "
+                            + "secretaria y el asesor; solo las propias para otro docente")
     public ResponseEntity<List<StudentRiskResponse>> byCourse(
-            @PathVariable UUID courseId, @RequestParam @Min(1) @Max(3) int trimester) {
-        return ResponseEntity.ok(toResponses(predictionService.byCourse(courseId, trimester)));
+            @PathVariable UUID courseId,
+            @RequestParam @Min(1) @Max(3) int trimester,
+            Authentication authentication) {
+        UUID scope = authz.courseRiskScopeTeacherId(authentication);
+        return ResponseEntity.ok(
+                toResponses(predictionService.byCourse(courseId, trimester, scope)));
     }
 
     /**

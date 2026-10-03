@@ -661,6 +661,17 @@ public class AuthorizationComponent {
     }
 
     /**
+     * Whose rows a course-wide risk listing may show. Director and the secretariat read every
+     * subject, which is what {@code null} means; a teacher is scoped to themselves, and the service
+     * then decides between the whole course (homeroom) and only their own subjects. A token with no
+     * usable subject resolves to an id that owns nothing, never to {@code null}: widening on a
+     * broken token is the failure this closes.
+     */
+    public UUID courseRiskScopeTeacherId(Authentication authentication) {
+        return pdcListScopeTeacherId(authentication);
+    }
+
+    /**
      * Ownership of a curricular adaptation, resolved through the plan it hangs off. An adaptation
      * names the student it was written for, so reading one is disclosure, not just metadata.
      */

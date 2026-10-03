@@ -1400,6 +1400,26 @@ class AuthorizationComponentTest {
         assertThat(authz.pdcListScopeTeacherId(null)).isEqualTo(new UUID(0L, 0L));
     }
 
+    // ---- courseRiskScopeTeacherId ----
+
+    @Test
+    void courseRiskScope_teacher_isNarrowedToTheirOwnId() {
+        UUID teacher = UUID.randomUUID();
+
+        assertThat(authz.courseRiskScopeTeacherId(token(teacher, "Teacher"))).isEqualTo(teacher);
+    }
+
+    @Test
+    void courseRiskScope_directorAndSecretary_areUnscoped() {
+        assertThat(authz.courseRiskScopeTeacherId(token(UUID.randomUUID(), "Director"))).isNull();
+        assertThat(authz.courseRiskScopeTeacherId(token(UUID.randomUUID(), "Secretary"))).isNull();
+    }
+
+    @Test
+    void courseRiskScope_noUsableToken_matchesNothingInsteadOfWidening() {
+        assertThat(authz.courseRiskScopeTeacherId(null)).isEqualTo(new UUID(0L, 0L));
+    }
+
     // ---- canReadAdaptation / canWriteAdaptation ----
 
     @Test

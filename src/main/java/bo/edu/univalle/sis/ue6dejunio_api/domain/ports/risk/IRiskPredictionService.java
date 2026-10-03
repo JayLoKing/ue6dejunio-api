@@ -47,7 +47,18 @@ public interface IRiskPredictionService {
      */
     List<StudentRisk> byClassGroup(UUID classGroupId, int trimester);
 
-    List<StudentRisk> byCourse(UUID courseId, int trimester);
+    /**
+     * The standing predictions of every subject of a course, worst first, narrowed to the reader.
+     *
+     * <p>The course's homeroom teacher reads all of its subjects on purpose; any other teacher
+     * reads only the subjects they run there. The caller (who knows the role) says which reader
+     * this is, so the rule lives here and not in a controller.
+     *
+     * @param teacherScopeId {@code null} for a reader with no ownership scope (Director,
+     *     secretariat): every row. Otherwise the teacher asking: the whole course if they are its
+     *     homeroom teacher, only the rows of the class groups they teach in it if they are not.
+     */
+    List<StudentRisk> byCourse(UUID courseId, int trimester, UUID teacherScopeId);
 
     /**
      * One row per classroom of the gestión, counting students by their worst risk band.

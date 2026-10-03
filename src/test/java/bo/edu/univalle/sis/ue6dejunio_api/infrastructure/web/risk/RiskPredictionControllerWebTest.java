@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.risk;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -17,6 +18,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.risk.StudentRisk;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.risk.IRiskPredictionService.RunSummary;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.JwtAuthConverter;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.error.GlobalExceptionHandler;
 import java.math.BigDecimal;
@@ -54,6 +56,7 @@ class RiskPredictionControllerWebTest {
 
     @Autowired private MockMvc mvc;
     @MockitoBean private IRiskPredictionService predictionService;
+    @MockitoBean private AuthorizationComponent authz;
 
     @TestConfiguration
     static class MockBeans {
@@ -144,7 +147,7 @@ class RiskPredictionControllerWebTest {
 
     @Test
     void byCourse_answersTheSameShape() throws Exception {
-        when(predictionService.byCourse(eq(COURSE), anyInt()))
+        when(predictionService.byCourse(eq(COURSE), anyInt(), any()))
                 .thenReturn(List.of(risk(RiskLevel.EN_RIESGO)));
 
         mvc.perform(get("/api/courses/{id}/risk", COURSE).param("trimester", "2"))

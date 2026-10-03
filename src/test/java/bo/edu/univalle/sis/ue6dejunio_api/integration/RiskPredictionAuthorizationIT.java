@@ -120,6 +120,82 @@ class RiskPredictionAuthorizationIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /** Files one prediction for Ana in the given subject. */
+    private void predictAna(UUID classGroupId) {
+        RiskFeatures vector =
+                new RiskFeatures(
+                        ana,
+                        classGroupId,
+                        1,
+                        List.of(new BigDecimal("8")),
+                        List.of(new BigDecimal("30")),
+                        List.of(new BigDecimal("25")),
+                        List.of(new BigDecimal("4")),
+                        new BigDecimal("87.50"),
+                        8);
+        riskPredictions.upsertAll(
+                List.of(
+                        new NewRiskPrediction(
+                                ana,
+                                classGroupId,
+                                1,
+                                RiskLevel.EN_RIESGO,
+                                new BigDecimal("0.5000"),
+                                new BigDecimal("0.0100"),
+                                vector,
+                                LocalDateTime.of(2026, 4, 10, 8, 0))));
+    }
+
+    /**
+     * A teacher who runs one subject of the course reads the predictions of that subject and no
+     * other: the panel spans every subject, but a subject they do not teach is not theirs to read.
+     */
+    @Test
+    void courseRisk_aTeacherWhoOnlyRunsOneSubject_readsOnlyThatSubjectsRows() throws Exception {
+        UUID technicalTeacher = seedUser("Teacher", true);
+        UUID languageGroup = seedClassGroup(courseId, technicalTeacher, "Lenguaje");
+        predictAna(languageGroup);
+
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(technicalTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].subjectName").value("Lenguaje"));
+    }
+
+    /** The homeroom teacher reads all of them on purpose; the attend button is gated per row. */
+    @Test
+    void courseRisk_theHomeroomTeacher_readsEverySubject() throws Exception {
+        UUID technicalTeacher = seedUser("Teacher", true);
+        predictAna(seedClassGroup(courseId, technicalTeacher, "Lenguaje"));
+
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(owningTeacher, "Teacher"))
+                                .param("trimester", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void courseRisk_directorAndSecretary_readEverySubject() throws Exception {
+        UUID technicalTeacher = seedUser("Teacher", true);
+        predictAna(seedClassGroup(courseId, technicalTeacher, "Lenguaje"));
+
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(director, "Director"))
+                                .param("trimester", "1"))
+                .andExpect(jsonPath("$.length()").value(2));
+        mvc.perform(
+                        get("/api/courses/{id}/risk", courseId)
+                                .header("Authorization", bearer(secretary, "Secretary"))
+                                .param("trimester", "1"))
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
     @Test
     void courseRisk_theSecretariatReadsIt() throws Exception {
         mvc.perform(
