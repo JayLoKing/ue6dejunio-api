@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledReport;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
@@ -26,6 +27,13 @@ public interface IStudentService {
      * made; see {@link StudentMovementSummary} for what that leaves out.
      */
     StudentMovementSummary movementSummary(Integer academicYearId);
+
+    /**
+     * The students who sat in the previous gestión and have no seat in the reference one (the
+     * active gestión when none is named). An unknown gestión is a 404; one with nothing before it
+     * is an empty report, not an error.
+     */
+    NotReenrolledReport notReenrolled(Integer academicYearId);
 
     /**
      * Takes a student off the roll, recording under which category, in whose words, and by whom.

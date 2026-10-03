@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentWithdrawa
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.WithdrawStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.NotReenrolledResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReinstateStudentRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReinstateStudentResponse;
@@ -128,6 +129,23 @@ public class StudentController {
         return ResponseEntity.ok(
                 StudentMovementSummaryResponse.from(
                         studentService.movementSummary(academicYearId)));
+    }
+
+    /**
+     * Students who sat in last year's classrooms and have no seat this year, for Secretaría and the
+     * Director to chase. Closed to teachers for the same reason as the movement table: it spans the
+     * whole school, not a course.
+     */
+    @GetMapping("/not-reenrolled")
+    @PreAuthorize("hasAnyRole('Director','Secretary')")
+    @Operation(
+            summary =
+                    "Estudiantes con matricula efectiva en la gestion anterior y sin matricula "
+                            + "en la gestion consultada. Sin gestion responde por la actual")
+    public ResponseEntity<NotReenrolledResponse> notReenrolled(
+            @RequestParam(value = "id_academic_year", required = false) Integer academicYearId) {
+        return ResponseEntity.ok(
+                NotReenrolledResponse.from(studentService.notReenrolled(academicYearId)));
     }
 
     @PostMapping("/{id}/withdraw")

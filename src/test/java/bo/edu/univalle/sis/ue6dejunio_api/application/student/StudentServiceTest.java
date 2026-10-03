@@ -12,8 +12,11 @@ import bo.edu.univalle.sis.ue6dejunio_api.application.services.student.StudentSe
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.catalog.AcademicYearItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledReport;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
@@ -346,5 +349,56 @@ class StudentServiceTest {
 
         verify(studentDomain).movementSummary(5);
         verify(academicYearDomain, never()).currentYearId();
+    }
+
+    private static AcademicYearItem yearItem(int id, int year) {
+        return new AcademicYearItem(id, year, false, false);
+    }
+
+    /** No gestión named: the report is about the active one, against the year before it. */
+    @Test
+    void notReenrolled_withoutAGestionUsesTheCurrentOneAndItsPredecessor() {
+        NotReenrolledStudent row =
+                new NotReenrolledStudent(
+                        UUID.randomUUID(),
+                        "R1",
+                        "C1",
+                        "Ana Perez",
+                        "Effective",
+                        new NotReenrolledStudent.LastCourse(UUID.randomUUID(), "1ro", "A"));
+        when(academicYearDomain.currentYearId()).thenReturn(7);
+        when(academicYearDomain.findItem(7)).thenReturn(Optional.of(yearItem(7, 2026)));
+        when(academicYearDomain.previousYearIdOf(7)).thenReturn(Optional.of(6));
+        when(academicYearDomain.findItem(6)).thenReturn(Optional.of(yearItem(6, 2025)));
+        when(studentDomain.notReenrolled(7, 6)).thenReturn(List.of(row));
+
+        NotReenrolledReport report = studentService.notReenrolled(null);
+
+        assertThat(report.academicYear()).isEqualTo(new NotReenrolledReport.YearRef(7, 2026));
+        assertThat(report.previousYear()).isEqualTo(new NotReenrolledReport.YearRef(6, 2025));
+        assertThat(report.students()).containsExactly(row);
+        assertThat(row.lastCourse().name()).isEqualTo("1ro A");
+    }
+
+    /** With no earlier gestión there is nobody to have failed to come back: empty, not an error. */
+    @Test
+    void notReenrolled_withNoPreviousYear_isEmptyAndNeverAsksTheDatabase() {
+        when(academicYearDomain.findItem(7)).thenReturn(Optional.of(yearItem(7, 2025)));
+        when(academicYearDomain.previousYearIdOf(7)).thenReturn(Optional.empty());
+
+        NotReenrolledReport report = studentService.notReenrolled(7);
+
+        assertThat(report.previousYear()).isNull();
+        assertThat(report.students()).isEmpty();
+        verify(studentDomain, never()).notReenrolled(any(), any());
+        verify(academicYearDomain, never()).currentYearId();
+    }
+
+    @Test
+    void notReenrolled_forAnUnknownGestion_isNotFound() {
+        when(academicYearDomain.findItem(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> studentService.notReenrolled(99))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

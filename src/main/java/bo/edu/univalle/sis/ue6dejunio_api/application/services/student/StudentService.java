@@ -8,6 +8,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledReport;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
@@ -81,6 +82,27 @@ public class StudentService implements IStudentService {
         // year they were enrolled in.
         Integer year = academicYearId == null ? academicYearDomain.currentYearId() : academicYearId;
         return studentDomain.movementSummary(year);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public NotReenrolledReport notReenrolled(Integer academicYearId) {
+        Integer yearId =
+                academicYearId == null ? academicYearDomain.currentYearId() : academicYearId;
+        NotReenrolledReport.YearRef reference = yearRef(yearId);
+        Integer previousId = academicYearDomain.previousYearIdOf(yearId).orElse(null);
+        if (previousId == null) {
+            return new NotReenrolledReport(reference, null, List.of());
+        }
+        return new NotReenrolledReport(
+                reference, yearRef(previousId), studentDomain.notReenrolled(yearId, previousId));
+    }
+
+    private NotReenrolledReport.YearRef yearRef(Integer yearId) {
+        return academicYearDomain
+                .findItem(yearId)
+                .map(y -> new NotReenrolledReport.YearRef(y.id(), y.year()))
+                .orElseThrow(() -> new ResourceNotFoundException("AcademicYear", yearId));
     }
 
     /**
