@@ -390,8 +390,17 @@ public class RiskPredictionService implements IRiskPredictionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StudentRisk> byStudent(UUID studentId) {
-        return predictionDomain.byStudent(studentId);
+    public List<StudentRisk> byStudent(UUID studentId, UUID teacherScopeId) {
+        List<StudentRisk> all = predictionDomain.byStudent(studentId);
+        if (teacherScopeId == null) {
+            return all;
+        }
+        // One lookup for every course of the student, never one per row or per course: the rows
+        // already carry the class group they belong to.
+        Set<UUID> readable =
+                classGroupDomain.classGroupIdsReadableByTeacherInCourses(
+                        teacherScopeId, enrollmentDomain.courseIdsOfStudent(studentId));
+        return all.stream().filter(r -> readable.contains(r.prediction().classGroupId())).toList();
     }
 
     @Override

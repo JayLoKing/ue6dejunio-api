@@ -162,8 +162,10 @@ public class RiskPredictionController {
     @GetMapping("/students/{studentId}/risk")
     @PreAuthorize("@authz.canReadStudent(authentication, #studentId)")
     @Operation(summary = "Predicciones vigentes de un estudiante en todas sus materias")
-    public ResponseEntity<List<StudentRiskResponse>> byStudent(@PathVariable UUID studentId) {
-        return ResponseEntity.ok(toResponses(predictionService.byStudent(studentId)));
+    public ResponseEntity<List<StudentRiskResponse>> byStudent(
+            @PathVariable UUID studentId, Authentication authentication) {
+        UUID scope = authz.subjectScopeTeacherId(authentication);
+        return ResponseEntity.ok(toResponses(predictionService.byStudent(studentId, scope)));
     }
 
     /**

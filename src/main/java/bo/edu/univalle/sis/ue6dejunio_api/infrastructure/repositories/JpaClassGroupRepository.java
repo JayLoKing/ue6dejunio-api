@@ -22,6 +22,14 @@ public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity,
     List<UUID> findIdsByCourseAndTeacher(
             @Param("courseId") UUID courseId, @Param("teacherId") UUID teacherId);
 
+    @Query(
+            "SELECT cg.id FROM ClassGroupEntity cg"
+                    + " WHERE cg.course.id IN :courseIds"
+                    + " AND (cg.teacher.id = :teacherId"
+                    + " OR cg.course.homeroomTeacher.id = :teacherId)")
+    List<UUID> findIdsReadableByTeacherInCourses(
+            @Param("teacherId") UUID teacherId, @Param("courseIds") Collection<UUID> courseIds);
+
     boolean existsByTeacher_IdAndCourse_IdIn(UUID teacherId, Collection<UUID> courseIds);
 
     // The to-one associations below are EAGER on the entity, and a derived query does not

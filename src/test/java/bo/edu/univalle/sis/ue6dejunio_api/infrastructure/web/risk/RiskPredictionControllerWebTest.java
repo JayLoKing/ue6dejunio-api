@@ -158,7 +158,8 @@ class RiskPredictionControllerWebTest {
 
     @Test
     void byStudent_answersEverySubjectTheStudentSits() throws Exception {
-        when(predictionService.byStudent(STUDENT)).thenReturn(List.of(risk(RiskLevel.SIN_RIESGO)));
+        when(predictionService.byStudent(eq(STUDENT), any()))
+                .thenReturn(List.of(risk(RiskLevel.SIN_RIESGO)));
 
         mvc.perform(get("/api/students/{id}/risk", STUDENT))
                 .andExpect(status().isOk())

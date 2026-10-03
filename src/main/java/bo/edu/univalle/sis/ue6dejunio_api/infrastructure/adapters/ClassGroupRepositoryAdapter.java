@@ -121,6 +121,16 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
     }
 
     @Override
+    public Set<UUID> classGroupIdsReadableByTeacherInCourses(
+            UUID teacherId, Collection<UUID> courseIds) {
+        if (teacherId == null || courseIds == null || courseIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(
+                classGroupRepo.findIdsReadableByTeacherInCourses(teacherId, courseIds));
+    }
+
+    @Override
     public boolean teachesInAnyCourse(UUID teacherId, Collection<UUID> courseIds) {
         // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
         if (teacherId == null || courseIds == null || courseIds.isEmpty()) {

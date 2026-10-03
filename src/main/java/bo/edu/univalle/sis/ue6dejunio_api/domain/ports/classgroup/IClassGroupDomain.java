@@ -46,6 +46,14 @@ public interface IClassGroupDomain {
     Set<UUID> classGroupIdsTaughtInCourse(UUID teacherId, UUID courseId);
 
     /**
+     * The ids of every class group the teacher may read across a set of courses, in one query: the
+     * ones they run, plus every class group of a course they are homeroom teacher of. What a
+     * per-student view spanning several courses needs to apply the course rule once per course
+     * without asking course by course.
+     */
+    Set<UUID> classGroupIdsReadableByTeacherInCourses(UUID teacherId, Collection<UUID> courseIds);
+
+    /**
      * Same tie as {@link #teachesInCourse}, asked once for a whole set of courses. An ownership
      * guard spanning every course a student is enrolled in must not query them one by one.
      */

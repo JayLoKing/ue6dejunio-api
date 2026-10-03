@@ -87,7 +87,17 @@ public interface IRiskPredictionService {
      */
     List<InstitutionRiskEntry> institutionRisk(Integer academicYearId, int trimester, int places);
 
-    List<StudentRisk> byStudent(UUID studentId);
+    /**
+     * One student across every subject they sit.
+     *
+     * <p>Same reading rule as {@link #byCourse}, applied per course the student is enrolled in: a
+     * teacher reads every subject of a course they are homeroom of and only the subjects they run
+     * in any other.
+     *
+     * @param teacherScopeId {@code null} for a reader with no ownership scope (Director,
+     *     secretariat): every row. Otherwise the teacher asking.
+     */
+    List<StudentRisk> byStudent(UUID studentId, UUID teacherScopeId);
 
     RiskPrediction markAttended(UUID predictionId, boolean attended);
 
