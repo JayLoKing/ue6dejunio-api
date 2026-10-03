@@ -1,15 +1,26 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment;
 
+import java.util.List;
+
 /**
- * @param studentsReadmitted how many of the existing ones were off the roll and were put back.
- *     Counted apart from {@code studentsExisting} because it is the one number in here that reports
- *     a change to a student the import did not create, and a school re-registering someone should
- *     see that it happened
+ * What a roster load did.
+ *
+ * @param studentsTotal how many rows the request carried, repeated rows and skipped ones included
+ * @param studentsCreated how many of them were not on record and were created
+ * @param studentsExisting how many rows matched a student already on record, withdrawn ones
+ *     included
+ * @param enrollmentsCreated how many students were seated in the course, whether by a new row or by
+ *     reopening a closed one
+ * @param enrollmentsSkipped how many rows matched a student who already holds a seat in the course,
+ *     or repeated one seated earlier in the same request. Not the withdrawn ones: those are in
+ *     {@code skippedWithdrawn}
+ * @param skippedWithdrawn the withdrawn students the load left out, once each. Only the Director's
+ *     explicit reinstatement puts one back, so a load neither seats them nor changes their status
  */
 public record EnrollResult(
         int studentsTotal,
         int studentsCreated,
         int studentsExisting,
-        int studentsReadmitted,
         int enrollmentsCreated,
-        int enrollmentsSkipped) {}
+        int enrollmentsSkipped,
+        List<SkippedStudent> skippedWithdrawn) {}

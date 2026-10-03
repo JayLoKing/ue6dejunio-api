@@ -7,14 +7,15 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
-import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -88,12 +89,10 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         int existing = 0;
         int enrolled = 0;
         int skipped = 0;
-        // Who the school is taking back. A set, so a file that repeats a name counts them once,
-        // and written after the loop the same way the reopened enrolments are: listing someone on
-        // a roster is the school saying they attend, and it used to be the one way of saying it
-        // the record ignored — the import gave them a live enrolment while students.status stayed
-        // 'Withdrawn', so the teacher saw them in the course and the directory did not.
-        Set<UUID> readmitted = new HashSet<>();
+        // Withdrawn students the roster named. Only the Director's reinstatement puts one back, so
+        // the load leaves them alone and reports them. Keyed by id so a file that repeats a name
+        // lists them once; the name comes from the row already loaded, not from another query.
+        Map<UUID, SkippedStudent> skippedWithdrawn = new LinkedHashMap<>();
 
         for (CreateStudentCommand sc : command.students()) {
             Student student = resolve(sc, byRude, byIdentityCard);
@@ -105,9 +104,11 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 index(byIdentityCard, student.getIdentityCard(), student);
             } else {
                 existing++;
-                // Only noted here. Who comes back is written once, after the roster has been read.
                 if (STATUS_WITHDRAWN.equals(student.getStatus())) {
-                    readmitted.add(student.getId());
+                    skippedWithdrawn.putIfAbsent(
+                            student.getId(),
+                            new SkippedStudent(student.getId(), student.fullName()));
+                    continue;
                 }
             }
             // add() is false when the id is already there, which covers both a seat still held from
@@ -126,11 +127,13 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
             }
         }
         enrollmentDomain.reactivateEnrollments(command.courseId(), toReactivate);
-        studentDomain.updateStatusIn(
-                readmitted,
-                new StudentStatusChange(STATUS_EFFECTIVE, null, null, command.actorId()));
         return new EnrollResult(
-                command.students().size(), created, existing, readmitted.size(), enrolled, skipped);
+                command.students().size(),
+                created,
+                existing,
+                enrolled,
+                skipped,
+                List.copyOf(skippedWithdrawn.values()));
     }
 
     @Override
