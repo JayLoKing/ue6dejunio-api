@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.SubjectStatus;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,7 +14,7 @@ public interface ISubjectDomain {
 
     Optional<Subject> findById(UUID id);
 
-    PageResult<Subject> list(PageQuery pageQuery);
+    PageResult<Subject> list(PageQuery pageQuery, SubjectStatus status);
 
     void deactivate(UUID id);
 

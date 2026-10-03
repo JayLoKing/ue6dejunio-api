@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.SubjectStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.SubjectEntity;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.mappers.SubjectMapper;
@@ -12,6 +13,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaKnowled
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories.JpaSubjectRepository;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,10 +84,15 @@ public class SubjectRepositoryAdapter implements ISubjectDomain {
     }
 
     @Override
-    public PageResult<Subject> list(PageQuery pageQuery) {
+    public PageResult<Subject> list(PageQuery pageQuery, SubjectStatus status) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
-        return SpringPaging.toPageResult(
-                subjectRepo.findByActiveTrue(pageable).map(mapper::toDomain));
+        Page<SubjectEntity> page =
+                switch (status) {
+                    case ACTIVE -> subjectRepo.findByActiveTrue(pageable);
+                    case INACTIVE -> subjectRepo.findByActiveFalse(pageable);
+                    case ALL -> subjectRepo.findAll(pageable);
+                };
+        return SpringPaging.toPageResult(page.map(mapper::toDomain));
     }
 
     @Override

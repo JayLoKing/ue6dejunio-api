@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.SubjectStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.UpdateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectService;
@@ -57,8 +58,8 @@ public class SubjectService implements ISubjectService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<Subject> list(PageQuery pageQuery) {
-        return subjectDomain.list(pageQuery);
+    public PageResult<Subject> list(PageQuery pageQuery, SubjectStatus status) {
+        return subjectDomain.list(pageQuery, status);
     }
 
     @Override

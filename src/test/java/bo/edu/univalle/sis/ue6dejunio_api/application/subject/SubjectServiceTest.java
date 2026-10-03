@@ -9,8 +9,11 @@ import static org.mockito.Mockito.when;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.subject.SubjectService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.SubjectStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.UpdateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectDomain;
 import java.util.Optional;
@@ -114,6 +117,15 @@ class SubjectServiceTest {
                 .hasMessage(
                         "no se pudo desactivar la materia porque tiene calificaciones registradas");
         verify(subjectDomain, org.mockito.Mockito.never()).deactivate(id);
+    }
+
+    @Test
+    void list_passesTheStatusFilterToThePort() {
+        PageQuery q = PageQuery.of(0, 10);
+        PageResult<Subject> page = new PageResult<>(java.util.List.of(), 0, 10, 0);
+        when(subjectDomain.list(q, SubjectStatus.INACTIVE)).thenReturn(page);
+
+        assertThat(subjectService.list(q, SubjectStatus.INACTIVE)).isSameAs(page);
     }
 
     @Test

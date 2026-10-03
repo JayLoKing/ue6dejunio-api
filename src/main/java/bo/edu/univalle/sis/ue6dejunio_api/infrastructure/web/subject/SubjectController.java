@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortDirection;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.CreateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.Subject;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.SubjectStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.subject.UpdateSubjectCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.subject.ISubjectService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateSubjectRequest;
@@ -18,6 +19,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -60,15 +62,20 @@ public class SubjectController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar materias activas. offset=pagina, limit=cantidad")
+    @Operation(summary = "Listar materias. status=active (por defecto), inactive o all")
     public ResponseEntity<PagedResponse<SubjectResponse>> list(
             @RequestParam(defaultValue = "1") @Min(1) int offset,
             @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
-            @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort) {
+            @RequestParam(defaultValue = "asc") @Pattern(regexp = "(?i)asc|desc") String sort,
+            @RequestParam(defaultValue = "active") @Pattern(regexp = "(?i)active|inactive|all")
+                    String status) {
         SortDirection dir = "desc".equalsIgnoreCase(sort) ? SortDirection.DESC : SortDirection.ASC;
         PageQuery p = PageQuery.of(offset - 1, limit, new SortField("name", dir));
         return ResponseEntity.ok(
-                PagedResponse.of(subjectService.list(p).map(SubjectResponse::from)));
+                PagedResponse.of(
+                        subjectService
+                                .list(p, SubjectStatus.valueOf(status.toUpperCase(Locale.ROOT)))
+                                .map(SubjectResponse::from)));
     }
 
     @PutMapping("/{id}")

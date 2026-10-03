@@ -20,6 +20,14 @@ public interface JpaSubjectRepository extends JpaRepository<SubjectEntity, UUID>
     @EntityGraph(attributePaths = {"area"})
     Page<SubjectEntity> findByActiveTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"area"})
+    Page<SubjectEntity> findByActiveFalse(Pageable pageable);
+
+    // Overrides findAll(Pageable) only to attach the graph; the listing maps every row to its area.
+    @Override
+    @EntityGraph(attributePaths = {"area"})
+    Page<SubjectEntity> findAll(Pageable pageable);
+
     /**
      * Whether the area is still spoken for. Inactive subjects count: deactivating one leaves the
      * row and its foreign key in place, so the area is not free to be deleted either way.
