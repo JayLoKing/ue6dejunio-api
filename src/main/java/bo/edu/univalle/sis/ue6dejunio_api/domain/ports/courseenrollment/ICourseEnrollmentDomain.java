@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface ICourseEnrollmentDomain {
@@ -33,6 +34,13 @@ public interface ICourseEnrollmentDomain {
      * first. More than one is possible: the unique key is per course, not per gestión.
      */
     List<EnrollmentSeat> seatsOfStudentInYear(UUID studentId, Integer academicYearId);
+
+    /**
+     * Which of these students hold an Effective enrolment in a course of the gestión, asked once
+     * for the whole set. Only the ids that do are returned; a student with two such seats appears
+     * once.
+     */
+    Set<UUID> studentsEffectiveInYear(Integer academicYearId, Collection<UUID> studentIds);
 
     void saveEnrollment(UUID studentId, UUID courseId);
 

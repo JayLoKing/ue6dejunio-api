@@ -19,9 +19,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -74,6 +76,16 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
         return enrollmentRepo.seatsOfStudentInYear(studentId, academicYearId).stream()
                 .map(row -> new EnrollmentSeat((UUID) row[0], (String) row[1]))
                 .toList();
+    }
+
+    @Override
+    public Set<UUID> studentsEffectiveInYear(Integer academicYearId, Collection<UUID> studentIds) {
+        if (academicYearId == null || studentIds == null || studentIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(
+                enrollmentRepo.studentIdsWithStatusInYear(
+                        academicYearId, STATUS_EFFECTIVE, studentIds));
     }
 
     @Override
