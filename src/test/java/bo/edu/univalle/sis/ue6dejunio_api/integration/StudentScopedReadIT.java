@@ -202,6 +202,28 @@ class StudentScopedReadIT extends AbstractIntegrationTest {
     }
 
     /**
+     * A course between homeroom teachers carries a null there. The readable-groups query reaches
+     * through that column, and a join on it would silently drop the course, and with it the subject
+     * the teacher runs.
+     */
+    @Test
+    void studentRisk_aSubjectTeacherInACourseWithNoHomeroom_stillReadsTheirSubject()
+            throws Exception {
+        UUID courseB = seedCourse(null, "B");
+        UUID languageInB = seedClassGroup(courseB, technical, "Lenguaje");
+        UUID mathInB = seedClassGroup(courseB, stranger, "Matematicas");
+        seedEnrollment(ana, courseB);
+        predict(languageInB);
+        predict(mathInB);
+
+        // Ana's rows: Matematicas and Lenguaje in A, Lenguaje and Matematicas in B. The technical
+        // teacher reads Lenguaje of A and Lenguaje of B.
+        riskAs(technical, "Teacher")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    /**
      * Homeroom of one of the student's courses and a subject teacher in another: all rows of the
      * first, only their own of the second.
      */
