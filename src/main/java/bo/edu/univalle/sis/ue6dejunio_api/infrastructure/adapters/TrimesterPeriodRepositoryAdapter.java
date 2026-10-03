@@ -110,4 +110,15 @@ public class TrimesterPeriodRepositoryAdapter implements ITrimesterPeriodDomain 
                 || assessmentScoreRepo.existsInYearAndTrimester(academicYearId, trimester)
                 || academicScoreRepo.existsInYearAndTrimester(academicYearId, trimester);
     }
+
+    @Override
+    public boolean hasAttendanceLeftOutside(
+            Integer academicYearId,
+            LocalDate oldStart,
+            LocalDate oldEnd,
+            LocalDate newStart,
+            LocalDate newEnd) {
+        return attendanceRepo.existsInYearLeftOutside(
+                academicYearId, oldStart, oldEnd, newStart, newEnd);
+    }
 }

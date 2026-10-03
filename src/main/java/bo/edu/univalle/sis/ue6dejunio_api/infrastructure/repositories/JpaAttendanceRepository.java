@@ -22,6 +22,25 @@ public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity,
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
 
+    /**
+     * Attendance of the gestión dated inside the old range and outside the new one: the days a
+     * period edit would stop covering. Covers both slices (start moved later, end moved earlier)
+     * and a fully shifted range in one probe.
+     */
+    @Query(
+            """
+        SELECT COUNT(a) > 0 FROM AttendanceEntity a
+        WHERE a.courseEnrollment.course.academicYear.id = :yearId
+          AND a.date BETWEEN :oldStart AND :oldEnd
+          AND (a.date < :newStart OR a.date > :newEnd)
+        """)
+    boolean existsInYearLeftOutside(
+            @Param("yearId") Integer yearId,
+            @Param("oldStart") LocalDate oldStart,
+            @Param("oldEnd") LocalDate oldEnd,
+            @Param("newStart") LocalDate newStart,
+            @Param("newEnd") LocalDate newEnd);
+
     Optional<AttendanceEntity> findByCourseEnrollment_IdAndDateAndClassGroupIsNull(
             UUID courseEnrollmentId, LocalDate date);
 

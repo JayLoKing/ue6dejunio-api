@@ -30,4 +30,16 @@ public interface ITrimesterPeriodDomain {
      */
     boolean hasRecordedActivity(
             Integer academicYearId, int trimester, LocalDate start, LocalDate end);
+
+    /**
+     * Whether the gestión holds attendance dated inside the old range {@code [oldStart, oldEnd]}
+     * but outside the new one {@code [newStart, newEnd]}, i.e. on a day an edit would stop
+     * covering. A cheap EXISTS probe: no rows are loaded.
+     */
+    boolean hasAttendanceLeftOutside(
+            Integer academicYearId,
+            LocalDate oldStart,
+            LocalDate oldEnd,
+            LocalDate newStart,
+            LocalDate newEnd);
 }

@@ -176,6 +176,94 @@ class TrimesterPeriodServiceTest {
         assertThat(result.startDate()).isEqualTo(LocalDate.parse("2026-02-05"));
     }
 
+    private UUID stubPeriod(String start, String end) {
+        UUID id = UUID.randomUUID();
+        TrimesterPeriod p = period(id, 1, start, end);
+        when(domain.findById(id)).thenReturn(Optional.of(p));
+        when(domain.findByAcademicYear(YEAR_ID)).thenReturn(List.of(p));
+        return id;
+    }
+
+    private static UpdateTrimesterPeriodCommand range(String start, String end) {
+        return new UpdateTrimesterPeriodCommand(LocalDate.parse(start), LocalDate.parse(end));
+    }
+
+    @Test
+    void update_extendingThePeriod_isAllowedWithoutProbingAttendance() {
+        UUID id = stubPeriod("2026-02-10", "2026-05-20");
+        when(domain.update(id, LocalDate.parse("2026-02-01"), LocalDate.parse("2026-05-31")))
+                .thenReturn(period(id, 1, "2026-02-01", "2026-05-31"));
+
+        service.update(id, range("2026-02-01", "2026-05-31"));
+
+        verify(domain, never()).hasAttendanceLeftOutside(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void update_shrinkingWithNoAttendanceInTheRemovedDays_isAllowed() {
+        UUID id = stubPeriod("2026-02-01", "2026-05-31");
+        LocalDate newEnd = LocalDate.parse("2026-05-15");
+        when(domain.hasAttendanceLeftOutside(
+                        YEAR_ID,
+                        LocalDate.parse("2026-02-01"),
+                        LocalDate.parse("2026-05-31"),
+                        LocalDate.parse("2026-02-01"),
+                        newEnd))
+                .thenReturn(false);
+        when(domain.update(id, LocalDate.parse("2026-02-01"), newEnd))
+                .thenReturn(period(id, 1, "2026-02-01", "2026-05-15"));
+
+        TrimesterPeriod result = service.update(id, range("2026-02-01", "2026-05-15"));
+
+        assertThat(result.endDate()).isEqualTo(newEnd);
+    }
+
+    @Test
+    void update_shrinkingPastRecordedAttendance_isRefusedAndSavesNothing() {
+        UUID id = stubPeriod("2026-02-01", "2026-05-31");
+        when(domain.hasAttendanceLeftOutside(any(), any(), any(), any(), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.update(id, range("2026-02-01", "2026-05-15")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("No se puede acortar el trimestre");
+        verify(domain, never()).update(any(), any(), any());
+    }
+
+    @Test
+    void update_shiftingAwayFromRecordedAttendance_isRefused() {
+        UUID id = stubPeriod("2026-02-01", "2026-05-31");
+        // The whole old range moves later: the attendance of February falls outside.
+        when(domain.hasAttendanceLeftOutside(
+                        YEAR_ID,
+                        LocalDate.parse("2026-02-01"),
+                        LocalDate.parse("2026-05-31"),
+                        LocalDate.parse("2026-03-01"),
+                        LocalDate.parse("2026-06-30")))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> service.update(id, range("2026-03-01", "2026-06-30")))
+                .isInstanceOf(ConflictException.class);
+        verify(domain, never()).update(any(), any(), any());
+    }
+
+    @Test
+    void update_probesAttendanceOfThePeriodsOwnGestionOnly() {
+        UUID id = stubPeriod("2026-02-01", "2026-05-31");
+        when(domain.hasAttendanceLeftOutside(any(), any(), any(), any(), any())).thenReturn(false);
+        when(domain.update(any(), any(), any()))
+                .thenReturn(period(id, 1, "2026-02-01", "2026-05-15"));
+
+        service.update(id, range("2026-02-01", "2026-05-15"));
+
+        verify(domain)
+                .hasAttendanceLeftOutside(
+                        YEAR_ID,
+                        LocalDate.parse("2026-02-01"),
+                        LocalDate.parse("2026-05-31"),
+                        LocalDate.parse("2026-02-01"),
+                        LocalDate.parse("2026-05-15"));
+    }
+
     @Test
     void getById_unknown_throwsNotFound() {
         when(domain.findById(any())).thenReturn(Optional.empty());

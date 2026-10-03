@@ -57,6 +57,7 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
         List<TrimesterPeriod> existing =
                 trimesterPeriodDomain.findByAcademicYear(current.academicYearId());
         requireNoOverlap(existing, c.startDate(), c.endDate(), id);
+        requireNoAttendanceLeftOutside(current, c);
         return trimesterPeriodDomain.update(id, c.startDate(), c.endDate());
     }
 
@@ -91,6 +92,32 @@ public class TrimesterPeriodService implements ITrimesterPeriodService {
                             + " registradas");
         }
         trimesterPeriodDomain.delete(id);
+    }
+
+    /**
+     * Extending a period is always safe. Shrinking or shifting it is refused only when attendance
+     * sits on a day the old range covered and the new one does not: that record would be left
+     * outside every report scoped by this period. Scores are unaffected (matched by trimester
+     * number), so only attendance is probed.
+     */
+    private void requireNoAttendanceLeftOutside(
+            TrimesterPeriod current, UpdateTrimesterPeriodCommand c) {
+        boolean extendsOnly =
+                !c.startDate().isAfter(current.startDate())
+                        && !c.endDate().isBefore(current.endDate());
+        if (extendsOnly) {
+            return;
+        }
+        if (trimesterPeriodDomain.hasAttendanceLeftOutside(
+                current.academicYearId(),
+                current.startDate(),
+                current.endDate(),
+                c.startDate(),
+                c.endDate())) {
+            throw new ConflictException(
+                    "No se puede acortar el trimestre: hay asistencias registradas en las fechas"
+                            + " que quedarían fuera");
+        }
     }
 
     private static void validateDateRange(LocalDate startDate, LocalDate endDate) {
