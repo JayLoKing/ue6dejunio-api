@@ -89,10 +89,7 @@ public class AuthController {
                                 : null));
     }
 
-    /**
-     * Edits the caller's own names and phone. No id anywhere in the request: the subject is the one
-     * the resource server verified, so nobody can edit somebody else's profile through here.
-     */
+    /** Reads the caller's own row; the subject comes from the verified token, never from a path. */
     @GetMapping("/profile")
     @Operation(
             summary = "Datos editables del usuario autenticado",
@@ -102,6 +99,10 @@ public class AuthController {
         return ResponseEntity.ok(ProfileResponse.from(authService.getProfile(userId)));
     }
 
+    /**
+     * Edits the caller's own names and phone. No id anywhere in the request: the subject is the one
+     * the resource server verified, so nobody can edit somebody else's profile through here.
+     */
     @PutMapping("/profile")
     @Operation(
             summary = "Actualizar nombres y teléfono del usuario autenticado",
