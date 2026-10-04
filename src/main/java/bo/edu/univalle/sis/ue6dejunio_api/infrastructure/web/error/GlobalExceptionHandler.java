@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.error;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ForbiddenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidCredentialsException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
@@ -58,6 +59,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(HttpServletRequest req) {
         return build(HttpStatus.FORBIDDEN, "Forbidden", "Acceso denegado", req);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(
+            ForbiddenException ex, HttpServletRequest req) {
+        return build(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), req);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
