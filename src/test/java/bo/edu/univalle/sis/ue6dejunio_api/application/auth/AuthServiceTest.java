@@ -427,6 +427,31 @@ class AuthServiceTest {
     }
 
     @Test
+    void getProfile_returnsTheCallersOwnRow() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+
+        assertThat(authService.getProfile(activeUser.getId())).isSameAs(activeUser);
+    }
+
+    @Test
+    void getProfile_deactivatedUser_throwsUserInactive() {
+        activeUser.setActive(false);
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+
+        assertThatThrownBy(() -> authService.getProfile(activeUser.getId()))
+                .isInstanceOf(UserInactiveException.class);
+    }
+
+    @Test
+    void getProfile_unknownUser_throwsResourceNotFound() {
+        UUID ghost = UUID.randomUUID();
+        when(userDomain.findById(ghost)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.getProfile(ghost))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void updateProfile_unknownUser_throwsResourceNotFound() {
         UUID ghost = UUID.randomUUID();
         when(userDomain.findById(ghost)).thenReturn(Optional.empty());

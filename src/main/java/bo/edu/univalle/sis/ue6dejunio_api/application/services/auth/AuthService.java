@@ -160,6 +160,19 @@ public class AuthService implements IAuthService {
 
     @Override
     @Transactional(readOnly = true)
+    public User getProfile(UUID userId) {
+        User user =
+                userDomain
+                        .findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
+        if (!user.isActive()) {
+            throw new UserInactiveException();
+        }
+        return user;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public void forgotPassword(String email) {
         Optional<User> maybeUser = userDomain.findByEmail(email);
         if (maybeUser.isPresent() && maybeUser.get().isActive()) {

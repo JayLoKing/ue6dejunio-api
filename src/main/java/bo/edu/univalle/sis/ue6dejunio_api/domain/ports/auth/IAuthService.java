@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import java.util.UUID;
 
 public interface IAuthService {
@@ -41,6 +42,17 @@ public interface IAuthService {
      *     user behind the token no longer exists
      */
     AuthenticatedUser updateProfile(UpdateProfileCommand command);
+
+    /**
+     * The caller's own row, for the profile form: the token has only a joined full name, and the
+     * form edits names and last names apart.
+     *
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException if the
+     *     account is closed
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException if the
+     *     user behind the token no longer exists
+     */
+    User getProfile(UUID userId);
 
     void forgotPassword(String email);
 

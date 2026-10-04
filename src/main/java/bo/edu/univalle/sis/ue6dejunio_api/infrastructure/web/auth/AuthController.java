@@ -11,6 +11,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordR
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.LoginRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.MeResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ProfileResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ResetPasswordRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateProfileRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -92,6 +93,15 @@ public class AuthController {
      * Edits the caller's own names and phone. No id anywhere in the request: the subject is the one
      * the resource server verified, so nobody can edit somebody else's profile through here.
      */
+    @GetMapping("/profile")
+    @Operation(
+            summary = "Datos editables del usuario autenticado",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ProfileResponse> profile(JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getToken().getSubject());
+        return ResponseEntity.ok(ProfileResponse.from(authService.getProfile(userId)));
+    }
+
     @PutMapping("/profile")
     @Operation(
             summary = "Actualizar nombres y teléfono del usuario autenticado",
