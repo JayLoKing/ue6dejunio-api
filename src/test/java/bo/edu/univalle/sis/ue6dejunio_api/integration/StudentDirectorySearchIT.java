@@ -110,6 +110,33 @@ class StudentDirectorySearchIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].parallel").value("A"));
     }
 
+    /** The web links "Ver curso" from the row, so the row has to say which course and parallel. */
+    @Test
+    void rowCarriesTheCourseAndParallelIds_onTheListAndOnTheSearch() throws Exception {
+        Integer parallelId =
+                jdbc.queryForObject(
+                        "SELECT id_parallel FROM courses WHERE id_course = ?",
+                        Integer.class,
+                        homeroomCourse);
+        String director = "Bearer " + tokenFor(this.director, "Director");
+
+        mvc.perform(
+                        get("/api/students/search")
+                                .param("q", "Lopez")
+                                .header("Authorization", director))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].courseId").value(homeroomCourse.toString()))
+                .andExpect(jsonPath("$.content[0].parallelId").value(parallelId));
+
+        mvc.perform(get("/api/students/search").header("Authorization", director))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(
+                        jsonPath("$.content[?(@.id == '" + studentInOtherCourse + "')].courseId")
+                                .value(otherCourse.toString()));
+    }
+
     @Test
     void teacher_scopedToOwnHomeroomCourse_othersExcluded() throws Exception {
         mvc.perform(

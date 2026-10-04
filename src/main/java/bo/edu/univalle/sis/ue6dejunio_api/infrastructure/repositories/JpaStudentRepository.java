@@ -65,7 +65,7 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
                     """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
             s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
-            g.name, p.name, l.name, s.status, y.year)
+            g.name, p.name, l.name, s.status, y.year, c.id, p.id)
         FROM StudentEntity s
         LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c
@@ -106,7 +106,7 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
                     """
         SELECT DISTINCT new bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem(
             s.id, s.rudeCode, s.identityCard, CONCAT(s.names, ' ', s.lastNames),
-            g.name, p.name, l.name, s.status, y.year)
+            g.name, p.name, l.name, s.status, y.year, c.id, p.id)
         FROM StudentEntity s
         LEFT JOIN CourseEnrollmentEntity ce ON ce.student = s AND ce.status = s.status
         LEFT JOIN ce.course c

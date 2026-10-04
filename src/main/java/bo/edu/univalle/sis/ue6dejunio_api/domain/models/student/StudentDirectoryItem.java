@@ -12,6 +12,8 @@ import java.util.UUID;
  * @param academicYear the gestión the grade and parallel above belong to. A student who moves up
  *     keeps this record and gains another year, so the grade means nothing without the year it was
  *     true of
+ * @param courseId the course the grade and parallel name, so a caller can open it. Null with them
+ * @param parallelId the parallel of that course, null with it
  */
 public record StudentDirectoryItem(
         UUID id,
@@ -22,4 +24,6 @@ public record StudentDirectoryItem(
         String parallel,
         String level,
         String status,
-        Integer academicYear) {}
+        Integer academicYear,
+        UUID courseId,
+        Integer parallelId) {}
