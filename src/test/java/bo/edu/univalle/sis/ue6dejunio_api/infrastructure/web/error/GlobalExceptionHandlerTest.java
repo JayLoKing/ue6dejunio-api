@@ -252,6 +252,23 @@ class GlobalExceptionHandlerTest {
                         });
     }
 
+    /**
+     * A browser that closed its notification stream is not a server failure.
+     *
+     * <p>The heartbeat finds the dead stream by writing to it, and completing that emitter makes
+     * Spring raise this on the async dispatch. It used to land in the generic handler, which logged
+     * an ERROR with a stacktrace for every closed tab and then failed a second time trying to write
+     * a JSON body onto a {@code text/event-stream} response. There is nobody left to answer.
+     */
+    @Test
+    void aClosedStreamIsNeitherAnsweredNorLoggedAsAnError() {
+        ResponseEntity<Void> response =
+                handler.handleResponseNotUsable(requestTo("/api/notifications/stream"));
+
+        assertThat(response).isNull();
+        assertThat(logged.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.WARN));
+    }
+
     // The message names the constraint, and a constraint name is a schema detail: it tells the
     // caller nothing they can act on and tells an attacker the shape of the tables.
     @Test

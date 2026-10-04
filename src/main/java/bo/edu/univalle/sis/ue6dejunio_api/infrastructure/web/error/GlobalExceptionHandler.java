@@ -29,6 +29,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -304,6 +305,21 @@ public class GlobalExceptionHandler {
                         req.getRequestURI(),
                         includeBindingErrors ? details : List.of());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    /**
+     * The client hung up on a response that was still open — in practice, a browser tab that closed
+     * its notification stream and is found out by the next heartbeat.
+     *
+     * <p>Nothing is written and nothing is logged above debug: the connection is gone, and the
+     * response already carries {@code text/event-stream}, so an {@link ErrorResponse} body could
+     * not be converted anyway. A {@code null} entity is how Spring is told the request is handled
+     * with nothing to send — the same answer its own {@code ResponseEntityExceptionHandler} gives.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public ResponseEntity<Void> handleResponseNotUsable(HttpServletRequest req) {
+        log.debug("Client went away on {} {}", req.getMethod(), req.getRequestURI());
+        return null;
     }
 
     @ExceptionHandler(Exception.class)
