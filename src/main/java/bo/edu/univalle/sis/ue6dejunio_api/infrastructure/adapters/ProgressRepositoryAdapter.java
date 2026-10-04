@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +33,8 @@ public class ProgressRepositoryAdapter implements IProgressDomain {
     }
 
     @Override
-    public boolean planExists(UUID planId) {
-        return planRepo.existsById(planId);
+    public Optional<String> findPlanStatus(UUID planId) {
+        return planRepo.findStatusById(planId);
     }
 
     @Override

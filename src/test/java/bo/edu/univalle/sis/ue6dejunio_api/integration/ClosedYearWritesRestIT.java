@@ -216,10 +216,11 @@ class ClosedYearWritesRestIT extends AbstractIntegrationTest {
     @Test
     void closedYear_rejectsRecordingProgress() throws Exception {
         closeYear();
+        UUID approved = seedPlan(course, 3, "Approved");
 
         refused(
                 send(
-                        post("/api/pdc/" + plan + "/progress"),
+                        post("/api/pdc/" + approved + "/progress"),
                         teacher,
                         "Teacher",
                         "{\"advancedContent\":\"Tema 1\",\"percentage\":10}"));

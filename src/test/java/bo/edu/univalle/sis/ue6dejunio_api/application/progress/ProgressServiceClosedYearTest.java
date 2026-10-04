@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.progress.ProgressService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.progress.CreateProgressCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.progress.IProgressDomain;
 import java.math.BigDecimal;
@@ -29,7 +30,8 @@ class ProgressServiceClosedYearTest {
     @Test
     void create_inAClosedYear_isRefusedBeforeAnyWrite() {
         UUID planId = UUID.randomUUID();
-        when(progressDomain.planExists(planId)).thenReturn(true);
+        when(progressDomain.findPlanStatus(planId))
+                .thenReturn(java.util.Optional.of(PdcStatus.APPROVED));
         doThrow(new ConflictException("La gestión 2026 está cerrada; no admite cambios."))
                 .when(closedYearGuard)
                 .requireOpenForPlan(planId);
