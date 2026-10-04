@@ -101,6 +101,7 @@ public abstract class AbstractIntegrationTest {
         "course_enrollments",
         "courses",
         "students",
+        "director_handovers",
         "users"
     };
 

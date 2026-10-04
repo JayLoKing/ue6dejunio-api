@@ -345,6 +345,24 @@ CREATE TABLE IF NOT EXISTS pedagogical_report_failures (
 CREATE INDEX IF NOT EXISTS ix_pedagogical_report_failure_enrollment
     ON pedagogical_report_failures (id_course_enrollment);
 
+-- Mirrors V26: the handover of the Director role, at most one pending row.
+CREATE TABLE IF NOT EXISTS director_handovers (
+    id_handover uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    outgoing_id uuid NOT NULL REFERENCES users(id_user) ON DELETE RESTRICT,
+    incoming_id uuid NOT NULL REFERENCES users(id_user) ON DELETE RESTRICT,
+    incoming_created boolean NOT NULL,
+    previous_role_id integer REFERENCES roles(id_role) ON DELETE RESTRICT,
+    started_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_at timestamp NULL,
+    cancelled_at timestamp NULL,
+    CONSTRAINT chk_director_handover_not_closed_and_cancelled
+        CHECK (closed_at IS NULL OR cancelled_at IS NULL),
+    CONSTRAINT chk_director_handover_distinct_users CHECK (outgoing_id <> incoming_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_director_handovers_single_pending
+    ON director_handovers ((true))
+    WHERE closed_at IS NULL AND cancelled_at IS NULL;
+
 -- The catalog seed runs once per Spring context, and more than one context is created against the
 -- same shared container (ProdProfileHardeningIT activates a second profile). Every statement here
 -- is therefore idempotent: re-running the script must be a no-op, not a duplicate-key failure.
