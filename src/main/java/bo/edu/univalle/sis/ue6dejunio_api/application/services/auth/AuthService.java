@@ -13,6 +13,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.handover.IDirectorHandoverService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import java.util.Optional;
@@ -32,6 +33,7 @@ public class AuthService implements IAuthService {
     private final IJwtService jwtService;
     private final ICourseDomain courseDomain;
     private final IEmailService emailService;
+    private final IDirectorHandoverService handoverService;
     private final String resetUrl;
 
     public AuthService(
@@ -40,12 +42,14 @@ public class AuthService implements IAuthService {
             IJwtService jwtService,
             ICourseDomain courseDomain,
             IEmailService emailService,
+            IDirectorHandoverService handoverService,
             @Value("${app.frontend.reset-url}") String resetUrl) {
         this.userDomain = userDomain;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.courseDomain = courseDomain;
         this.emailService = emailService;
+        this.handoverService = handoverService;
         this.resetUrl = resetUrl;
     }
 
@@ -131,6 +135,10 @@ public class AuthService implements IAuthService {
         user.setPassword(passwordEncoder.encode(command.newPassword()));
         user.setMustChangePassword(false);
         userDomain.save(user);
+        // A password of their own is what proves the incoming Director received the mail. Same
+        // transaction: if closing the handover fails, the password change rolls back with it, and
+        // the incoming Director simply tries again while the outgoing one still has access.
+        handoverService.completeFor(user.getId());
     }
 
     @Override
@@ -172,5 +180,8 @@ public class AuthService implements IAuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
         userDomain.save(user);
+        // The recovery link is the other way the incoming Director can end up with a password of
+        // their own (they lost the temporary one), so it closes a pending handover too.
+        handoverService.completeFor(user.getId());
     }
 }

@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.auth.AuthService;
@@ -14,6 +16,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenExc
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
@@ -21,6 +24,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course.ICourseDomain;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.handover.IDirectorHandoverService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import java.time.Instant;
@@ -29,6 +33,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +48,7 @@ class AuthServiceTest {
     @Mock private IJwtService jwtService;
     @Mock private ICourseDomain courseDomain;
     @Mock private IEmailService emailService;
+    @Mock private IDirectorHandoverService handoverService;
 
     private AuthService authService;
 
@@ -57,6 +63,7 @@ class AuthServiceTest {
                         jwtService,
                         courseDomain,
                         emailService,
+                        handoverService,
                         RESET_URL);
 
         activeUser =
@@ -276,6 +283,84 @@ class AuthServiceTest {
         assertThat(activeUser.getPassword()).isEqualTo("$encoded$");
         assertThat(activeUser.isMustChangePassword()).isFalse();
         verify(userDomain).save(activeUser);
+    }
+
+    /**
+     * A password set by the incoming Director is what closes a handover, whichever door it came
+     * through. The hook runs after the save, in the same transaction, and only for a password that
+     * was actually set.
+     */
+    @Test
+    void resetPassword_validToken_offersTheHandoverTheUser() {
+        when(jwtService.validatePasswordResetToken("valid-token")).thenReturn(activeUser.getId());
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.encode("newSecret1")).thenReturn("$encoded$");
+
+        authService.resetPassword("valid-token", "newSecret1");
+
+        InOrder order = inOrder(userDomain, handoverService);
+        order.verify(userDomain).save(activeUser);
+        order.verify(handoverService).completeFor(activeUser.getId());
+    }
+
+    @Test
+    void resetPassword_invalidToken_doesNotTouchTheHandover() {
+        when(jwtService.validatePasswordResetToken("bad-token"))
+                .thenThrow(new InvalidResetTokenException());
+
+        assertThatThrownBy(() -> authService.resetPassword("bad-token", "newSecret1"))
+                .isInstanceOf(InvalidResetTokenException.class);
+
+        verifyNoInteractions(handoverService);
+    }
+
+    @Test
+    void changePassword_success_savesThePassword_thenOffersTheHandoverTheUser() {
+        activeUser.setMustChangePassword(true);
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("temp", "$hashed$")).thenReturn(true);
+        when(passwordEncoder.encode("newSecret1")).thenReturn("$encoded$");
+
+        authService.changePassword(
+                new ChangePasswordCommand(activeUser.getId(), "temp", "newSecret1"));
+
+        assertThat(activeUser.getPassword()).isEqualTo("$encoded$");
+        assertThat(activeUser.isMustChangePassword()).isFalse();
+        InOrder order = inOrder(userDomain, handoverService);
+        order.verify(userDomain).save(activeUser);
+        order.verify(handoverService).completeFor(activeUser.getId());
+    }
+
+    @Test
+    void changePassword_wrongCurrentPassword_doesNotTouchTheHandover() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("bad", "$hashed$")).thenReturn(false);
+
+        assertThatThrownBy(
+                        () ->
+                                authService.changePassword(
+                                        new ChangePasswordCommand(
+                                                activeUser.getId(), "bad", "newSecret1")))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(userDomain, never()).save(any(User.class));
+        verifyNoInteractions(handoverService);
+    }
+
+    @Test
+    void changePassword_deactivatedUser_doesNotTouchTheHandover() {
+        activeUser.setActive(false);
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("temp", "$hashed$")).thenReturn(true);
+
+        assertThatThrownBy(
+                        () ->
+                                authService.changePassword(
+                                        new ChangePasswordCommand(
+                                                activeUser.getId(), "temp", "newSecret1")))
+                .isInstanceOf(UserInactiveException.class);
+
+        verifyNoInteractions(handoverService);
     }
 
     @Test
