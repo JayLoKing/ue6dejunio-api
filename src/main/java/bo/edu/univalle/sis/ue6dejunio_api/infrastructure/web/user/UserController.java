@@ -11,14 +11,18 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateUserReque
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateUserRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UserListResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UserLookupResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -70,6 +74,19 @@ public class UserController {
     @Operation(summary = "Obtener usuario por id")
     public ResponseEntity<UserResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(UserResponse.from(userService.getById(id)));
+    }
+
+    @GetMapping("/lookup")
+    @Operation(
+            summary =
+                    "Buscar un usuario por correo exacto. 200 con el usuario, 204 si el correo"
+                            + " no pertenece a nadie")
+    public ResponseEntity<UserLookupResponse> lookup(
+            @RequestParam @NotBlank @Email @Size(max = 100) String email) {
+        return userService
+                .findByEmail(email)
+                .map(user -> ResponseEntity.ok(UserLookupResponse.from(user)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping

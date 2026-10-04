@@ -15,6 +15,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserService;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -136,6 +137,12 @@ public class UserService implements IUserService {
         return userDomain
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findByEmail(String email) {
+        return userDomain.findByEmail(email.trim());
     }
 
     @Override

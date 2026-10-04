@@ -285,6 +285,21 @@ class UserServiceTest {
     }
 
     @Test
+    void findByEmail_trimsTheAddressAndReturnsWhoOwnsIt() {
+        User owner = pendingUser(java.util.UUID.randomUUID());
+        when(userDomain.findByEmail("ana@ue6.bo")).thenReturn(Optional.of(owner));
+
+        assertThat(userService.findByEmail("  ana@ue6.bo ")).containsSame(owner);
+    }
+
+    @Test
+    void findByEmail_noOwner_isEmpty() {
+        when(userDomain.findByEmail("nadie@ue6.bo")).thenReturn(Optional.empty());
+
+        assertThat(userService.findByEmail("nadie@ue6.bo")).isEmpty();
+    }
+
+    @Test
     void resendCredentials_unknownUser_throwsResourceNotFound() {
         java.util.UUID id = java.util.UUID.randomUUID();
         when(userDomain.findById(id)).thenReturn(Optional.empty());

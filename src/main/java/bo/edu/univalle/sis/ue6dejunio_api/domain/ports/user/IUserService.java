@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface IUserService {
@@ -14,6 +15,13 @@ public interface IUserService {
     User update(UUID id, UpdateUserCommand command);
 
     User getById(UUID id);
+
+    /**
+     * Who owns this email address, if anybody. The Director's handover form asks before it posts,
+     * because posting an address that already belongs to someone promotes that person on the spot.
+     * The address is trimmed; an unknown one is an empty answer, not an error.
+     */
+    Optional<User> findByEmail(String email);
 
     PageResult<UsersList> list(PageQuery pageQuery, String search, UUID excludeUserId);
 
