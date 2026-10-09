@@ -29,6 +29,8 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
     private UUID director;
     private UUID teacher;
     private UUID courseA;
+    private UUID technicalTeacher;
+    private UUID unrelatedTeacher;
 
     @BeforeEach
     void seed() {
@@ -37,6 +39,11 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
 
         courseA = seedCourse(teacher, "A");
         UUID langA = seedClassGroup(courseA, teacher, "Lenguaje");
+        // Teaches one subject in course A without being its homeroom teacher.
+        technicalTeacher = seedUser("Teacher", true);
+        seedClassGroup(courseA, technicalTeacher, "Matematicas");
+        // Holds nothing in course A at all.
+        unrelatedTeacher = seedUser("Teacher", false);
         // 90, 75 and 47 — a podium whose order is unmistakable, and nowhere near a tie.
         gradeOneArea(
                 seedEnrollment(seedStudent("Ana", "Perez"), courseA),
@@ -114,6 +121,43 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
         assertThat(JsonPath.<List<Integer>>read(body, "$[*].position")).containsExactly(1, 2);
         assertThat(new BigDecimal(JsonPath.read(body, "$[0].finalAverage").toString()))
                 .isEqualByComparingTo("90.00");
+    }
+
+    /**
+     * A technical teacher reads the course podium too, and it is the same podium: ranked over every
+     * subject of the course, not narrowed to the one they teach — which, here, nobody is graded in.
+     */
+    @Test
+    void honorRoll_isOpenToATechnicalTeacherOfTheCourseAndStillRanksEverySubject()
+            throws Exception {
+        String body =
+                mvc.perform(
+                                get("/api/gradebook/honor-roll")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(technicalTeacher, "Teacher"))
+                                        .param("id_course", courseA.toString())
+                                        .param("places", "2"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].fullName"))
+                .containsExactly("Ana Perez", "Beto Quispe");
+    }
+
+    /** A teacher with no class group in the course has no business with its podium. */
+    @Test
+    void honorRoll_isClosedToATeacherWithNoClassGroupInTheCourse() throws Exception {
+        mvc.perform(
+                        get("/api/gradebook/honor-roll")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(unrelatedTeacher, "Teacher"))
+                                .param("id_course", courseA.toString())
+                                .param("places", "3"))
+                .andExpect(status().isForbidden());
     }
 
     /**

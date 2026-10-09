@@ -123,10 +123,19 @@ public class GradebookController {
                                 .map(StudentAnnualSummaryResponse::from)));
     }
 
+    /**
+     * The course podium. Open to every teacher with a class group in the course, not only its
+     * homeroom teacher, and still ranked over every subject whoever reads it: the school answered
+     * that a technical teacher sees the same podium the homeroom teacher does. Narrowing the
+     * ranking to the reader's subject would make it a different list under the same name.
+     */
     @GetMapping("/honor-roll")
-    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
+    @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
     @Operation(
-            summary = "Cuadro de honor del curso: los mejores promedios finales, el mejor primero")
+            summary =
+                    "Cuadro de honor del curso: los mejores promedios finales, el mejor primero."
+                            + " Siempre considera todas las materias del curso, sin importar"
+                            + " quien lo consulte")
     public ResponseEntity<List<HonorRollEntryResponse>> honorRoll(
             @RequestParam("id_course") UUID courseId,
             @RequestParam(defaultValue = "3") @Min(1) @Max(50) int places) {
