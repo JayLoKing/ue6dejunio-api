@@ -158,25 +158,38 @@ class StudentScopedReadIT extends AbstractIntegrationTest {
         summaryAs(stranger, "Teacher").andExpect(status().isForbidden());
     }
 
-    /** The guard was opened for this one route; every sibling stays homeroom-or-Director. */
+    /** The libreta is the whole student's year, and stays homeroom-or-Director. */
     @Test
-    void siblingReads_stayClosedToTheTechnicalTeacher() throws Exception {
+    void reportCard_staysClosedToTheTechnicalTeacher() throws Exception {
         mvc.perform(
                         get("/api/gradebook/report-card")
                                 .header("Authorization", bearer(technical, "Teacher"))
                                 .param("id_course_enrollment", enrollment.toString()))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * The centralizers were opened to the technical teacher too (phase 4), on the same terms as
+     * this summary: their subject only — and, being whole-course sheets, without the averages taken
+     * across subjects. {@code GradebookCentralizerScopeIT} covers them in full.
+     */
+    @Test
+    void centralizers_openToTheTechnicalTeacher_narrowedToTheirSubject() throws Exception {
         mvc.perform(
                         get("/api/gradebook/centralizer")
                                 .header("Authorization", bearer(technical, "Teacher"))
                                 .param("id_course", courseId.toString())
                                 .param("trimester", "1"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].subjects.length()").value(1))
+                .andExpect(jsonPath("$.content[0].subjects[0].subjectName").value("Lenguaje"));
         mvc.perform(
                         get("/api/gradebook/annual-centralizer")
                                 .header("Authorization", bearer(technical, "Teacher"))
                                 .param("id_course", courseId.toString()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].subjects.length()").value(1))
+                .andExpect(jsonPath("$.content[0].subjects[0].subjectName").value("Lenguaje"));
     }
 
     // ---------------------------------------------------------------- /students/{id}/risk
