@@ -131,7 +131,7 @@ class GradebookServiceFrozenResultTest {
     }
 
     private StudentAnnualSummary annualRow() {
-        return service.annualCentralizer(courseId, pageQuery).content().get(0);
+        return service.annualCentralizer(courseId, pageQuery, null).content().get(0);
     }
 
     @Test

@@ -63,16 +63,25 @@ public class GradebookController {
                         gradebookService.studentSummary(courseEnrollmentId, trimester, scope)));
     }
 
+    /**
+     * Wide gate, narrow rows — the {@code student-summary} pattern. Any teacher of the course gets
+     * in; the service then hands a teacher who is not its homeroom teacher only the subjects they
+     * teach, without the general average.
+     */
     @GetMapping("/centralizer")
-    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
+    @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
     @Operation(
             summary =
-                    "Centralizador del curso: todos los estudiantes con totales + promedio general")
+                    "Centralizador del curso: todos los estudiantes con totales + promedio general."
+                            + " Un docente que no es el asesor ve solo las materias que dicta, sin"
+                            + " promedio general")
     public ResponseEntity<PagedResponse<StudentSummaryResponse>> centralizer(
             @RequestParam("id_course") UUID courseId,
             @RequestParam @Min(1) @Max(3) Integer trimester,
             @RequestParam(defaultValue = "1") @Min(1) int offset,
-            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit,
+            Authentication authentication) {
+        UUID scope = authz.subjectScopeTeacherId(authentication);
         PageQuery p =
                 PageQuery.of(
                         offset - 1,
@@ -82,7 +91,7 @@ public class GradebookController {
         return ResponseEntity.ok(
                 PagedResponse.of(
                         gradebookService
-                                .centralizer(courseId, trimester, p)
+                                .centralizer(courseId, trimester, p, scope)
                                 .map(StudentSummaryResponse::from)));
     }
 
@@ -98,16 +107,21 @@ public class GradebookController {
                 StudentReportCardResponse.from(gradebookService.reportCard(courseEnrollmentId)));
     }
 
+    /** Same gate and same narrowing as {@link #centralizer}, over the whole year. */
     @GetMapping("/annual-centralizer")
-    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
+    @PreAuthorize("@authz.canReadCourseRoster(authentication, #courseId)")
     @Operation(
             summary =
                     "Centralizador anual del curso: por area los tres trimestres y su "
-                            + "promedio, mas los promedios trimestrales y el promedio final")
+                            + "promedio, mas los promedios trimestrales y el promedio final."
+                            + " Un docente que no es el asesor ve solo sus areas, sin promedios"
+                            + " entre materias")
     public ResponseEntity<PagedResponse<StudentAnnualSummaryResponse>> annualCentralizer(
             @RequestParam("id_course") UUID courseId,
             @RequestParam(defaultValue = "1") @Min(1) int offset,
-            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit) {
+            @RequestParam(defaultValue = "30") @Min(1) @Max(200) int limit,
+            Authentication authentication) {
+        UUID scope = authz.subjectScopeTeacherId(authentication);
         // No trimester and no gestión: the course already names its academic year, and the sheet
         // is the whole year by definition.
         PageQuery p =
@@ -119,7 +133,7 @@ public class GradebookController {
         return ResponseEntity.ok(
                 PagedResponse.of(
                         gradebookService
-                                .annualCentralizer(courseId, p)
+                                .annualCentralizer(courseId, p, scope)
                                 .map(StudentAnnualSummaryResponse::from)));
     }
 

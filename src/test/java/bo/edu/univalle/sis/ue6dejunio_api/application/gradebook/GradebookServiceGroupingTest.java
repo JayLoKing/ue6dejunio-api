@@ -130,7 +130,8 @@ class GradebookServiceGroupingTest {
                                 new BigDecimal("70.00")));
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(batched);
 
-        PageResult<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageQuery);
+        PageResult<StudentTrimesterSummary> result =
+                service.centralizer(courseId, 1, pageQuery, null);
 
         assertThat(result.content()).hasSize(2);
         StudentTrimesterSummary rowA = result.content().get(0);
@@ -158,7 +159,8 @@ class GradebookServiceGroupingTest {
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
-        PageResult<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageQuery);
+        PageResult<StudentTrimesterSummary> result =
+                service.centralizer(courseId, 1, pageQuery, null);
 
         StudentTrimesterSummary row = result.content().get(0);
         assertThat(row.subjects()).isEmpty();
@@ -170,7 +172,8 @@ class GradebookServiceGroupingTest {
         PageResult<CourseStudent> page = page(List.of());
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
 
-        PageResult<StudentTrimesterSummary> result = service.centralizer(courseId, 1, pageQuery);
+        PageResult<StudentTrimesterSummary> result =
+                service.centralizer(courseId, 1, pageQuery, null);
 
         assertThat(result.content()).isEmpty();
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());
@@ -344,7 +347,7 @@ class GradebookServiceGroupingTest {
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page);
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(List.of());
 
-        service.centralizer(courseId, 1, pageQuery);
+        service.centralizer(courseId, 1, pageQuery, null);
 
         verify(enrollmentDomain, never()).activeStudentsByCourse(any(), any());
     }

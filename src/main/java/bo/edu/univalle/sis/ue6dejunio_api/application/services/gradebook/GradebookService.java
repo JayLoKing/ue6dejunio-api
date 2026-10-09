@@ -39,6 +39,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BinaryOperator;
@@ -111,22 +112,79 @@ public class GradebookService implements IGradebookService {
     @Override
     @Transactional(readOnly = true)
     public PageResult<StudentTrimesterSummary> centralizer(
-            UUID courseId, Integer trimester, PageQuery pageQuery) {
+            UUID courseId, Integer trimester, PageQuery pageQuery, UUID teacherScopeId) {
         PageResult<CourseStudent> page = enrollmentDomain.studentsByCourse(courseId, pageQuery);
         Map<UUID, List<AcademicScore>> grouped = scoresByEnrollment(page);
-        return page.map(
-                cs ->
-                        buildSummary(
-                                cs.courseEnrollmentId(),
-                                cs.studentId(),
-                                cs.fullName(),
-                                trimester,
-                                grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+        PageResult<StudentTrimesterSummary> sheet =
+                page.map(
+                        cs ->
+                                buildSummary(
+                                        cs.courseEnrollmentId(),
+                                        cs.studentId(),
+                                        cs.fullName(),
+                                        trimester,
+                                        grouped.getOrDefault(cs.courseEnrollmentId(), List.of())));
+        return narrowedTo(courseId, teacherScopeId)
+                .map(taught -> sheet.map(row -> onlyTaught(row, taught)))
+                .orElse(sheet);
+    }
+
+    /**
+     * The class groups a reader of a whole-course sheet is limited to, or empty when they read all
+     * of it. Asked once per page, never per student: the answer depends on the course and the
+     * reader, and every row of the page shares both.
+     *
+     * <p>A course with no homeroom teacher carries a null there, and the comparison runs from the
+     * reader's id, so it never makes every teacher the homeroom teacher.
+     */
+    private Optional<Set<UUID>> narrowedTo(UUID courseId, UUID teacherScopeId) {
+        if (teacherScopeId == null
+                || teacherScopeId.equals(courseService.getById(courseId).homeroomTeacherId())) {
+            return Optional.empty();
+        }
+        return Optional.of(classGroupDomain.classGroupIdsTaughtInCourse(teacherScopeId, courseId));
+    }
+
+    /**
+     * A trimester row cut down to the reader's own subjects. The general average goes too, unlike
+     * in {@link #studentSummary}: here it sits beside every student of the course and would read
+     * out, row after row, the subjects the reader was not given.
+     */
+    private static StudentTrimesterSummary onlyTaught(
+            StudentTrimesterSummary row, Set<UUID> taught) {
+        return new StudentTrimesterSummary(
+                row.courseEnrollmentId(),
+                row.studentId(),
+                row.fullName(),
+                row.trimester(),
+                row.subjects().stream().filter(s -> taught.contains(s.classGroupId())).toList(),
+                null);
+    }
+
+    /**
+     * A year row cut down to the reader's own areas. Each area they keep stays whole — its three
+     * trimesters and its own average are marks of their subject. Every column taken across subjects
+     * goes: the trimester averages, the final average and the year's result. {@code frozen} stays,
+     * since whether the year is closed says nothing about any other subject.
+     */
+    private static StudentAnnualSummary onlyTaught(StudentAnnualSummary row, Set<UUID> taught) {
+        return new StudentAnnualSummary(
+                row.courseEnrollmentId(),
+                row.studentId(),
+                row.fullName(),
+                row.subjects().stream().filter(s -> taught.contains(s.classGroupId())).toList(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                row.frozen());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<StudentAnnualSummary> annualCentralizer(UUID courseId, PageQuery pageQuery) {
+    public PageResult<StudentAnnualSummary> annualCentralizer(
+            UUID courseId, PageQuery pageQuery, UUID teacherScopeId) {
         // No gestión parameter: the course already belongs to one academic year, so asking for the
         // year again would only let a caller contradict the course it just named. The batched load
         // is the same one the trimester centralizer does — it never filtered by trimester in SQL —
@@ -137,15 +195,20 @@ public class GradebookService implements IGradebookService {
         Map<UUID, EnrollmentOutcome> outcomes =
                 enrollmentDomain.outcomesOf(
                         page.content().stream().map(CourseStudent::courseEnrollmentId).toList());
-        return page.map(
-                cs ->
-                        withFrozenResult(
-                                buildAnnualSummary(
-                                        cs.courseEnrollmentId(),
-                                        cs.studentId(),
-                                        cs.fullName(),
-                                        grouped.getOrDefault(cs.courseEnrollmentId(), List.of())),
-                                outcomes.get(cs.courseEnrollmentId())));
+        PageResult<StudentAnnualSummary> sheet =
+                page.map(
+                        cs ->
+                                withFrozenResult(
+                                        buildAnnualSummary(
+                                                cs.courseEnrollmentId(),
+                                                cs.studentId(),
+                                                cs.fullName(),
+                                                grouped.getOrDefault(
+                                                        cs.courseEnrollmentId(), List.of())),
+                                        outcomes.get(cs.courseEnrollmentId())));
+        return narrowedTo(courseId, teacherScopeId)
+                .map(taught -> sheet.map(row -> onlyTaught(row, taught)))
+                .orElse(sheet);
     }
 
     /**
@@ -549,7 +612,8 @@ public class GradebookService implements IGradebookService {
     public CourseOverview courseOverview(UUID courseId, Integer trimester, PageQuery pageQuery) {
         Course course = courseService.getById(courseId);
         List<ClassGroup> classGroups = classGroupDomain.byCourse(courseId);
-        PageResult<StudentTrimesterSummary> students = centralizer(courseId, trimester, pageQuery);
+        PageResult<StudentTrimesterSummary> students =
+                centralizer(courseId, trimester, pageQuery, null);
         Map<String, Long> genderCounts = enrollmentDomain.genderCountsOfCourse(courseId);
         int males = genderCounts.getOrDefault("M", 0L).intValue();
         int females = genderCounts.getOrDefault("F", 0L).intValue();

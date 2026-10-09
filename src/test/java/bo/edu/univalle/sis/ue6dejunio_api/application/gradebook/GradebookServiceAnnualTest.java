@@ -94,7 +94,8 @@ class GradebookServiceAnnualTest {
                 score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
                 score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         AnnualSubjectScore lang = subject(row, "Lenguaje");
         assertThat(lang.trimester1()).isEqualByComparingTo("10.00");
@@ -118,7 +119,8 @@ class GradebookServiceAnnualTest {
                 score(enrollmentA, classGroupMath, "Matematica", 1, "1.00"),
                 score(enrollmentA, classGroupMath, "Matematica", 2, "0.01"));
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         assertThat(subject(row, "Lenguaje").average()).isEqualByComparingTo("10.33");
         assertThat(subject(row, "Matematica").average()).isEqualByComparingTo("0.51");
@@ -137,7 +139,8 @@ class GradebookServiceAnnualTest {
                 score(enrollmentA, classGroupMath, "Matematica", 2, "10.00"),
                 score(enrollmentA, classGroupMath, "Matematica", 3, "10.00"));
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         // (40 + 7) / 2.
         assertThat(row.finalAverage()).isEqualByComparingTo("23.50");
@@ -157,7 +160,7 @@ class GradebookServiceAnnualTest {
         when(scoreDomain.findByCourseEnrollmentIn(anyCollection())).thenReturn(scores);
 
         StudentAnnualSummary annual =
-                service.annualCentralizer(courseId, pageQuery).content().get(0);
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         assertThat(annual.trimester1Average()).isEqualByComparingTo("5.50");
         assertThat(annual.trimester2Average()).isEqualByComparingTo("10.00");
@@ -167,7 +170,7 @@ class GradebookServiceAnnualTest {
         // centralizer prints as the general average is what lands in this row's column.
         for (int trimester = 1; trimester <= 3; trimester++) {
             StudentTrimesterSummary perTrimester =
-                    service.centralizer(courseId, trimester, pageQuery).content().get(0);
+                    service.centralizer(courseId, trimester, pageQuery, null).content().get(0);
             assertThat(annualColumn(annual, trimester))
                     .isEqualByComparingTo(perTrimester.generalAverage());
         }
@@ -180,7 +183,8 @@ class GradebookServiceAnnualTest {
         // trimesters for it and drag the student's year down for a course they never had.
         batched(score(enrollmentA, classGroupComputing, "Computacion", 3, "90.00"));
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         AnnualSubjectScore computing = subject(row, "Computacion");
         assertThat(computing.trimester1()).isNull();
@@ -198,7 +202,8 @@ class GradebookServiceAnnualTest {
                 score(enrollmentA, classGroupLang, "Lenguaje", 3, "60.00"),
                 score(enrollmentA, classGroupComputing, "Computacion", 3, "90.00"));
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         // The school's template carries two final averages that agree only while every area is
         // graded in all three trimesters. Here they part: the areas give (60 + 90) / 2 = 75, the
@@ -220,7 +225,7 @@ class GradebookServiceAnnualTest {
 
         AnnualSubjectScore lang =
                 subject(
-                        service.annualCentralizer(courseId, pageQuery).content().get(0),
+                        service.annualCentralizer(courseId, pageQuery, null).content().get(0),
                         "Lenguaje");
 
         assertThat(lang.trimester2()).isNull();
@@ -232,7 +237,8 @@ class GradebookServiceAnnualTest {
         rosterOf(courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"));
         batched();
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         assertThat(row.subjects()).isEmpty();
         assertThat(row.trimester1Average()).isNull();
@@ -252,7 +258,8 @@ class GradebookServiceAnnualTest {
                 score(enrollmentA, classGroupLang, "Lenguaje", 2, "90.00"),
                 score(enrollmentA, classGroupMath, "Matematica", 2, "60.00"));
 
-        StudentAnnualSummary row = service.annualCentralizer(courseId, pageQuery).content().get(0);
+        StudentAnnualSummary row =
+                service.annualCentralizer(courseId, pageQuery, null).content().get(0);
 
         assertThat(row.subjects())
                 .extracting(AnnualSubjectScore::subjectName)
@@ -268,7 +275,8 @@ class GradebookServiceAnnualTest {
                 score(enrollmentA, classGroupLang, "Lenguaje", 1, "60.00"),
                 score(enrollmentB, classGroupMath, "Matematica", 1, "80.00"));
 
-        PageResult<StudentAnnualSummary> result = service.annualCentralizer(courseId, pageQuery);
+        PageResult<StudentAnnualSummary> result =
+                service.annualCentralizer(courseId, pageQuery, null);
 
         assertThat(result.content()).hasSize(2);
         assertThat(result.content().get(0).subjects())
@@ -309,7 +317,7 @@ class GradebookServiceAnnualTest {
     void annualCentralizer_emptyPage_skipsTheBatchQuery() {
         when(enrollmentDomain.studentsByCourse(courseId, pageQuery)).thenReturn(page(List.of()));
 
-        assertThat(service.annualCentralizer(courseId, pageQuery).content()).isEmpty();
+        assertThat(service.annualCentralizer(courseId, pageQuery, null).content()).isEmpty();
         verify(scoreDomain, never()).findByCourseEnrollmentIn(anyCollection());
     }
 
@@ -318,7 +326,7 @@ class GradebookServiceAnnualTest {
         rosterOf(courseStudent(enrollmentA, studentA, "Nelsy", "Aiza"));
         batched();
 
-        service.annualCentralizer(courseId, pageQuery);
+        service.annualCentralizer(courseId, pageQuery, null);
 
         // Same rule the trimester centralizer follows: a student who left still has a record of
         // the year they were here, and the year-end sheet is exactly where that record is read.

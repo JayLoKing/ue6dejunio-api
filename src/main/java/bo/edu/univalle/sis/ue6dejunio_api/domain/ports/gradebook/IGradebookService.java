@@ -27,14 +27,32 @@ public interface IGradebookService {
     StudentTrimesterSummary studentSummary(
             UUID courseEnrollmentId, Integer trimester, UUID teacherScopeId);
 
+    /**
+     * The course's trimester sheet: every enrolled student with a total per subject and the general
+     * average.
+     *
+     * <p>Unlike {@link #studentSummary}, a narrowed reader does not get the general average: on a
+     * whole-course sheet that column, beside every student, is a reading of the subjects they were
+     * not given, and the school asked that a technical teacher's report be of their subject only.
+     *
+     * @param teacherScopeId {@code null} for a reader with no ownership scope (Director,
+     *     secretariat): the whole sheet. Otherwise the teacher asking: the whole sheet if they are
+     *     the course's homeroom teacher; if they are not, only the class groups they teach in it
+     *     and a null general average.
+     */
     PageResult<StudentTrimesterSummary> centralizer(
-            UUID courseId, Integer trimester, PageQuery pageQuery);
+            UUID courseId, Integer trimester, PageQuery pageQuery, UUID teacherScopeId);
 
     /**
      * The whole year of the course: per-area totals with their average, the three trimester
      * averages, and the final average. No trimester and no gestión — the course pins both.
+     *
+     * @param teacherScopeId as in {@link #centralizer}. A narrowed reader keeps each of their areas
+     *     whole — its three trimesters and its own average — and gets null for every column taken
+     *     across subjects: the trimester averages, the final average and the year's result.
      */
-    PageResult<StudentAnnualSummary> annualCentralizer(UUID courseId, PageQuery pageQuery);
+    PageResult<StudentAnnualSummary> annualCentralizer(
+            UUID courseId, PageQuery pageQuery, UUID teacherScopeId);
 
     /**
      * The annual summary of every enrollment of the course, withdrawn included, in a fixed order
