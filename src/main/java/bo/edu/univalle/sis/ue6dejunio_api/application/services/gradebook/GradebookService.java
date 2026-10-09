@@ -677,10 +677,8 @@ public class GradebookService implements IGradebookService {
                         .stream()
                         .map(GradebookService::annualSubject)
                         // A report whose columns move between two loads is unreadable, and the
-                        // order a batched
-                        // query answers in is not guaranteed. The class group breaks ties so two
-                        // areas sharing
-                        // a name still land somewhere fixed.
+                        // order a batched query answers in is not guaranteed. The class group
+                        // breaks ties so two areas sharing a name still land somewhere fixed.
                         .sorted(
                                 Comparator.comparing(
                                                 AnnualSubjectScore::subjectName,
