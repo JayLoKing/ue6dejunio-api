@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -263,6 +264,37 @@ public class AttendanceService implements IAttendanceService {
     @Transactional(readOnly = true)
     public CourseStudentAttendance attendanceByStudent(
             UUID courseId, Integer trimester, PageQuery pageQuery) {
+        return studentAttendance(
+                courseId, trimester, pageQuery, attendanceDomain::dailyStatusCountsByEnrollmentIn);
+    }
+
+    /**
+     * The same report over one class group's session marks. The course is the class group's own, so
+     * the roll and the trimester periods are exactly the course report's; only the rows counted
+     * differ. A class group that does not exist is a 404 from {@code courseOfClassGroup}.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public CourseStudentAttendance attendanceByStudentOfClassGroup(
+            UUID classGroupId, Integer trimester, PageQuery pageQuery) {
+        UUID courseId = attendanceDomain.courseOfClassGroup(classGroupId);
+        return studentAttendance(
+                courseId,
+                trimester,
+                pageQuery,
+                ids -> attendanceDomain.sessionStatusCountsByEnrollmentIn(classGroupId, ids));
+    }
+
+    /**
+     * The body both per-student reports share. {@code marksOf} is the one thing that differs
+     * between them — which rows are counted — so the roll, the period filter and the arithmetic
+     * cannot drift apart: there is only one copy of each.
+     */
+    private CourseStudentAttendance studentAttendance(
+            UUID courseId,
+            Integer trimester,
+            PageQuery pageQuery,
+            Function<List<UUID>, List<EnrollmentStatusCount>> marksOf) {
         ReportScope resolved = resolveScope(courseId, trimester);
         PageResult<CourseStudent> roll =
                 enrollmentDomain.activeStudentsByCourse(courseId, pageQuery);
@@ -272,8 +304,7 @@ public class AttendanceService implements IAttendanceService {
         Map<UUID, long[]> countsByEnrollment = new HashMap<>();
         // An empty page is not a question worth asking the database.
         if (!enrollmentIds.isEmpty()) {
-            for (EnrollmentStatusCount row :
-                    attendanceDomain.dailyStatusCountsByEnrollmentIn(enrollmentIds)) {
+            for (EnrollmentStatusCount row : marksOf.apply(enrollmentIds)) {
                 if (periodContaining(resolved.periods(), row.date()) == null) {
                     continue; // out-of-period date: excluded here exactly as in the course panel
                 }

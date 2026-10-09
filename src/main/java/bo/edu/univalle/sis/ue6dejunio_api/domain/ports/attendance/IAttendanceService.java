@@ -42,5 +42,16 @@ public interface IAttendanceService {
     CourseStudentAttendance attendanceByStudent(
             UUID courseId, Integer trimester, PageQuery pageQuery);
 
+    /**
+     * {@link #attendanceByStudent} for one subject: the same roll of the class group's course, the
+     * same trimester periods and the same percentage rule, counting that class group's session
+     * marks instead of the daily ones. A technical teacher's report of their own subject.
+     *
+     * <p>The result names the course, not the class group, because it is the course report's shape
+     * reused whole; the caller already named the class group it asked for.
+     */
+    CourseStudentAttendance attendanceByStudentOfClassGroup(
+            UUID classGroupId, Integer trimester, PageQuery pageQuery);
+
     record DailyMark(UUID courseEnrollmentId, String status) {}
 }

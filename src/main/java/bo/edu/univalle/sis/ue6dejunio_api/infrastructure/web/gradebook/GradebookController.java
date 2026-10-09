@@ -2,10 +2,12 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.gradebook;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.attendance.IAttendanceService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.AuthorizationComponent;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAcademicSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseStudentAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.HonorRollEntryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentAnnualSummaryResponse;
@@ -39,10 +41,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class GradebookController {
 
     private final IGradebookService gradebookService;
+    private final IAttendanceService attendanceService;
     private final AuthorizationComponent authz;
 
-    public GradebookController(IGradebookService gradebookService, AuthorizationComponent authz) {
+    public GradebookController(
+            IGradebookService gradebookService,
+            IAttendanceService attendanceService,
+            AuthorizationComponent authz) {
         this.gradebookService = gradebookService;
+        this.attendanceService = attendanceService;
         this.authz = authz;
     }
 
@@ -238,5 +245,37 @@ public class GradebookController {
                         gradebookService
                                 .classGroupAttendance(classGroupId, date, p)
                                 .map(CourseAttendanceResponse::from)));
+    }
+
+    /**
+     * The per-student attendance report of one subject: the course's {@code
+     * /courses/{id}/attendance-by-student}, counting the class group's session marks instead of the
+     * daily ones. Lives beside {@code /attendance/session}, the other per-class-group attendance
+     * read, and behind the same guard: the class group's teacher, the course's homeroom teacher,
+     * the Director and the secretariat.
+     */
+    @GetMapping("/attendance/session/by-student")
+    @PreAuthorize("@authz.canReadClassGroup(authentication, #classGroupId)")
+    @Operation(
+            summary =
+                    "Porcentaje de asistencia por estudiante en una materia (sesiones de esa "
+                            + "materia). trimester opcional: presente -> alcance trimestral, "
+                            + "ausente -> anual")
+    public ResponseEntity<CourseStudentAttendanceResponse> classGroupAttendanceByStudent(
+            @RequestParam("id_class_group") UUID classGroupId,
+            @RequestParam(required = false) @Min(1) @Max(3) Integer trimester,
+            @RequestParam(defaultValue = "1") @Min(1) int offset,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(200) int limit) {
+        // The course report's order, stated for the same reason: PageQuery carries none.
+        PageQuery p =
+                PageQuery.of(
+                        offset - 1,
+                        limit,
+                        SortField.asc("student.lastNames"),
+                        SortField.asc("student.names"));
+        return ResponseEntity.ok(
+                CourseStudentAttendanceResponse.from(
+                        attendanceService.attendanceByStudentOfClassGroup(
+                                classGroupId, trimester, p)));
     }
 }
