@@ -104,4 +104,20 @@ public interface JpaAttendanceRepository extends JpaRepository<AttendanceEntity,
         """)
     List<Object[]> dailyStatusCountsByEnrollmentIn(
             @Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds);
+
+    /**
+     * The session sibling of {@link #dailyStatusCountsByEnrollmentIn}: the same grouping, over the
+     * rows of one class group. The equality on the class group is what leaves out both the daily
+     * rows (a null there never equals anything) and every other subject's sessions.
+     */
+    @Query(
+            """
+        SELECT a.courseEnrollment.id, a.date, a.status, COUNT(a)
+        FROM AttendanceEntity a
+        WHERE a.courseEnrollment.id IN :courseEnrollmentIds AND a.classGroup.id = :classGroupId
+        GROUP BY a.courseEnrollment.id, a.date, a.status
+        """)
+    List<Object[]> sessionStatusCountsByEnrollmentIn(
+            @Param("classGroupId") UUID classGroupId,
+            @Param("courseEnrollmentIds") Collection<UUID> courseEnrollmentIds);
 }

@@ -91,7 +91,24 @@ public class AttendanceRepositoryAdapter implements IAttendanceDomain {
         if (courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
             return List.of();
         }
-        return attendanceRepo.dailyStatusCountsByEnrollmentIn(courseEnrollmentIds).stream()
+        return toEnrollmentStatusCounts(
+                attendanceRepo.dailyStatusCountsByEnrollmentIn(courseEnrollmentIds));
+    }
+
+    @Override
+    public List<EnrollmentStatusCount> sessionStatusCountsByEnrollmentIn(
+            UUID classGroupId, Collection<UUID> courseEnrollmentIds) {
+        if (courseEnrollmentIds == null || courseEnrollmentIds.isEmpty()) {
+            return List.of();
+        }
+        return toEnrollmentStatusCounts(
+                attendanceRepo.sessionStatusCountsByEnrollmentIn(
+                        classGroupId, courseEnrollmentIds));
+    }
+
+    /** The adapter's half of the raw GROUP BY rows: COUNT() arrives as a Long, not a long. */
+    private static List<EnrollmentStatusCount> toEnrollmentStatusCounts(List<Object[]> rows) {
+        return rows.stream()
                 .map(
                         row ->
                                 new EnrollmentStatusCount(

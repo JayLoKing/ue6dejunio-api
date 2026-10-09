@@ -87,4 +87,15 @@ public interface IAttendanceDomain {
      */
     List<EnrollmentStatusCount> dailyStatusCountsByEnrollmentIn(
             Collection<UUID> courseEnrollmentIds);
+
+    /**
+     * The session counterpart of {@link #dailyStatusCountsByEnrollmentIn}: the same per (enrolment,
+     * date, status) grouping, over one class group's session rows only. Backs a technical teacher's
+     * per-student report of their own subject. Neither the daily rows nor another class group's
+     * sessions are counted — those belong to a different reader.
+     *
+     * @return no row for an enrolment nobody marked in that class group
+     */
+    List<EnrollmentStatusCount> sessionStatusCountsByEnrollmentIn(
+            UUID classGroupId, Collection<UUID> courseEnrollmentIds);
 }
