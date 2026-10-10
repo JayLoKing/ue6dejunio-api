@@ -794,8 +794,7 @@ public class AuthorizationComponent {
     private boolean hasRole(Authentication auth, String role) {
         // An absent authentication holds no role. Every caller guards first, but reaching here with
         // null used to throw inside @PreAuthorize, which Spring surfaces as a 500 — an
-        // unauthenticated
-        // request has to be denied, not turned into a server error.
+        // unauthenticated request has to be denied, not turned into a server error.
         if (auth == null) {
             return false;
         }
