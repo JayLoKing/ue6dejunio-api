@@ -548,7 +548,8 @@ public class AuthorizationComponent {
     }
 
     /**
-     * Who may write a course's informe pedagógico. Its homeroom teacher, and nobody else.
+     * Who may write — and read — a course's informe pedagógico. Its homeroom teacher, and nobody
+     * else.
      *
      * <p>Narrower than {@link #canWritePdcForCourse} on purpose: a specialist plans the subject
      * they run, but the informe is a statement about the whole classroom, and the school's own form
@@ -556,9 +557,11 @@ public class AuthorizationComponent {
      * dar fe" over their signature. A subject teacher writing inside it would put their account of
      * one area under somebody else's name.
      *
-     * <p>The Director is not here either, for the same reason they open no plans: the office reads
-     * what the classroom hands in. Reading it is {@link #canReadCourse}, which the Director and the
-     * secretariat already pass — this guard is only about who signs.
+     * <p>The Director is not here either, for the same reason they open no plans. Nor does the
+     * office read it: the sheet lists the students failing the trimester so their homeroom teacher
+     * can decide what to do with each one, which makes it that teacher's working document rather
+     * than a school-wide report. So the read goes through this guard too, not {@link
+     * #canReadCourse}, which the Director and the secretariat pass.
      */
     public boolean canWritePedagogicalReport(Authentication authentication, UUID courseId) {
         if (authentication == null || courseId == null || isReadOnlyStaff(authentication)) {

@@ -44,13 +44,20 @@ public class PedagogicalReportController {
         this.pedagogicalReportService = pedagogicalReportService;
     }
 
+    /**
+     * Read by the person who writes it, through the same predicate as {@link #save}. The sheet
+     * lists the students failing the trimester so their homeroom teacher can plan what to do with
+     * each one: it is that teacher's working document, not a school-wide report, so neither the
+     * Director nor the secretariat reads it.
+     */
     @GetMapping
-    @PreAuthorize("@authz.canReadCourse(authentication, #courseId)")
+    @PreAuthorize("@authz.canWritePedagogicalReport(authentication, #courseId)")
     @Operation(
             summary =
                     "Informe pedagogico del curso en un trimestre: datos del curso, logros y "
                             + "dificultades, estadistica de aprobados y reprobados, y el cuadro de estudiantes "
-                            + "reprobados con sus areas. Devuelve la hoja completa aunque nadie la haya escrito aun")
+                            + "reprobados con sus areas. Devuelve la hoja completa aunque nadie la haya escrito "
+                            + "aun. Solo la lee el docente de aula del curso, que es quien la escribe")
     public ResponseEntity<PedagogicalReportResponse> sheet(
             @RequestParam("id_course") UUID courseId,
             @RequestParam @Min(1) @Max(3) Integer trimester) {

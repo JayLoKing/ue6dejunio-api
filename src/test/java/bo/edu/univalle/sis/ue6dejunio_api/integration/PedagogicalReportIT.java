@@ -23,8 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>The derivation is unit-tested against mocked ports that hand back the totals the test itself
  * wrote. What only a database can answer is whether section III and section IV are built from the
  * same {@code total_score} the school's other sheets print — a generated column this code never
- * writes — whether the effective roster really excludes a withdrawn student, and whether the write
- * side is reachable by the teacher who signs the document and by nobody else.
+ * writes — whether the effective roster really excludes a withdrawn student, and whether the
+ * document, read or written, is reachable by the teacher who signs it and by nobody else.
  */
 class PedagogicalReportIT extends AbstractIntegrationTest {
 
@@ -103,7 +103,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
 
     @Test
     void sheet_countsTheRosterByGenderOffTheMarksTheOtherSheetsPrint() throws Exception {
-        String body = sheetAs(director, "Director");
+        String body = sheetAs(homeroomTeacher, "Teacher");
 
         assertThat(JsonPath.<Integer>read(body, "$.stats.effective.total")).isEqualTo(3);
         assertThat(JsonPath.<Integer>read(body, "$.stats.effective.male")).isEqualTo(1);
@@ -116,7 +116,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
 
     @Test
     void sheet_namesTheClassroomAndTheTeacherWhoSignsIt() throws Exception {
-        String body = sheetAs(director, "Director");
+        String body = sheetAs(homeroomTeacher, "Teacher");
 
         assertThat(JsonPath.<String>read(body, "$.parallelName")).isEqualTo("A");
         assertThat(JsonPath.<Integer>read(body, "$.trimester")).isEqualTo(1);
@@ -126,7 +126,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
 
     @Test
     void sheet_listsOnlyTheAreasEachStudentActuallyFailed() throws Exception {
-        String body = sheetAs(director, "Director");
+        String body = sheetAs(homeroomTeacher, "Teacher");
 
         assertThat(JsonPath.<List<String>>read(body, "$.failingStudents[*].fullName"))
                 .containsExactly("Bruno Bermudez", "Carla Caceres");
@@ -159,7 +159,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
                         + "WHERE id_course_enrollment = ?",
                 brunoEnrollment);
 
-        String body = sheetAs(director, "Director");
+        String body = sheetAs(homeroomTeacher, "Teacher");
 
         assertThat(JsonPath.<Integer>read(body, "$.stats.effective.total")).isEqualTo(2);
         assertThat(JsonPath.<List<String>>read(body, "$.failingStudents[*].fullName"))
@@ -198,7 +198,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
                         jsonPath("$.failingStudents[0].actions")
                                 .value("Refuerzo en horario alterno"));
 
-        String body = sheetAs(director, "Director");
+        String body = sheetAs(homeroomTeacher, "Teacher");
         assertThat(JsonPath.<String>read(body, "$.difficulties"))
                 .isEqualTo("Dificultades en operaciones basicas.");
         assertThat(JsonPath.<String>read(body, "$.failingStudents[0].verificationSource"))
@@ -267,7 +267,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM pedagogical_report_failures", Integer.class))
                 .isEqualTo(1);
-        String body = sheetAs(director, "Director");
+        String body = sheetAs(homeroomTeacher, "Teacher");
         assertThat(JsonPath.<String>read(body, "$.achievements"))
                 .isEqualTo("Solo cambio los logros");
         assertThat(JsonPath.<String>read(body, "$.failingStudents[0].verificationSource"))
@@ -348,8 +348,8 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The document carries one DOCENTE and closes over their signature. Reading it is the office's
-     * business; writing inside it is not.
+     * The document carries one DOCENTE and closes over their signature. It is the homeroom
+     * teacher's working sheet, so the office neither writes inside it nor reads it.
      */
     @Test
     void save_byTheDirector_isForbidden() throws Exception {
@@ -374,6 +374,36 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
                                 .param("trimester", "1")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"achievements\":\"Escrito por otro docente\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void sheet_byTheHomeroomTeacherWhoWritesIt_isServed() throws Exception {
+        String body = sheetAs(homeroomTeacher, "Teacher");
+
+        assertThat(JsonPath.<Integer>read(body, "$.trimester")).isEqualTo(1);
+    }
+
+    /**
+     * The sheet lists the students failing the trimester for the teacher who has to act on them. It
+     * is not a school-wide report, so neither the Director nor the secretariat reads it.
+     */
+    @Test
+    void sheet_byTheDirector_isForbidden() throws Exception {
+        sheetIsForbiddenFor(director, "Director");
+    }
+
+    @Test
+    void sheet_byTheSecretary_isForbidden() throws Exception {
+        sheetIsForbiddenFor(seedUser("Secretary", false), "Secretary");
+    }
+
+    private void sheetIsForbiddenFor(UUID userId, String role) throws Exception {
+        mvc.perform(
+                        get("/api/gradebook/pedagogical-report")
+                                .header("Authorization", "Bearer " + tokenFor(userId, role))
+                                .param("id_course", courseId.toString())
+                                .param("trimester", "1"))
                 .andExpect(status().isForbidden());
     }
 
@@ -414,7 +444,7 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
                                 Integer.class,
                                 courseId))
                 .isEqualTo(1);
-        assertThat(JsonPath.<String>read(sheetAs(director, "Director"), "$.achievements"))
+        assertThat(JsonPath.<String>read(sheetAs(homeroomTeacher, "Teacher"), "$.achievements"))
                 .isEqualTo("Version final");
     }
 
@@ -434,7 +464,9 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
 
         mvc.perform(
                         get("/api/gradebook/pedagogical-report")
-                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
                                 .param("id_course", courseId.toString())
                                 .param("trimester", "2"))
                 .andExpect(status().isOk())
@@ -447,7 +479,9 @@ class PedagogicalReportIT extends AbstractIntegrationTest {
     void sheet_trimesterOutsideTheYear_isRejected() throws Exception {
         mvc.perform(
                         get("/api/gradebook/pedagogical-report")
-                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenFor(homeroomTeacher, "Teacher"))
                                 .param("id_course", courseId.toString())
                                 .param("trimester", "4"))
                 .andExpect(status().isBadRequest());
