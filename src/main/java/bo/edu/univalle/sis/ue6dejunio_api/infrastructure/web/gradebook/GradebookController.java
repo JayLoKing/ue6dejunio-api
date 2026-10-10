@@ -167,7 +167,7 @@ public class GradebookController {
     }
 
     @GetMapping("/honor-roll/institution")
-    @PreAuthorize("hasRole('Director')")
+    @PreAuthorize("hasAnyRole('Director','Secretary')")
     @Operation(
             summary =
                     "Cuadro de honor de toda la unidad educativa en una gestion: los mejores "

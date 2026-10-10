@@ -189,7 +189,35 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The school's podium is the Director's to read: a teacher owns their classroom, not the year.
+     * The secretariat reads the whole school without writing, and the podium is a read: the same
+     * places the Director gets, for the office that prepares the recognition.
+     */
+    @Test
+    void institutionHonorRoll_isReadByTheSecretary() throws Exception {
+        UUID secretary = seedUser("Secretary", false);
+
+        String body =
+                mvc.perform(
+                                get("/api/gradebook/honor-roll/institution")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(secretary, "Secretary"))
+                                        .param(
+                                                "id_academic_year",
+                                                String.valueOf(currentAcademicYearId()))
+                                        .param("places", "2"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].fullName"))
+                .containsExactly("Dario Soto", "Ana Perez");
+    }
+
+    /**
+     * The school's podium is the Director's and the secretariat's to read: a teacher owns their
+     * classroom, not the year.
      */
     @Test
     void institutionHonorRoll_isClosedToATeacher() throws Exception {

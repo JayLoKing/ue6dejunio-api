@@ -123,7 +123,36 @@ class RiskInstitutionIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The school's list is the Director's to read: a teacher owns their classroom, not the year.
+     * The secretariat reads the whole school without writing, and this list is a read: the same
+     * rows the Director gets, so the office can follow up with the families.
+     */
+    @Test
+    void institutionRisk_isReadByTheSecretary() throws Exception {
+        UUID secretary = seedUser("Secretary", false);
+
+        String body =
+                mvc.perform(
+                                get("/api/risk/institution")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(secretary, "Secretary"))
+                                        .param(
+                                                "id_academic_year",
+                                                String.valueOf(currentAcademicYearId()))
+                                        .param("trimester", "1")
+                                        .param("places", "10"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].fullName"))
+                .containsExactly("Cruz Carla", "Alvarez Ana");
+    }
+
+    /**
+     * The school's list is the Director's and the secretariat's to read: a teacher owns their
+     * classroom, not the year.
      */
     @Test
     void institutionRisk_isClosedToATeacher() throws Exception {

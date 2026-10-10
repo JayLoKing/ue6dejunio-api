@@ -109,14 +109,15 @@ public class RiskPredictionController {
     }
 
     /**
-     * The Director's list: the students of the whole school closest to failing, worst first.
+     * The school's list: the students of the whole school closest to failing, worst first.
      *
      * <p>The one endpoint here gated on role alone, and it is the right gate for this one: the
      * answer spans every course of the gestión, so there is no single course to resolve ownership
-     * against. Nobody below the Director has a scope that covers it.
+     * against. Only the Director and the secretariat, which reads the whole school without writing,
+     * have a scope that covers it; a teacher's scope stops at their classroom.
      */
     @GetMapping("/risk/institution")
-    @PreAuthorize("hasRole('Director')")
+    @PreAuthorize("hasAnyRole('Director','Secretary')")
     @Operation(
             summary =
                     "Estudiantes en riesgo de toda la unidad educativa en una gestion: un "

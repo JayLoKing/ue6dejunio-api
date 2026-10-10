@@ -216,6 +216,8 @@ public class SecurityConfig {
                                         // subject's own panel and rerun
                                         // belong to whoever teaches it, and the secretariat reads
                                         // without writing.
+                                        .requestMatchers(HttpMethod.GET, "/api/risk/institution")
+                                        .hasAnyRole("Director", "Secretary")
                                         .requestMatchers("/api/risk/**")
                                         .hasRole("Director")
                                         .requestMatchers(HttpMethod.GET, "/api/class-groups/*/risk")
