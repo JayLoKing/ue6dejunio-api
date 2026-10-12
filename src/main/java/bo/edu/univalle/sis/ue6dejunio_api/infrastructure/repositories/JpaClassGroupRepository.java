@@ -143,4 +143,12 @@ public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity,
             @Param("courseId") UUID courseId,
             @Param("fromTeacherId") UUID fromTeacherId,
             @Param("toTeacher") UserEntity toTeacher);
+
+    /**
+     * Erases every class group of the course in one statement. The database cascades what hangs off
+     * them; a score would block it, which is why only a course with no records reaches here.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM ClassGroupEntity cg WHERE cg.course.id = :courseId")
+    int deleteAllOfCourse(@Param("courseId") UUID courseId);
 }

@@ -126,4 +126,12 @@ public interface IClassGroupDomain {
      * @return how many class groups moved, 0 when the outgoing teacher held none in this course
      */
     int reassignTeacherInCourse(UUID courseId, UUID fromTeacherId, UUID toTeacherId);
+
+    /**
+     * Erases every class group of the course in one statement, for a course being removed for good.
+     * Only for bare class groups: a score on one blocks the delete (its key is RESTRICT), and
+     * criteria, attendance or plans on one would be erased with it, which is why the caller first
+     * makes sure the course holds no academic record.
+     */
+    void deleteAllOfCourse(UUID courseId);
 }

@@ -304,6 +304,12 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
         return classGroupRepo.reassignTeacherInCourse(courseId, fromTeacherId, toTeacher);
     }
 
+    @Override
+    @Transactional
+    public void deleteAllOfCourse(UUID courseId) {
+        classGroupRepo.deleteAllOfCourse(courseId);
+    }
+
     private ClassGroup toDomain(ClassGroupEntity e) {
         CourseEntity c = e.getCourse();
         UserEntity t = e.getTeacher();
