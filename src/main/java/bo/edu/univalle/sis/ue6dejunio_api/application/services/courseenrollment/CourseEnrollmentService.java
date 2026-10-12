@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
@@ -58,6 +59,21 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
     @Override
     @Transactional
     public EnrollResult enroll(EnrollToCourseCommand command) {
+        return load(command, false);
+    }
+
+    @Override
+    @Transactional
+    public EnrollResult enrollOne(EnrollToCourseCommand command) {
+        return load(command, true);
+    }
+
+    /**
+     * The one load both use cases share. With {@code refuse} set, a row the roster would merely
+     * report — seated elsewhere this gestión, or conflicting identifiers — throws instead. It does
+     * so before that row writes anything, and the use case's transaction undoes any earlier row.
+     */
+    private EnrollResult load(EnrollToCourseCommand command, boolean refuse) {
         if (!enrollmentDomain.courseExists(command.courseId())) {
             throw new ResourceNotFoundException("Course", command.courseId());
         }
@@ -121,6 +137,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         for (CreateStudentCommand sc : command.students()) {
             Optional<EnrollConflict> conflict = conflictOf(sc, byRude, byIdentityCard);
             if (conflict.isPresent()) {
+                if (refuse) {
+                    throw new ConflictException(conflict.get().reason());
+                }
                 conflicts.add(conflict.get());
                 continue;
             }
@@ -145,6 +164,12 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                             seatedElsewhere(
                                     student, command.courseId(), enrollmentInCourse, seatsInYear);
                     if (elsewhere.isPresent()) {
+                        if (refuse) {
+                            throw new ConflictException(
+                                    "El estudiante ya está inscrito en "
+                                            + elsewhere.get().courseLabel()
+                                            + " de esta gestión.");
+                        }
                         skippedOtherCourse.putIfAbsent(student.getId(), elsewhere.get());
                         continue;
                     }

@@ -134,6 +134,33 @@ class EnrollmentIntegrityIT extends AbstractIntegrationTest {
         assertThat(rowsIn(luis, target)).isZero();
     }
 
+    /** Typed in by hand, the same student is refused with a 409 that names the course. */
+    @Test
+    void singleEnroll_ofAStudentSeatedInASiblingCourse_isAConflictNamingTheCourse()
+            throws Exception {
+        UUID student = seedStudent("Ana", "Quispe");
+        seedEnrollment(student, sibling);
+
+        mvc.perform(
+                        post("/api/course-enrollments")
+                                .header("Authorization", "Bearer " + tokenFor(teacher, "Teacher"))
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {"id_course": "%s", "student": %s}
+                                        """
+                                                .formatted(target, rowOf(student))))
+                .andExpect(status().isConflict())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "El estudiante ya está inscrito en "
+                                                + labelOf(sibling)
+                                                + " de esta gestión."));
+
+        assertThat(rowsIn(student, target)).isZero();
+    }
+
     /** A seat in last year's course is history, not a seat taken this year. */
     @Test
     void studentSeatedInACourseOfLastYear_isEnrolled() throws Exception {

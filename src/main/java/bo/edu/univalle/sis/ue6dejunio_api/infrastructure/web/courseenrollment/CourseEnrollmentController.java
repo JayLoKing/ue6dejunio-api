@@ -61,7 +61,7 @@ public class CourseEnrollmentController {
     public ResponseEntity<EnrollResponse> enrollSingle(
             @Valid @RequestBody EnrollStudentRequest request) {
         EnrollResult result =
-                enrollmentService.enroll(
+                enrollmentService.enrollOne(
                         new EnrollToCourseCommand(
                                 request.courseId(), List.of(toCommand(request.student()))));
         return ResponseEntity.ok(EnrollResponse.from(result));

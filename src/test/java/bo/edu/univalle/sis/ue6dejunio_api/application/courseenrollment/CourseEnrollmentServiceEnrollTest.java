@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.CourseEnrollmentService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollConflict;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
@@ -612,6 +613,53 @@ class CourseEnrollmentServiceEnrollTest {
 
         assertThat(result.conflicts()).isEmpty();
         verify(enrollmentDomain).saveEnrollment(id, courseId);
+    }
+
+    /**
+     * One student typed in by hand has no summary to be listed in: a student seated elsewhere this
+     * gestión is refused outright, naming the course, so the form can say why.
+     */
+    @Test
+    void enrollOne_studentSeatedInASiblingCourse_isAConflictNamingTheCourse() {
+        UUID id = UUID.randomUUID();
+        rosterOf(student(id, "R1", "C1"));
+        seatsInYear(new YearSeat(id, SIBLING_COURSE, "Segundo B", STATUS_EFFECTIVE));
+
+        assertThatThrownBy(() -> service.enrollOne(cmd(courseId, List.of(row("R1", "C1")))))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("El estudiante ya está inscrito en Segundo B de esta gestión.");
+
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
+    }
+
+    /** Likewise a RUDE and a CI of two different students: nothing is written. */
+    @Test
+    void enrollOne_rudeAndCardOfDifferentStudents_isAConflict() {
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(List.of(named(UUID.randomUUID(), "R1", "C1", "Ana", "Perez")));
+        when(studentDomain.findByIdentityCardIn(anyCollection()))
+                .thenReturn(List.of(named(UUID.randomUUID(), "R2", "C2", "Luis", "Mamani")));
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+
+        assertThatThrownBy(() -> service.enrollOne(cmd(courseId, List.of(row("R1", "C2")))))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Ana Perez")
+                .hasMessageContaining("Luis Mamani");
+
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
+        verify(studentDomain, never()).save(any());
+    }
+
+    /** The roster load reports the same cases instead of refusing the whole file. */
+    @Test
+    void enroll_aRosterWithAStudentSeatedElsewhere_doesNotThrow() {
+        UUID id = UUID.randomUUID();
+        rosterOf(student(id, "R1", "C1"));
+        seatsInYear(new YearSeat(id, SIBLING_COURSE, "Segundo B", STATUS_EFFECTIVE));
+
+        assertThat(service.enroll(cmd(courseId, List.of(row("R1", "C1")))).skippedOtherCourse())
+                .hasSize(1);
     }
 
     /** A withdrawn student is reported as skipped and kept out of both buckets. */
