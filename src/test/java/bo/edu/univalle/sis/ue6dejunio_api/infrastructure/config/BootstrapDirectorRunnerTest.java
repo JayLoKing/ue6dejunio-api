@@ -144,6 +144,24 @@ class BootstrapDirectorRunnerTest {
         verify(userDomain, never()).save(any());
     }
 
+    /**
+     * An environment variable typed in capitals used to seed an account the web could never sign
+     * into, because the login form lowercases what it sends.
+     */
+    @Test
+    void configuredInCapitals_storesAndLooksUpTheLowercaseAddress() {
+        directorRoleExists();
+        when(userDomain.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(PASSWORD)).thenReturn("hashed");
+
+        runner("  Rectora@UE6.bo ", PASSWORD).run();
+
+        verify(userDomain).findByEmail(EMAIL);
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userDomain).save(saved.capture());
+        assertThat(saved.getValue().getEmail()).isEqualTo(EMAIL);
+    }
+
     /** No role, no account: a Director without their role could not be authorized for anything. */
     @Test
     void withoutTheDirectorRole_refusesToStart() {

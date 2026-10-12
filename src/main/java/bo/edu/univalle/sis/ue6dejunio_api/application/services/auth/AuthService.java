@@ -12,6 +12,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordComma
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
@@ -61,7 +62,7 @@ public class AuthService implements IAuthService {
     public AuthenticatedUser login(LoginCommand command) {
         User user =
                 userDomain
-                        .findByEmail(command.email())
+                        .findByEmail(Emails.normalize(command.email()))
                         .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(command.rawPassword(), user.getPassword())) {
@@ -179,13 +180,14 @@ public class AuthService implements IAuthService {
         if (!passwordEncoder.matches(command.currentPassword(), user.getPassword())) {
             throw new ValidationException("La contraseña actual no es correcta");
         }
-        if (command.newEmail().equals(user.getEmail())) {
+        String newEmail = Emails.normalize(command.newEmail());
+        if (newEmail.equals(user.getEmail())) {
             throw new ValidationException("El correo nuevo es igual al actual");
         }
-        if (userDomain.existsByEmail(command.newEmail())) {
-            throw new DuplicateResourceException("email", command.newEmail());
+        if (userDomain.existsByEmail(newEmail)) {
+            throw new DuplicateResourceException("email", newEmail);
         }
-        user.setEmail(command.newEmail());
+        user.setEmail(newEmail);
         return issueFor(userDomain.save(user));
     }
 
@@ -205,7 +207,7 @@ public class AuthService implements IAuthService {
     @Override
     @Transactional(readOnly = true)
     public void forgotPassword(String email) {
-        Optional<User> maybeUser = userDomain.findByEmail(email);
+        Optional<User> maybeUser = userDomain.findByEmail(Emails.normalize(email));
         if (maybeUser.isPresent() && maybeUser.get().isActive()) {
             User user = maybeUser.get();
             String token = jwtService.issuePasswordResetToken(user);

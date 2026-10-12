@@ -567,4 +567,74 @@ class AuthServiceTest {
 
         verify(userDomain, never()).save(any(User.class));
     }
+
+    // --- email normalization ---
+
+    /** Whatever casing or padding is typed, the lookup asks for the stored lowercase address. */
+    @Test
+    void login_mixedCaseEmail_looksUpTheNormalizedAddress() {
+        when(userDomain.findByEmail("director@ue6.bo")).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret123", "$hashed$")).thenReturn(true);
+        when(jwtService.issueToken(any(User.class), any(), any(), any(), any()))
+                .thenReturn(sessionFor("director@ue6.bo"));
+
+        AuthenticatedUser result =
+                authService.login(new LoginCommand("  Director@UE6.bo ", "secret123"));
+
+        assertThat(result.email()).isEqualTo("director@ue6.bo");
+        verify(userDomain).findByEmail("director@ue6.bo");
+    }
+
+    @Test
+    void forgotPassword_mixedCaseEmail_reachesTheUser() {
+        when(userDomain.findByEmail("director@ue6.bo")).thenReturn(Optional.of(activeUser));
+        when(jwtService.issuePasswordResetToken(activeUser)).thenReturn("reset-jwt");
+
+        authService.forgotPassword(" DIRECTOR@ue6.bo");
+
+        verify(emailService)
+                .sendPasswordReset(
+                        activeUser.getEmail(),
+                        activeUser.fullName(),
+                        RESET_URL + "?token=reset-jwt");
+    }
+
+    @Test
+    void changeEmail_mixedCaseAddress_isCheckedAndStoredNormalized() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret", "$hashed$")).thenReturn(true);
+        when(userDomain.existsByEmail("nuevo@ue6.bo")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.issueToken(any(User.class), any(), any(), any(), any()))
+                .thenReturn(sessionFor("nuevo@ue6.bo"));
+
+        authService.changeEmail(changeTo(" Nuevo@UE6.bo ", "secret"));
+
+        assertThat(activeUser.getEmail()).isEqualTo("nuevo@ue6.bo");
+    }
+
+    @Test
+    void changeEmail_mixedCaseAddressOfAnotherUser_isDuplicate() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret", "$hashed$")).thenReturn(true);
+        when(userDomain.existsByEmail("otro@ue6.bo")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.changeEmail(changeTo("OTRO@ue6.bo", "secret")))
+                .isInstanceOf(DuplicateResourceException.class);
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    /** The current address in capitals is still the current address. */
+    @Test
+    void changeEmail_currentAddressInOtherCase_isAValidationError() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret", "$hashed$")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.changeEmail(changeTo("DIRECTOR@ue6.bo", "secret")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("El correo nuevo es igual al actual");
+
+        verify(userDomain, never()).save(any(User.class));
+    }
 }

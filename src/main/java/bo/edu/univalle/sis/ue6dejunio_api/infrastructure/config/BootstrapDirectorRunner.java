@@ -1,6 +1,7 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.config;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
@@ -49,7 +50,8 @@ public class BootstrapDirectorRunner implements CommandLineRunner {
         this.userDomain = userDomain;
         this.roleDomain = roleDomain;
         this.passwordEncoder = passwordEncoder;
-        this.email = email;
+        // Normalized once, so the account it seeds is the one the web's lowercased login finds.
+        this.email = Emails.normalize(email);
         this.password = password;
         this.ci = ci;
         this.names = names;

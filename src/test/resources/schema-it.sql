@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
     names varchar(100) NOT NULL,
     last_names varchar(100) NOT NULL,
     phone varchar(20),
-    email varchar(100) NOT NULL UNIQUE,
+    -- Mirrors V27: addresses are stored trimmed and lowercase (Emails.normalize).
+    email varchar(100) NOT NULL UNIQUE
+        CONSTRAINT ck_users_email_normalized CHECK (email = lower(btrim(email, E' \t\r\n'))),
     password text NOT NULL,
     id_role integer REFERENCES roles(id_role) ON DELETE RESTRICT,
     is_technical boolean DEFAULT false,

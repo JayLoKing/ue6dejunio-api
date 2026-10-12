@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.handover.DirectorHandove
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.handover.DirectorHandoverDetail;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.handover.StartDirectorHandoverCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.handover.IDirectorHandoverDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.handover.IDirectorHandoverService;
@@ -94,7 +95,7 @@ public class DirectorHandoverService implements IDirectorHandoverService {
             throw new ConflictException(
                     "Ya hay un cambio de Director en curso; cancélalo o espera a que termine");
         }
-        String email = command.email() == null ? "" : command.email().trim();
+        String email = command.email() == null ? "" : Emails.normalize(command.email());
         if (email.isEmpty()) {
             throw new ValidationException("El correo del nuevo Director es obligatorio");
         }

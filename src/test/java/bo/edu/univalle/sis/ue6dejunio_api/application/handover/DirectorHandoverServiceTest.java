@@ -193,6 +193,37 @@ class DirectorHandoverServiceTest {
         verify(userDomain).findByEmail("ana@ue6.bo");
     }
 
+    /** The incoming Director typed in capitals is still the teacher already on file. */
+    @Test
+    void start_lowercasesTheEmailBeforeLookingItUp() {
+        User teacher = user("Ana", "Quispe", "ana@ue6.bo", TEACHER, true);
+        callerIsAnActiveDirector();
+        when(userDomain.findByEmail("ana@ue6.bo")).thenReturn(Optional.of(teacher));
+        when(roleDomain.findByName("Director")).thenReturn(Optional.of(DIRECTOR));
+        stubPasswordAndPersistence();
+
+        service.start(byEmail(" Ana@UE6.bo"));
+
+        verify(userDomain).findByEmail("ana@ue6.bo");
+    }
+
+    @Test
+    void start_aNewAccountTypedInCapitals_isStoredLowercase() {
+        callerIsAnActiveDirector();
+        when(userDomain.findByEmail("nuevo@ue6.bo")).thenReturn(Optional.empty());
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(roleDomain.findByName("Director")).thenReturn(Optional.of(DIRECTOR));
+        stubPasswordAndPersistence();
+
+        service.start(
+                new StartDirectorHandoverCommand(
+                        outgoing.getId(), "NUEVO@ue6.bo", "1234567", "Luis", "Rojas", null));
+
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userDomain).save(saved.capture());
+        assertThat(saved.getValue().getEmail()).isEqualTo("nuevo@ue6.bo");
+    }
+
     // ---- start: create ----------------------------------------------------------------------
 
     @Test
