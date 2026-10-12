@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitProp
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitStore;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.RateLimitingFilter;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security.JwtAuthConverter;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.error.SecurityErrorResponder;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +20,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 @EnableMethodSecurity
@@ -39,6 +41,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthConverter jwtAuthConverter,
             RateLimitingFilter rateLimitingFilter,
+            SecurityErrorResponder securityErrorResponder,
             @Qualifier("corsConfigurationSource") CorsConfigurationSource corsSource)
             throws Exception {
         http.cors(c -> c.configurationSource(corsSource))
@@ -228,8 +231,18 @@ public class SecurityConfig {
                                         .hasAnyRole("Director", "Teacher")
                                         .anyRequest()
                                         .authenticated())
+                // Both places, because they catch different rejections: the resource server's own
+                // entry point answers a token it could not verify, exceptionHandling answers a
+                // request that arrived with none or whose role a rule above refused.
                 .oauth2ResourceServer(
-                        o -> o.jwt(j -> j.jwtAuthenticationConverter(jwtAuthConverter)));
+                        o ->
+                                o.jwt(j -> j.jwtAuthenticationConverter(jwtAuthConverter))
+                                        .authenticationEntryPoint(securityErrorResponder)
+                                        .accessDeniedHandler(securityErrorResponder))
+                .exceptionHandling(
+                        e ->
+                                e.authenticationEntryPoint(securityErrorResponder)
+                                        .accessDeniedHandler(securityErrorResponder));
         return http.build();
     }
 
@@ -237,6 +250,12 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg)
             throws Exception {
         return cfg.getAuthenticationManager();
+    }
+
+    /** The JSON body for the 401 and 403 the chain decides before any controller runs. */
+    @Bean
+    public SecurityErrorResponder securityErrorResponder(JsonMapper json) {
+        return new SecurityErrorResponder(json);
     }
 
     @Bean
