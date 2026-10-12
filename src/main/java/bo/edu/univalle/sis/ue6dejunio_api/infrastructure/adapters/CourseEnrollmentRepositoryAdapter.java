@@ -7,6 +7,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseS
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.gradebook.AnnualResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.CourseEnrollmentEntity;
@@ -75,6 +76,23 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
     public List<EnrollmentSeat> seatsOfStudentInYear(UUID studentId, Integer academicYearId) {
         return enrollmentRepo.seatsOfStudentInYear(studentId, academicYearId).stream()
                 .map(row -> new EnrollmentSeat((UUID) row[0], (String) row[1]))
+                .toList();
+    }
+
+    @Override
+    public List<YearSeat> seatsInYearOfCourse(UUID courseId, Collection<UUID> studentIds) {
+        // An empty IN is invalid SQL on some dialects and a pointless query on all of them.
+        if (courseId == null || studentIds == null || studentIds.isEmpty()) {
+            return List.of();
+        }
+        return enrollmentRepo.seatsInYearOfCourse(courseId, studentIds).stream()
+                .map(
+                        row ->
+                                new YearSeat(
+                                        (UUID) row[0],
+                                        (UUID) row[1],
+                                        row[2] + " " + row[3],
+                                        (String) row[4]))
                 .toList();
     }
 

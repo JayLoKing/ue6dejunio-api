@@ -39,6 +39,25 @@ public interface JpaCourseEnrollmentRepository extends JpaRepository<CourseEnrol
     List<Object[]> seatsOfStudentInYear(
             @Param("studentId") UUID studentId, @Param("yearId") Integer yearId);
 
+    /**
+     * (studentId, courseId, grade name, parallel name, status) of every enrolment these students
+     * hold in the gestión of the given course, as raw rows. The year is read off the course in the
+     * same statement, so the caller need not look it up first.
+     */
+    @Query(
+            """
+        SELECT e.student.id, c.id, g.name, p.name, e.status
+        FROM CourseEnrollmentEntity e
+        JOIN e.course c
+        JOIN c.grade g
+        JOIN c.parallel p
+        WHERE e.student.id IN :studentIds
+        AND c.academicYear.id = (
+            SELECT t.academicYear.id FROM CourseEntity t WHERE t.id = :courseId)
+        """)
+    List<Object[]> seatsInYearOfCourse(
+            @Param("courseId") UUID courseId, @Param("studentIds") Collection<UUID> studentIds);
+
     /** Distinct ids, among those given, with an enrolment in the status in a course of the year. */
     @Query(
             """

@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseS
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.FrozenResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -34,6 +35,16 @@ public interface ICourseEnrollmentDomain {
      * first. More than one is possible: the unique key is per course, not per gestión.
      */
     List<EnrollmentSeat> seatsOfStudentInYear(UUID studentId, Integer academicYearId);
+
+    /**
+     * Every seat these students hold in any course of the gestión the given course belongs to, the
+     * course itself included and whatever the status, asked once for the whole set.
+     *
+     * <p>What a roster import needs to know before it seats anyone: who already sits in a sibling
+     * course of the same year, and whether a withdrawn student left during this year or an earlier
+     * one. Both are answered from this one list rather than one lookup per name.
+     */
+    List<YearSeat> seatsInYearOfCourse(UUID courseId, Collection<UUID> studentIds);
 
     /**
      * Which of these students hold an Effective enrolment in a course of the gestión, asked once
