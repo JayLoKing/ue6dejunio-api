@@ -10,6 +10,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UserUpdate;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
@@ -93,12 +94,13 @@ public class UserService implements IUserService {
     }
 
     @Override
-    public User update(UUID id, UpdateUserCommand command) {
+    public UserUpdate update(UUID id, UpdateUserCommand command) {
         User user =
                 userDomain
                         .findById(id)
                         .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
 
+        boolean emailChanged = applyEmail(user, command.email());
         if (command.names() != null) user.setNames(command.names());
         if (command.lastNames() != null) user.setLastNames(command.lastNames());
         if (command.phone() != null) user.setPhone(command.phone());
@@ -116,7 +118,46 @@ public class UserService implements IUserService {
             // catalogue the Director picks a subject teacher from.
             user.setTechnical(isTechnicalTeacher(role, user.isTechnical()));
         }
-        return userDomain.save(user);
+        // The welcome mail of someone who never signed in most likely went to the typo being fixed
+        // here, so the corrected address gets a working password. Same preconditions as a resend,
+        // minus the refusal: a closed or settled account still gets its address corrected.
+        boolean resend = emailChanged && user.isActive() && user.isMustChangePassword();
+        String temporaryPassword = resend ? issueTemporaryPassword(user) : null;
+        User saved = userDomain.save(user);
+        if (resend) {
+            emailService.sendWelcomeCredentials(
+                    saved.getEmail(), saved.fullName(), temporaryPassword);
+        }
+        return new UserUpdate(saved, resend);
+    }
+
+    /**
+     * Moves the user to a new address if one was asked for, and says whether it actually moved.
+     * Compared and checked for an owner exactly as create does, so an address create would refuse
+     * is refused here too.
+     */
+    private boolean applyEmail(User user, String email) {
+        if (email == null || email.equals(user.getEmail())) {
+            return false;
+        }
+        if (email.isBlank()) {
+            throw new ValidationException("El correo no puede estar vacío");
+        }
+        if (userDomain.existsByEmail(email)) {
+            throw new DuplicateResourceException("email", email);
+        }
+        user.setEmail(email);
+        return true;
+    }
+
+    /** Stores the hash of a fresh temporary password and hands back the raw one for the mail. */
+    private String issueTemporaryPassword(User user) {
+        String temporaryPassword = passwordGenerator.generate();
+        user.setPassword(passwordEncoder.encode(temporaryPassword));
+        // Already true for every caller, but it is the invariant the mail stands on, so it is
+        // stated.
+        user.setMustChangePassword(true);
+        return temporaryPassword;
     }
 
     private static void rejectDirector(Role role) {
@@ -171,10 +212,7 @@ public class UserService implements IUserService {
                     "El usuario ya cambió su contraseña temporal; "
                             + "las credenciales no se pueden reenviar");
         }
-        String temporaryPassword = passwordGenerator.generate();
-        user.setPassword(passwordEncoder.encode(temporaryPassword));
-        // Already true, but it is the invariant this method stands on, so it is stated.
-        user.setMustChangePassword(true);
+        String temporaryPassword = issueTemporaryPassword(user);
         User saved = userDomain.save(user);
         emailService.sendWelcomeCredentials(saved.getEmail(), saved.fullName(), temporaryPassword);
     }

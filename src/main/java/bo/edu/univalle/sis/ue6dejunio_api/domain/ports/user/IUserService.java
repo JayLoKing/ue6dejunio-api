@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UserUpdate;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,7 +13,17 @@ import java.util.UUID;
 public interface IUserService {
     User create(CreateUserCommand command);
 
-    User update(UUID id, UpdateUserCommand command);
+    /**
+     * Applies the Director's edit. A new email is checked for an owner like on create, and if the
+     * user never got past the temporary password, a new one is mailed to the corrected address: the
+     * first one most likely went to the typo.
+     *
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException if
+     *     the new email already belongs to another user
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException if the email
+     *     is blank or the role asked for is Director
+     */
+    UserUpdate update(UUID id, UpdateUserCommand command);
 
     User getById(UUID id);
 

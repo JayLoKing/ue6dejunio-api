@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.SortField;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UserUpdate;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CreateUserRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.PagedResponse;
@@ -116,7 +117,7 @@ public class UserController {
     @Operation(summary = "Actualizar usuario")
     public ResponseEntity<UserResponse> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
-        User updated =
+        UserUpdate updated =
                 userService.update(
                         id,
                         new UpdateUserCommand(
@@ -124,7 +125,8 @@ public class UserController {
                                 request.lastNames(),
                                 request.phone(),
                                 request.roleId(),
-                                request.active()));
+                                request.active(),
+                                request.email()));
         return ResponseEntity.ok(UserResponse.from(updated));
     }
 

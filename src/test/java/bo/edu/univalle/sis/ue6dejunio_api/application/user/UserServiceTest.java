@@ -17,6 +17,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UserUpdate;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.mail.IEmailService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.role.IRoleDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
@@ -166,7 +167,7 @@ class UserServiceTest {
         when(userDomain.findById(id)).thenReturn(Optional.of(user));
         when(roleDomain.findById(1)).thenReturn(Optional.of(new Role(1, "Director")));
 
-        UpdateUserCommand toDirector = new UpdateUserCommand(null, null, null, 1, null);
+        UpdateUserCommand toDirector = new UpdateUserCommand(null, null, null, 1, null, null);
 
         assertThatThrownBy(() -> userService.update(id, toDirector))
                 .isInstanceOf(ValidationException.class);
@@ -188,7 +189,10 @@ class UserServiceTest {
         when(roleDomain.findById(2)).thenReturn(Optional.of(new Role(2, "Secretary")));
         when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User result = userService.update(id, new UpdateUserCommand(null, null, null, 2, null));
+        User result =
+                userService
+                        .update(id, new UpdateUserCommand(null, null, null, 2, null, null))
+                        .user();
 
         assertThat(result.isTechnical()).isFalse();
     }
@@ -297,6 +301,107 @@ class UserServiceTest {
         when(userDomain.findByEmail("nadie@ue6.bo")).thenReturn(Optional.empty());
 
         assertThat(userService.findByEmail("nadie@ue6.bo")).isEmpty();
+    }
+
+    private static UpdateUserCommand emailOnly(String email) {
+        return new UpdateUserCommand(null, null, null, null, null, email);
+    }
+
+    /**
+     * The case this exists for: a typo at registration sent the welcome mail nowhere, and the user
+     * never signed in. Fixing the address has to put a working password in the right inbox.
+     */
+    @Test
+    void update_emailOfAUserWhoNeverSignedIn_reissuesTheCredentialsToTheNewAddress() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(userDomain.existsByEmail("ana.quispe@ue6.bo")).thenReturn(false);
+        when(passwordGenerator.generate()).thenReturn("N3wTemp!");
+        when(passwordEncoder.encode("N3wTemp!")).thenReturn("$new$");
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, emailOnly("ana.quispe@ue6.bo"));
+
+        assertThat(result.credentialsResent()).isTrue();
+        assertThat(result.user().getEmail()).isEqualTo("ana.quispe@ue6.bo");
+        assertThat(result.user().getPassword()).isEqualTo("$new$");
+        assertThat(result.user().isMustChangePassword()).isTrue();
+        verify(emailService).sendWelcomeCredentials("ana.quispe@ue6.bo", "Ana Quispe", "N3wTemp!");
+    }
+
+    /** Someone who already chose a password keeps it; only the address moves. */
+    @Test
+    void update_emailOfAUserWhoAlreadySignedIn_changesOnlyTheEmail() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        user.setMustChangePassword(false);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(userDomain.existsByEmail("ana.quispe@ue6.bo")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, emailOnly("ana.quispe@ue6.bo"));
+
+        assertThat(result.credentialsResent()).isFalse();
+        assertThat(result.user().getEmail()).isEqualTo("ana.quispe@ue6.bo");
+        assertThat(result.user().getPassword()).isEqualTo("$old$");
+        verify(passwordGenerator, never()).generate();
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    /** A closed account is not mailed a password: resending refuses it too. */
+    @Test
+    void update_emailOfAnInactivePendingUser_changesTheEmailButSendsNothing() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        user.setActive(false);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(userDomain.existsByEmail("ana.quispe@ue6.bo")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, emailOnly("ana.quispe@ue6.bo"));
+
+        assertThat(result.credentialsResent()).isFalse();
+        assertThat(result.user().getEmail()).isEqualTo("ana.quispe@ue6.bo");
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    @Test
+    void update_emailThatBelongsToSomeoneElse_isDuplicateAndSavesNothing() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+        when(userDomain.existsByEmail("otro@ue6.bo")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.update(id, emailOnly("otro@ue6.bo")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El correo otro@ue6.bo ya está registrado con un usuario del sistema.");
+
+        verify(userDomain, never()).save(any(User.class));
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    /** The form always posts the address; sending back the current one is not a change. */
+    @Test
+    void update_sameEmailAsNow_isNotAChangeAndSendsNothing() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, emailOnly("ana@ue6.bo"));
+
+        assertThat(result.credentialsResent()).isFalse();
+        verify(userDomain, never()).existsByEmail(any());
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    @Test
+    void update_blankEmail_isRejected() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+
+        assertThatThrownBy(() -> userService.update(id, emailOnly("  ")))
+                .isInstanceOf(ValidationException.class);
+        verify(userDomain, never()).save(any(User.class));
     }
 
     @Test
