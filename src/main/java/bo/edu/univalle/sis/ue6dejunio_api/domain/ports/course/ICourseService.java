@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.domain.ports.course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseRemovalOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
@@ -56,5 +57,12 @@ public interface ICourseService {
      */
     List<Course> allOfYear(Integer academicYearId);
 
-    void delete(UUID id);
+    /**
+     * Removes a course. One that never held an enrolment or an academic record is erased together
+     * with its bare class groups; one that did is only deactivated, keeping everything it
+     * generated, and can be switched back on later. A course of a closed gestión is refused.
+     *
+     * @return which of the two happened
+     */
+    CourseRemovalOutcome delete(UUID id);
 }

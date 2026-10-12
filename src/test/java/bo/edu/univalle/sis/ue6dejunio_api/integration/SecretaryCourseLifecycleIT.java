@@ -102,16 +102,16 @@ class SecretaryCourseLifecycleIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void secretary_deactivatesACourse() throws Exception {
+    void secretary_removesACourse() throws Exception {
         UUID course = seedCourse(null, "A");
         send(delete("/api/courses/" + course), secretary, null)
                 .andExpect(status().is2xxSuccessful());
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT is_active FROM courses WHERE id_course = ?",
-                                Boolean.class,
+                                "SELECT count(*) FROM courses WHERE id_course = ?",
+                                Integer.class,
                                 course))
-                .isFalse();
+                .isZero();
     }
 
     @Test

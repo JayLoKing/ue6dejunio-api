@@ -14,6 +14,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.gradebook.IGradebookServi
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ClassGroupResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseAttendanceStatsResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseOverviewResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseRemovalResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseStudentAttendanceResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.CourseWithSubjectsResponse;
@@ -131,10 +132,16 @@ public class CourseController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Dar de baja curso (is_active=false)")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        courseService.delete(id);
-        return ResponseEntity.noContent().build();
+    @Operation(
+            summary = "Eliminar o dar de baja un curso",
+            description =
+                    "Sin estudiantes inscritos ni registros académicos, el curso y sus materias se"
+                            + " eliminan definitivamente (outcome=DELETED). Con alguno de ellos,"
+                            + " el curso se da de baja (is_active=false) y se conserva toda su"
+                            + " información (outcome=DEACTIVATED); se reactiva con PUT"
+                            + " /api/courses/{id}.")
+    public ResponseEntity<CourseRemovalResponse> delete(@PathVariable UUID id) {
+        return ResponseEntity.ok(new CourseRemovalResponse(courseService.delete(id)));
     }
 
     @GetMapping("/{id}/overview")

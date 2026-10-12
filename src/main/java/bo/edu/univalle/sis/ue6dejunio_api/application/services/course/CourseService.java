@@ -9,6 +9,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.CreateClassGr
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseRemovalOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseWithSubjects;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CreateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
@@ -312,18 +313,36 @@ public class CourseService implements ICourseService {
         }
     }
 
+    /**
+     * A course that never held a student or a teacher's work is a mistake to take back, so it is
+     * erased with its bare class groups. One that did is history: it is only switched off, keeping
+     * its enrolments, scores, attendance, plans and reports, and PUT can switch it back on.
+     *
+     * <p>The lock comes before the check so the check stays true until the delete: an enrolment or
+     * a criterion written in between would otherwise either block the delete with a RESTRICT key (a
+     * raw 500) or vanish with its class group through a CASCADE one. Every RESTRICT key on a course
+     * or a class group (enrolments, class groups, scores) is covered by the in-use check, so the
+     * erase path cannot meet one.
+     */
     @Override
     @Transactional
-    public void delete(UUID id) {
+    public CourseRemovalOutcome delete(UUID id) {
         getById(id);
         closedYearGuard.requireOpenForCourse(id);
-        requireNotInUse(id);
-        courseDomain.setActive(id, false);
+        courseDomain.lockForRemoval(id);
+        if (courseDomain.hasEnrollments(id) || courseDomain.hasAcademicRecords(id)) {
+            courseDomain.setActive(id, false);
+            return CourseRemovalOutcome.DEACTIVATED;
+        }
+        classGroupDomain.deleteAllOfCourse(id);
+        courseDomain.delete(id);
+        return CourseRemovalOutcome.DELETED;
     }
 
     /**
-     * A course that holds students or teacher-authored content is history, not a mistake to take
-     * back. Bare class groups do not count: duplicating a gestión creates them for every course.
+     * A course that holds students or teacher-authored content is history, so a PUT does not switch
+     * it off; DELETE is the path that decides between erasing and deactivating. Bare class groups
+     * do not count: duplicating a gestión creates them for every course.
      */
     private void requireNotInUse(UUID id) {
         if (courseDomain.hasEnrollments(id)) {

@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.course;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -11,7 +12,9 @@ import static org.mockito.Mockito.when;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.course.CourseService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.CourseRemovalOutcome;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.UpdateCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.classgroup.IClassGroupDomain;
@@ -26,8 +29,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * A course that holds students or academic content cannot be taken out of service, by DELETE or by
- * a PUT that flips {@code active} to false. Bare class groups do not count.
+ * Removing a course (DELETE) erases it when it never held students or academic content, and only
+ * deactivates it when it did, so everything it generated survives. Bare class groups do not count.
+ * A PUT that flips {@code active} to false still refuses a course in use.
  */
 @ExtendWith(MockitoExtension.class)
 class CourseServiceInUseTest {
@@ -58,42 +62,72 @@ class CourseServiceInUseTest {
     }
 
     @Test
-    void delete_withAnEnrollment_isRefusedAndStaysActive() {
+    void delete_withAnEnrollment_deactivatesAndDeletesNothing() {
         existing(true);
         when(courseDomain.hasEnrollments(id)).thenReturn(true);
 
-        assertThatThrownBy(() -> service().delete(id))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("estudiantes inscritos");
+        CourseRemovalOutcome outcome = service().delete(id);
 
-        verify(courseDomain, never()).setActive(any(), any(Boolean.class));
+        assertThat(outcome).isEqualTo(CourseRemovalOutcome.DEACTIVATED);
+        verify(courseDomain).setActive(id, false);
+        verify(courseDomain, never()).delete(any());
+        verify(classGroupDomain, never()).deleteAllOfCourse(any());
     }
 
     @Test
-    void delete_withAcademicContent_isRefusedAndStaysActive() {
+    void delete_withAcademicContentButNoStudents_deactivatesAndDeletesNothing() {
         existing(true);
         when(courseDomain.hasEnrollments(id)).thenReturn(false);
         when(courseDomain.hasAcademicRecords(id)).thenReturn(true);
 
-        assertThatThrownBy(() -> service().delete(id))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("registros académicos");
+        CourseRemovalOutcome outcome = service().delete(id);
 
-        verify(courseDomain, never()).setActive(any(), any(Boolean.class));
+        assertThat(outcome).isEqualTo(CourseRemovalOutcome.DEACTIVATED);
+        verify(courseDomain).setActive(id, false);
+        verify(courseDomain, never()).delete(any());
+        verify(classGroupDomain, never()).deleteAllOfCourse(any());
     }
 
     @Test
-    void delete_ofAnUnusedCourse_deactivatesItAfterTheGuards() {
+    void delete_ofAnUnusedCourse_removesItsClassGroupsThenTheCourseAfterTheGuards() {
         existing(true);
         when(courseDomain.hasEnrollments(id)).thenReturn(false);
         when(courseDomain.hasAcademicRecords(id)).thenReturn(false);
 
+        CourseRemovalOutcome outcome = service().delete(id);
+
+        assertThat(outcome).isEqualTo(CourseRemovalOutcome.DELETED);
+        InOrder order = inOrder(closedYearGuard, courseDomain, classGroupDomain);
+        order.verify(closedYearGuard).requireOpenForCourse(id);
+        order.verify(courseDomain).lockForRemoval(id);
+        order.verify(courseDomain).hasEnrollments(id);
+        order.verify(classGroupDomain).deleteAllOfCourse(id);
+        order.verify(courseDomain).delete(id);
+        verify(courseDomain, never()).setActive(any(), any(Boolean.class));
+    }
+
+    @Test
+    void delete_locksTheCourseBeforeDecidingWhatItHolds() {
+        existing(true);
+        when(courseDomain.hasEnrollments(id)).thenReturn(true);
+
         service().delete(id);
 
-        InOrder order = inOrder(closedYearGuard, courseDomain);
-        order.verify(closedYearGuard).requireOpenForCourse(id);
+        InOrder order = inOrder(courseDomain);
+        order.verify(courseDomain).lockForRemoval(id);
         order.verify(courseDomain).hasEnrollments(id);
-        order.verify(courseDomain).setActive(id, false);
+    }
+
+    @Test
+    void delete_ofAnUnknownCourse_isNotFoundAndTouchesNothing() {
+        when(courseDomain.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().delete(id))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(courseDomain, never()).lockForRemoval(any());
+        verify(courseDomain, never()).delete(any());
+        verify(courseDomain, never()).setActive(any(), any(Boolean.class));
     }
 
     @Test
@@ -151,5 +185,7 @@ class CourseServiceInUseTest {
         assertThatThrownBy(() -> service().delete(id)).hasMessageContaining("cerrada");
 
         verify(courseDomain, never()).hasEnrollments(any());
+        verify(courseDomain, never()).delete(any());
+        verify(classGroupDomain, never()).deleteAllOfCourse(any());
     }
 }
