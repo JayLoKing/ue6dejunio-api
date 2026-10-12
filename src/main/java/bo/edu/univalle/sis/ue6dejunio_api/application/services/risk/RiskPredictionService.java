@@ -300,14 +300,23 @@ public class RiskPredictionService implements IRiskPredictionService {
         return List.copyOf(byStudent.values());
     }
 
-    /** One course's worst students, one row each, out of every subject of the course. */
+    /**
+     * One course's worst students, one row each, out of the critical subjects of the course.
+     *
+     * <p>Only {@code RiesgoCritico} rows are ranked: the list is of students who are really at
+     * risk, and that is where the school draws the line. The cut is made here, before any place is
+     * taken, so {@code places} means that many critical students — filtering after the ranking
+     * would hand empty places to children who are passing and still call the list a top ten. The
+     * gestión read itself stays unfiltered because the per-course summary counts every band.
+     */
     private static List<InstitutionRiskEntry> worstOf(
             Course course, List<StudentRisk> risks, int places) {
         List<InstitutionRiskEntry> rows = new ArrayList<>();
         for (StudentRisk risk : risks) {
             // A prediction the model never scored cannot be placed against ones it did. Sorting it
             // as a zero would say the model looked at the child and found them safe.
-            if (risk.prediction().pFail() == null) {
+            if (risk.prediction().pFail() == null
+                    || !risk.prediction().riskLevel().demandsAttention()) {
                 continue;
             }
             rows.add(entryOf(course, risk));

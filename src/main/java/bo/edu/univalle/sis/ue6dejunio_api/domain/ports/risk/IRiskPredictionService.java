@@ -78,6 +78,10 @@ public interface IRiskPredictionService {
      * grain they can all go to a single child while the others it displaced are the ones the reader
      * opened it to find. The subject that comes with each student is their worst.
      *
+     * <p>Only students in {@code RiesgoCritico} are listed, and the subject shown is the worst of
+     * their critical ones. A trimester with fewer critical students than {@code places} answers a
+     * shorter list rather than padding it with students who are passing.
+     *
      * @param academicYearId the gestión, required. Without it the course listing answers every year
      *     at once, and the list would rank a student of 2024 beside one of 2026.
      * @param places how many students the list holds. Taken from every course first and then once

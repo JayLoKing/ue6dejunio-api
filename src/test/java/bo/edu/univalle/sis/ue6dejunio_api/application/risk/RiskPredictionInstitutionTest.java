@@ -304,13 +304,61 @@ class RiskPredictionInstitutionTest {
         risksOf(
                 quintoId,
                 risk("Ana", "Alvarez", "Matematicas", null, RiskLevel.RIESGO_CRITICO),
-                risk("Bruno", "Bermudez", "Lenguaje", "0.10", RiskLevel.SIN_RIESGO));
+                risk("Bruno", "Bermudez", "Lenguaje", "0.60", RiskLevel.RIESGO_CRITICO));
 
         List<InstitutionRiskEntry> worst = service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 10);
 
         assertThat(worst)
                 .extracting(InstitutionRiskEntry::fullName)
                 .containsExactly("Bermudez Bruno");
+    }
+
+    /**
+     * The list is of students who are really at risk, and the school draws that line at
+     * RiesgoCritico. Ranked by probability alone, a trimester with three failing students and ten
+     * places would fill the other seven with children who are passing, and the Director would read
+     * them as seven more cases to follow up.
+     */
+    @Test
+    void institutionRisk_listsOnlyStudentsInCriticalRisk() {
+        coursesOfTheYear(course(quintoId, "Quinto", "B"));
+        risksOf(
+                quintoId,
+                risk("Ana", "Alvarez", "Matematicas", "0.70", RiskLevel.RIESGO_CRITICO),
+                risk("Bruno", "Bermudez", "Lenguaje", "0.45", RiskLevel.EN_RIESGO),
+                risk("Carla", "Cruz", "Fisica", "0.20", RiskLevel.SIN_RIESGO),
+                risk("Dario", "Duran", "Quimica", "0.01", RiskLevel.SOBRESALIENTE));
+
+        List<InstitutionRiskEntry> worst = service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 10);
+
+        assertThat(worst).extracting(InstitutionRiskEntry::fullName).containsExactly("Alvarez Ana");
+    }
+
+    /**
+     * The cut happens before the ranking, not after it. Every place goes to a critical student
+     * while there are critical students to fill it — and the row a student gets is a critical one,
+     * even when a subject they are merely at risk in carries the higher probability.
+     */
+    @Test
+    void institutionRisk_ranksOnlyTheCriticalRowsOfAStudent() {
+        coursesOfTheYear(course(quintoId, "Quinto", "B"));
+        UUID ana = UUID.randomUUID();
+        risksOf(
+                quintoId,
+                riskOf(ana, "Ana", "Alvarez", "Lenguaje", "0.80", RiskLevel.EN_RIESGO),
+                riskOf(ana, "Ana", "Alvarez", "Matematicas", "0.60", RiskLevel.RIESGO_CRITICO),
+                risk("Bruno", "Bermudez", "Fisica", "0.90", RiskLevel.EN_RIESGO));
+
+        List<InstitutionRiskEntry> worst = service.institutionRisk(ACADEMIC_YEAR_ID, TRIMESTER, 1);
+
+        assertThat(worst)
+                .singleElement()
+                .satisfies(
+                        entry -> {
+                            assertThat(entry.studentId()).isEqualTo(ana);
+                            assertThat(entry.subjectName()).isEqualTo("Matematicas");
+                            assertThat(entry.riskLevel()).isEqualTo(RiskLevel.RIESGO_CRITICO);
+                        });
     }
 
     @Test

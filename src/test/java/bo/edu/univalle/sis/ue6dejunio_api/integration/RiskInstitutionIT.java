@@ -123,6 +123,44 @@ class RiskInstitutionIT extends AbstractIntegrationTest {
     }
 
     /**
+     * Only the students who are really at risk, which the school places at RiesgoCritico. Ten
+     * places and two failing students is a list of two, not two plus eight children who are
+     * passing.
+     */
+    @Test
+    void institutionRisk_leavesOutEveryStudentWhoIsNotInCriticalRisk() throws Exception {
+        UUID courseC = seedCourse(seedUser("Teacher", false), "C");
+        UUID mathC = seedClassGroup(courseC, teacher, "Matematicas");
+        UUID bruno = seedStudent("Bruno", "Bermudez");
+        UUID dario = seedStudent("Dario", "Duran");
+        seedEnrollment(bruno, courseC);
+        seedEnrollment(dario, courseC);
+        riskPredictions.upsertAll(
+                List.of(
+                        prediction(bruno, mathC, RiskLevel.EN_RIESGO, "0.4500"),
+                        prediction(dario, mathC, RiskLevel.SIN_RIESGO, "0.2000")));
+
+        String body =
+                mvc.perform(
+                                get("/api/risk/institution")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenFor(director, "Director"))
+                                        .param(
+                                                "id_academic_year",
+                                                String.valueOf(currentAcademicYearId()))
+                                        .param("trimester", "1")
+                                        .param("places", "10"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].fullName"))
+                .containsExactly("Cruz Carla", "Alvarez Ana");
+    }
+
+    /**
      * The secretariat reads the whole school without writing, and this list is a read: the same
      * rows the Director gets, so the office can follow up with the families.
      */

@@ -120,8 +120,9 @@ public class RiskPredictionController {
     @PreAuthorize("hasAnyRole('Director','Secretary')")
     @Operation(
             summary =
-                    "Estudiantes en riesgo de toda la unidad educativa en una gestion: un "
-                            + "estudiante por fila con su peor materia, el de peor riesgo primero")
+                    "Estudiantes en riesgo critico de toda la unidad educativa en una gestion: un "
+                            + "estudiante por fila con su peor materia critica, el de mayor "
+                            + "probabilidad de reprobar primero")
     public ResponseEntity<List<InstitutionRiskEntryResponse>> institutionRisk(
             // Required, unlike the listings above: a list spanning gestiones would rank a student
             // of one
