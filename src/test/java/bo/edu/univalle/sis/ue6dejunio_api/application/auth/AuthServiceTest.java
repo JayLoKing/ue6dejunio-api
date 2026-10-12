@@ -334,8 +334,12 @@ class AuthServiceTest {
         order.verify(handoverService).completeFor(activeUser.getId());
     }
 
+    /**
+     * A validation error, not invalid credentials: those map to 401, and under a live token the web
+     * reads a 401 as an expired session and logs the user out over a typo.
+     */
     @Test
-    void changePassword_wrongCurrentPassword_doesNotTouchTheHandover() {
+    void changePassword_wrongCurrentPassword_isAValidationError_andDoesNotTouchTheHandover() {
         when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
         when(passwordEncoder.matches("bad", "$hashed$")).thenReturn(false);
 
@@ -344,7 +348,8 @@ class AuthServiceTest {
                                 authService.changePassword(
                                         new ChangePasswordCommand(
                                                 activeUser.getId(), "bad", "newSecret1")))
-                .isInstanceOf(InvalidCredentialsException.class);
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("La contraseña actual no es correcta");
 
         verify(userDomain, never()).save(any(User.class));
         verifyNoInteractions(handoverService);

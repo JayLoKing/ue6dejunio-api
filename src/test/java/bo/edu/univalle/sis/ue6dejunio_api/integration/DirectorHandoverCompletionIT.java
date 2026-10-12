@@ -258,8 +258,9 @@ class DirectorHandoverCompletionIT extends AbstractIntegrationTest {
         String temporary = lastMailedPassword(email);
         String incomingToken = loginToken(email, temporary);
 
+        // 400, not 401: under a live token the web reads a 401 as an expired session.
         changePassword(incomingToken, "not-the-password", NEW_PASSWORD)
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest());
 
         assertThat(handoverPending()).isTrue();
         assertThat(activeOf(outgoing)).isTrue();

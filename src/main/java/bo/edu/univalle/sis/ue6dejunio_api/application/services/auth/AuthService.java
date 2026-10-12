@@ -129,8 +129,10 @@ public class AuthService implements IAuthService {
                         .orElseThrow(
                                 () -> new ResourceNotFoundException("Usuario", command.userId()));
 
+        // A validation error, not invalid credentials: those answer 401, and under a live token the
+        // web reads a 401 as an expired session and logs the user out over a typo.
         if (!passwordEncoder.matches(command.currentPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException();
+            throw new ValidationException("La contraseña actual no es correcta");
         }
         if (!user.isActive()) {
             throw new UserInactiveException();

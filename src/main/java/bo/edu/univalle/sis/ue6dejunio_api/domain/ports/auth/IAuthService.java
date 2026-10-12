@@ -28,6 +28,18 @@ public interface IAuthService {
      */
     AuthenticatedUser refresh(UUID userId);
 
+    /**
+     * Replaces the caller's password once they prove it is them with the current one, and clears
+     * the forced first-login change. The forced change and the voluntary one share this door.
+     *
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException if the
+     *     current password is wrong. Not a 401: under a live token the web reads that as an expired
+     *     session
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException if the
+     *     account is closed
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException if the
+     *     user behind the token no longer exists
+     */
     void changePassword(ChangePasswordCommand command);
 
     /**
