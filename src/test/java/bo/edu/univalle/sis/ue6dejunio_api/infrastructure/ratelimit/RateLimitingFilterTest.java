@@ -178,6 +178,45 @@ class RateLimitingFilterTest {
         assertThat(thirdResponse.getHeader(HttpHeaders.RETRY_AFTER)).isNotNull();
     }
 
+    private static MockHttpServletRequest changeEmailRequest(String subject) {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/api/auth/change-email");
+        request.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        request.setContent(
+                "{\"newEmail\":\"a@ue6.bo\",\"currentPassword\":\"old12345\"}"
+                        .getBytes(StandardCharsets.UTF_8));
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + fakeJwt(subject));
+        return request;
+    }
+
+    /**
+     * Changing the email takes the current password just like changing the password does, so it is
+     * throttled the same way, per user. Its bucket is its own: spending one form's attempts does
+     * not lock the other.
+     */
+    @Test
+    void changeEmail_exceededForKey_returns429_withoutSpendingChangePassword() throws Exception {
+        properties.getChangePassword().setCapacity(2);
+        properties.getChangePassword().setRefillPerMinute(2);
+        RateLimitingFilter filter = filter(fixedIp(FIXED_IP));
+        AtomicInteger passed = new AtomicInteger();
+        FilterChain chain = countingChain(passed);
+        String subject = "22222222-2222-2222-2222-222222222222";
+
+        for (int i = 0; i < 2; i++) {
+            filter.doFilter(changeEmailRequest(subject), new MockHttpServletResponse(), chain);
+        }
+        MockHttpServletResponse thirdResponse = new MockHttpServletResponse();
+        filter.doFilter(changeEmailRequest(subject), thirdResponse, chain);
+        MockHttpServletResponse passwordResponse = new MockHttpServletResponse();
+        filter.doFilter(changePasswordRequest(subject), passwordResponse, chain);
+
+        assertThat(thirdResponse.getStatus()).isEqualTo(429);
+        assertThat(thirdResponse.getHeader(HttpHeaders.RETRY_AFTER)).isNotNull();
+        assertThat(passwordResponse.getStatus()).isNotEqualTo(429);
+        assertThat(passed.get()).isEqualTo(3);
+    }
+
     @Test
     void ipResolverThrows_filterFailsSafe_doesNotCrashRequest() throws Exception {
         ClientIpResolver throwingResolver =

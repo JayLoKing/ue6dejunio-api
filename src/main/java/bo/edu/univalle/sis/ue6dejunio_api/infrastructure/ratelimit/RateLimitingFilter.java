@@ -22,9 +22,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Enforces per-request throttling before authentication runs. Order of checks per request:
- * endpoint-specific limiter (login / change-password), then the global per-IP limiter. Any
- * rejection short-circuits with {@code 429 Too Many Requests} + {@code Retry-After}, identical
- * regardless of whether the submitted email exists, and never invokes downstream authentication.
+ * endpoint-specific limiter (login / change-password / change-email), then the global per-IP
+ * limiter. Any rejection short-circuits with {@code 429 Too Many Requests} + {@code Retry-After},
+ * identical regardless of whether the submitted email exists, and never invokes downstream
+ * authentication.
  *
  * <p>Deliberately NOT a {@code @Component}: {@link OncePerRequestFilter} implements {@code
  * jakarta.servlet.Filter}, and {@code @WebMvcTest} slices auto-register any {@code Filter}-typed
@@ -39,6 +40,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private static final String LOGIN_PATH = "/api/auth/login";
     private static final String CHANGE_PASSWORD_PATH = "/api/auth/change-password";
+    private static final String CHANGE_EMAIL_PATH = "/api/auth/change-email";
     private static final String FORGOT_PASSWORD_PATH = "/api/auth/forgot-password";
     private static final String RESET_PASSWORD_PATH = "/api/auth/reset-password";
     private static final String UNKNOWN_SUBJECT = "unknown";
@@ -74,6 +76,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         boolean isLogin = isJsonPostTo(request, LOGIN_PATH);
         boolean isChangePassword = isJsonPostTo(request, CHANGE_PASSWORD_PATH);
+        boolean isChangeEmail = isJsonPostTo(request, CHANGE_EMAIL_PATH);
         boolean isForgotPassword = isJsonPostTo(request, FORGOT_PASSWORD_PATH);
         boolean isResetPassword = isJsonPostTo(request, RESET_PASSWORD_PATH);
 
@@ -89,6 +92,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             CachedBodyHttpServletRequest cached = new CachedBodyHttpServletRequest(request);
             effectiveRequest = cached;
             specificKey = "cpw:" + ip + ":" + extractUserId(request);
+            specificConfig = properties.getChangePassword();
+        } else if (isChangeEmail) {
+            // Same shape and limits as change-password: both take the current password, so both are
+            // a way to guess it. Its own key, so spending one form's attempts does not lock the
+            // other.
+            specificKey = "cem:" + ip + ":" + extractUserId(request);
             specificConfig = properties.getChangePassword();
         } else if (isForgotPassword) {
             CachedBodyHttpServletRequest cached = new CachedBodyHttpServletRequest(request);

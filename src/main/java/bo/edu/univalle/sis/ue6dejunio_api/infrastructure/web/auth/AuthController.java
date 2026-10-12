@@ -1,11 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.auth;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangeEmailCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.AuthResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ChangeEmailRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ChangePasswordRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ForgotPasswordResponse;
@@ -138,6 +140,25 @@ public class AuthController {
                 new ChangePasswordCommand(
                         userId, request.currentPassword(), request.newPassword()));
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Moves the caller's own account to another address. The id comes from the verified token, and
+     * the current password proves the person at the keyboard owns it. Answers with a fresh session
+     * because the old token's email claim still names the previous address.
+     */
+    @PostMapping("/change-email")
+    @Operation(
+            summary = "Cambiar el correo del usuario autenticado",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<AuthResponse> changeEmail(
+            @Valid @RequestBody ChangeEmailRequest request, JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getToken().getSubject());
+        AuthenticatedUser updated =
+                authService.changeEmail(
+                        new ChangeEmailCommand(
+                                userId, request.newEmail(), request.currentPassword()));
+        return ResponseEntity.ok(AuthResponse.from(updated));
     }
 
     @PostMapping("/forgot-password")

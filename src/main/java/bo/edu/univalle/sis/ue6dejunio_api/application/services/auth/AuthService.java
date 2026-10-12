@@ -1,10 +1,13 @@
 package bo.edu.univalle.sis.ue6dejunio_api.application.services.auth;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidCredentialsException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangeEmailCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
@@ -155,6 +158,32 @@ public class AuthService implements IAuthService {
         user.setNames(command.names());
         user.setLastNames(command.lastNames());
         user.setPhone(command.phone());
+        return issueFor(userDomain.save(user));
+    }
+
+    @Override
+    @Transactional
+    public AuthenticatedUser changeEmail(ChangeEmailCommand command) {
+        User user =
+                userDomain
+                        .findById(command.userId())
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Usuario", command.userId()));
+        if (!user.isActive()) {
+            throw new UserInactiveException();
+        }
+        // The password goes first, so whoever borrowed an open session cannot use this to probe
+        // which addresses belong to somebody.
+        if (!passwordEncoder.matches(command.currentPassword(), user.getPassword())) {
+            throw new ValidationException("La contraseña actual no es correcta");
+        }
+        if (command.newEmail().equals(user.getEmail())) {
+            throw new ValidationException("El correo nuevo es igual al actual");
+        }
+        if (userDomain.existsByEmail(command.newEmail())) {
+            throw new DuplicateResourceException("email", command.newEmail());
+        }
+        user.setEmail(command.newEmail());
         return issueFor(userDomain.save(user));
     }
 

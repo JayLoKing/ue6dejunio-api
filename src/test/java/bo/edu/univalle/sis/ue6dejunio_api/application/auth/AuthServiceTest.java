@@ -11,11 +11,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.auth.AuthService;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidCredentialsException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.InvalidResetTokenException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.AuthenticatedUser;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangeEmailCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.ChangePasswordCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
@@ -461,5 +464,102 @@ class AuthServiceTest {
                                 authService.updateProfile(
                                         new UpdateProfileCommand(ghost, "Maria", "Lopez", null)))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- changeEmail ---
+
+    private AuthenticatedUser sessionFor(String email) {
+        return new AuthenticatedUser(
+                activeUser.getId(),
+                email,
+                "Juan Ortuño",
+                "DIRECTOR",
+                "fresh-jwt",
+                Instant.now(),
+                Instant.now().plusSeconds(900),
+                false,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    private ChangeEmailCommand changeTo(String newEmail, String currentPassword) {
+        return new ChangeEmailCommand(activeUser.getId(), newEmail, currentPassword);
+    }
+
+    /**
+     * The token carries the address as a claim, so the answer is a fresh session: the caller swaps
+     * it in and the header, /me and the next refresh all read the new address.
+     */
+    @Test
+    void changeEmail_rightPassword_movesTheAddressAndReissuesTheSession() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret", "$hashed$")).thenReturn(true);
+        when(userDomain.existsByEmail("nuevo@ue6.bo")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.issueToken(any(User.class), any(), any(), any(), any()))
+                .thenReturn(sessionFor("nuevo@ue6.bo"));
+
+        AuthenticatedUser result = authService.changeEmail(changeTo("nuevo@ue6.bo", "secret"));
+
+        assertThat(activeUser.getEmail()).isEqualTo("nuevo@ue6.bo");
+        assertThat(activeUser.getPassword()).isEqualTo("$hashed$");
+        assertThat(result.email()).isEqualTo("nuevo@ue6.bo");
+        verify(userDomain).save(activeUser);
+        verify(jwtService).issueToken(activeUser, null, null, null, null);
+    }
+
+    /**
+     * A 400, not the 401 of a bad login: the web treats any 401 under a live token as an expired
+     * session and signs the user out, which is not what a mistyped password deserves.
+     */
+    @Test
+    void changeEmail_wrongPassword_isAValidationErrorAndSavesNothing() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("wrong", "$hashed$")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.changeEmail(changeTo("nuevo@ue6.bo", "wrong")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("La contraseña actual no es correcta");
+
+        verify(userDomain, never()).existsByEmail(anyString());
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    @Test
+    void changeEmail_addressOfAnotherUser_isDuplicateAndSavesNothing() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret", "$hashed$")).thenReturn(true);
+        when(userDomain.existsByEmail("otro@ue6.bo")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.changeEmail(changeTo("otro@ue6.bo", "secret")))
+                .isInstanceOf(DuplicateResourceException.class);
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    /** Asking to move to the address already held is a mistake worth saying, not a silent pass. */
+    @Test
+    void changeEmail_sameAddressAsNow_isAValidationError() {
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("secret", "$hashed$")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.changeEmail(changeTo("director@ue6.bo", "secret")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("El correo nuevo es igual al actual");
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    @Test
+    void changeEmail_deactivatedUser_throwsUserInactiveAndSavesNothing() {
+        activeUser.setActive(false);
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+
+        assertThatThrownBy(() -> authService.changeEmail(changeTo("nuevo@ue6.bo", "secret")))
+                .isInstanceOf(UserInactiveException.class);
+
+        verify(userDomain, never()).save(any(User.class));
     }
 }
