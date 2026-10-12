@@ -8,12 +8,12 @@ import java.util.List;
  * <p>Two views of the same load. The row counts ({@code studentsTotal}, {@code studentsExisting},
  * {@code enrollmentsCreated}, {@code enrollmentsSkipped}) are per row of the file, repeats
  * included. The student groups ({@code studentsCreated}, {@code studentsFromPreviousYear}, {@code
- * studentsReentering}, {@code skippedWithdrawn}, {@code skippedOtherCourse}) are per distinct
- * student and partition the distinct students the file named:
+ * studentsReentering}, {@code reinstated}, {@code skippedWithdrawn}, {@code skippedOtherCourse})
+ * are per distinct student and partition the distinct students the file named:
  *
  * <pre>
- * studentsCreated + studentsFromPreviousYear + studentsReentering + skippedWithdrawn.size()
- *     + skippedOtherCourse.size() == distinct students in the request
+ * studentsCreated + studentsFromPreviousYear + studentsReentering + reinstated.size()
+ *     + skippedWithdrawn.size() + skippedOtherCourse.size() == distinct students in the request
  * </pre>
  *
  * @param studentsTotal how many rows the request carried, repeated rows and skipped ones included
@@ -29,8 +29,12 @@ import java.util.List;
  * @param enrollmentsSkipped how many rows matched a student who already holds a seat in the course,
  *     or repeated one seated earlier in the same request. Not the withdrawn ones: those are in
  *     {@code skippedWithdrawn}
- * @param skippedWithdrawn the withdrawn students the load left out, once each. Only the Director's
- *     explicit reinstatement puts one back, so a load neither seats them nor changes their status
+ * @param reinstated the students withdrawn in an earlier gestión — no Effective or Withdrawn seat
+ *     of theirs in the course's own — whom the load returned to Effective and seated, once each.
+ *     Not counted in {@code studentsFromPreviousYear} nor {@code studentsReentering}
+ * @param skippedWithdrawn the students withdrawn in the course's own gestión that the load left
+ *     out, once each. Only the Director's explicit reinstatement puts one back, so a load neither
+ *     seats them nor changes their status
  * @param skippedOtherCourse the students the load left out because they already hold an Effective
  *     seat in another course of the same gestión, once each, with the course they sit in
  * @param conflicts the rows left out because their RUDE code and identity card belong to two
@@ -45,6 +49,7 @@ public record EnrollResult(
         int studentsReentering,
         int enrollmentsCreated,
         int enrollmentsSkipped,
+        List<ReinstatedStudent> reinstated,
         List<SkippedStudent> skippedWithdrawn,
         List<EnrolledElsewhere> skippedOtherCourse,
         List<EnrollConflict> conflicts) {}

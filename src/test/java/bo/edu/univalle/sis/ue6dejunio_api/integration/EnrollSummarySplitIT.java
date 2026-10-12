@@ -103,13 +103,28 @@ class EnrollSummarySplitIT extends AbstractIntegrationTest {
         UUID gone = seedStudent("Dino", "Baja");
         seatIn(gone, 2025, "B", "Effective");
         jdbc.update("UPDATE students SET status = 'Withdrawn' WHERE id_student = ?", gone);
+        // Withdrawn this gestión, from a sibling course: the one kind a load still leaves out.
+        UUID goneThisYear = seedStudent("Eva", "BajaReciente");
+        seatIn(goneThisYear, 2026, "B", "Withdrawn");
+        jdbc.update("UPDATE students SET status = 'Withdrawn' WHERE id_student = ?", goneThisYear);
 
-        load(rowOf(continuing), rowOf(returning), rowOf(leftLastYear), rowOf(gone), newcomer())
-                .andExpect(jsonPath("$.studentsTotal").value(5))
+        load(
+                        rowOf(continuing),
+                        rowOf(returning),
+                        rowOf(leftLastYear),
+                        rowOf(gone),
+                        rowOf(goneThisYear),
+                        newcomer())
+                .andExpect(jsonPath("$.studentsTotal").value(6))
                 .andExpect(jsonPath("$.studentsCreated").value(1))
                 .andExpect(jsonPath("$.studentsFromPreviousYear").value(1))
                 .andExpect(jsonPath("$.studentsReentering").value(2))
-                .andExpect(jsonPath("$.skippedWithdrawn.length()").value(1));
+                // Withdrawn in 2025 with no seat in 2026: that withdrawal belongs to last gestión.
+                .andExpect(jsonPath("$.reinstated.length()").value(1))
+                .andExpect(jsonPath("$.reinstated[0].studentId").value(gone.toString()))
+                .andExpect(jsonPath("$.skippedWithdrawn.length()").value(1))
+                .andExpect(
+                        jsonPath("$.skippedWithdrawn[0].studentId").value(goneThisYear.toString()));
     }
 
     /** Distinct students, however many rows the file spends on them. */

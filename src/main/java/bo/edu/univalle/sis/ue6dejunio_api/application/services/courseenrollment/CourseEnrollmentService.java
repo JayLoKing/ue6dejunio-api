@@ -10,10 +10,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollC
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.ReinstatedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
@@ -119,10 +121,13 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         int existing = 0;
         int enrolled = 0;
         int skipped = 0;
-        // Withdrawn students the roster named. Only the Director's reinstatement puts one back, so
-        // the load leaves them alone and reports them. Keyed by id so a file that repeats a name
-        // lists them once; the name comes from the row already loaded, not from another query.
+        // Students withdrawn this gestión that the roster named. Only the Director's reinstatement
+        // puts one back, so the load leaves them alone and reports them. Keyed by id so a file
+        // that repeats a name lists them once; the name comes from the row already loaded.
         Map<UUID, SkippedStudent> skippedWithdrawn = new LinkedHashMap<>();
+        // Students withdrawn in an earlier gestión that this year's roster names again. The roster
+        // is the school taking them back, so the load reinstates and seats them.
+        Map<UUID, ReinstatedStudent> reinstated = new LinkedHashMap<>();
         // Students already seated in another course of this gestión. A second seat in the same year
         // is what the Director's reinstatement or transfer decides, never a roster load.
         Map<UUID, EnrolledElsewhere> skippedOtherCourse = new LinkedHashMap<>();
@@ -153,13 +158,20 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 index(byIdentityCard, student.getIdentityCard(), student);
             } else {
                 existing++;
-                if (STATUS_WITHDRAWN.equals(student.getStatus())) {
-                    skippedWithdrawn.putIfAbsent(
+                // The object in the index still reads Withdrawn after a reinstatement earlier in
+                // this load, so a repeated row of theirs is recognised by id, not by status.
+                boolean takenBack = reinstated.containsKey(student.getId());
+                if (STATUS_WITHDRAWN.equals(student.getStatus()) && !takenBack) {
+                    if (leftThisGestion(student.getId(), seatsInYear)) {
+                        skippedWithdrawn.putIfAbsent(
+                                student.getId(),
+                                new SkippedStudent(student.getId(), student.fullName()));
+                        continue;
+                    }
+                    reinstated.put(
                             student.getId(),
-                            new SkippedStudent(student.getId(), student.fullName()));
-                    continue;
-                }
-                if (!createdNow.contains(student.getId())) {
+                            new ReinstatedStudent(student.getId(), student.fullName()));
+                } else if (!createdNow.contains(student.getId()) && !takenBack) {
                     Optional<EnrolledElsewhere> elsewhere =
                             seatedElsewhere(
                                     student, command.courseId(), enrollmentInCourse, seatsInYear);
@@ -192,6 +204,15 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
             }
         }
         enrollmentDomain.reactivateEnrollments(command.courseId(), toReactivate);
+        // The same status change the Director's reinstatement writes, with the loader as the one
+        // who decided. The seat itself was written above with everyone else's. Not the Director's
+        // reinstate use case itself: it seats into the active gestión rather than the course's,
+        // writes its own seat and re-reads the student, which per name would undo the batching.
+        for (UUID studentId : reinstated.keySet()) {
+            studentDomain.updateStatus(
+                    studentId,
+                    new StudentStatusChange(STATUS_EFFECTIVE, null, null, command.actorId()));
+        }
         int fromPreviousYear = fromPreviousYear(command.courseId(), carriedOver);
         return new EnrollResult(
                 command.students().size(),
@@ -201,6 +222,7 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 carriedOver.size() - fromPreviousYear,
                 enrolled,
                 skipped,
+                List.copyOf(reinstated.values()),
                 List.copyOf(skippedWithdrawn.values()),
                 List.copyOf(skippedOtherCourse.values()),
                 List.copyOf(conflicts));
@@ -229,6 +251,23 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                                 + " y el CI a "
                                 + byCard.fullName()
                                 + "."));
+    }
+
+    /**
+     * Whether a withdrawn student's withdrawal belongs to the course's own gestión.
+     *
+     * <p>Read off the seats, because that is where a withdrawal leaves its mark: it turns the
+     * student's Effective seats in the open years into Withdrawn ones. A student with a seat of
+     * either status in this gestión left during it, and only the Director takes them back. One with
+     * none left in an earlier gestión, and this year's roster naming them is the school taking them
+     * back.
+     */
+    private static boolean leftThisGestion(UUID studentId, Map<UUID, List<YearSeat>> seatsInYear) {
+        return seatsInYear.getOrDefault(studentId, List.of()).stream()
+                .anyMatch(
+                        seat ->
+                                STATUS_WITHDRAWN.equals(seat.status())
+                                        || STATUS_EFFECTIVE.equals(seat.status()));
     }
 
     /**

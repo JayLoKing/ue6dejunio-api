@@ -161,6 +161,71 @@ class EnrollmentIntegrityIT extends AbstractIntegrationTest {
         assertThat(rowsIn(student, target)).isZero();
     }
 
+    /**
+     * A student withdrawn with a seat closed in {@code course}, the way the withdrawal leaves it.
+     */
+    private UUID withdrawnFrom(UUID course) {
+        UUID student = seedStudent("Ana", "Quispe");
+        jdbc.update(
+                "UPDATE course_enrollments SET status = 'Withdrawn' WHERE id_course_enrollment = ?",
+                seedEnrollment(student, course));
+        jdbc.update("UPDATE students SET status = 'Withdrawn' WHERE id_student = ?", student);
+        return student;
+    }
+
+    private String statusOf(UUID student) {
+        return jdbc.queryForObject(
+                "SELECT status FROM students WHERE id_student = ?", String.class, student);
+    }
+
+    /**
+     * Withdrawn last gestión and back on this year's roster: the load reinstates them into the new
+     * course and records the teacher who loaded it as the one who decided.
+     */
+    @Test
+    void studentWithdrawnLastGestion_isReinstatedIntoThisYearsCourse() throws Exception {
+        UUID student =
+                withdrawnFrom(seedCourse(seedUser("Teacher", false), "B", academicYearId(2025)));
+
+        sync(target, rowOf(student))
+                .andExpect(jsonPath("$.enrollmentsCreated").value(1))
+                .andExpect(jsonPath("$.reinstated.length()").value(1))
+                .andExpect(jsonPath("$.reinstated[0].studentId").value(student.toString()))
+                .andExpect(jsonPath("$.reinstated[0].fullName").value("Ana Quispe"))
+                .andExpect(jsonPath("$.skippedWithdrawn.length()").value(0));
+
+        assertThat(statusOf(student)).isEqualTo("Effective");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status_changed_by FROM students WHERE id_student = ?",
+                                UUID.class,
+                                student))
+                .isEqualTo(teacher);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM course_enrollments "
+                                        + "WHERE id_student = ? AND id_course = ?",
+                                String.class,
+                                student,
+                                target))
+                .isEqualTo("Effective");
+    }
+
+    /** Withdrawn this gestión, from a sibling course: still the Director's to undo. */
+    @Test
+    void studentWithdrawnThisGestion_isStillLeftOut() throws Exception {
+        UUID student = withdrawnFrom(sibling);
+
+        sync(target, rowOf(student))
+                .andExpect(jsonPath("$.enrollmentsCreated").value(0))
+                .andExpect(jsonPath("$.reinstated.length()").value(0))
+                .andExpect(jsonPath("$.skippedWithdrawn.length()").value(1))
+                .andExpect(jsonPath("$.skippedWithdrawn[0].studentId").value(student.toString()));
+
+        assertThat(statusOf(student)).isEqualTo("Withdrawn");
+        assertThat(rowsIn(student, target)).isZero();
+    }
+
     /** A seat in last year's course is history, not a seat taken this year. */
     @Test
     void studentSeatedInACourseOfLastYear_isEnrolled() throws Exception {

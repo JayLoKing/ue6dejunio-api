@@ -19,10 +19,12 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollC
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.ReinstatedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
@@ -79,7 +81,7 @@ class CourseEnrollmentServiceEnrollTest {
     }
 
     private EnrollToCourseCommand cmd(UUID course, List<CreateStudentCommand> students) {
-        return new EnrollToCourseCommand(course, students);
+        return new EnrollToCourseCommand(course, students, ACTOR);
     }
 
     private static final String STATUS_EFFECTIVE = "Effective";
@@ -97,6 +99,72 @@ class CourseEnrollmentServiceEnrollTest {
     }
 
     /**
+     * The withdrawal happened in the gestión being loaded: withdrawing closes the seats a student
+     * holds in the open years, so it leaves a Withdrawn seat in a course of this one.
+     */
+    private void withdrawnThisYear(UUID id) {
+        seatsInYear(new YearSeat(id, courseId, "Primero A", STATUS_WITHDRAWN));
+    }
+
+    private static final UUID ACTOR = UUID.randomUUID();
+
+    private EnrollToCourseCommand cmdBy(UUID actor, List<CreateStudentCommand> students) {
+        return new EnrollToCourseCommand(courseId, students, actor);
+    }
+
+    /**
+     * Withdrawn in an earlier gestión — no seat of theirs in this one, open or closed — the student
+     * is back on a new year's roster, and that roster is the school taking them back. The load
+     * reinstates them: their status returns to Effective, recorded as the loader's decision, and
+     * they are seated like anyone else.
+     */
+    @Test
+    void studentWithdrawnInAnEarlierGestion_isReinstatedAndEnrolled() {
+        UUID id = UUID.randomUUID();
+        rosterOf(withdrawn(id, "R1", "C1"));
+
+        EnrollResult result = service.enroll(cmdBy(ACTOR, List.of(row("R1", "C1"))));
+
+        verify(studentDomain)
+                .updateStatus(id, new StudentStatusChange(STATUS_EFFECTIVE, null, null, ACTOR));
+        verify(enrollmentDomain).saveEnrollment(id, courseId);
+        assertThat(result.reinstated()).containsExactly(new ReinstatedStudent(id, "Ana Perez"));
+        assertThat(result.skippedWithdrawn()).isEmpty();
+        assertThat(result.enrollmentsCreated()).isEqualTo(1);
+        assertThat(result.studentsReentering()).isZero();
+        assertThat(result.studentsFromPreviousYear()).isZero();
+    }
+
+    /** A repeated row of a student the load just reinstated is a repeat, not a second return. */
+    @Test
+    void reinstatedStudentTwiceInOneFile_isReinstatedOnceAndSeatedOnce() {
+        UUID id = UUID.randomUUID();
+        rosterOf(withdrawn(id, "R1", "C1"));
+
+        EnrollResult result =
+                service.enroll(cmdBy(ACTOR, List.of(row("R1", "C1"), row("R1", "C1"))));
+
+        verify(studentDomain, times(1)).updateStatus(eq(id), any());
+        verify(enrollmentDomain, times(1)).saveEnrollment(id, courseId);
+        assertThat(result.reinstated()).hasSize(1);
+        assertThat(result.enrollmentsSkipped()).isEqualTo(1);
+    }
+
+    /** Withdrawn this gestión stays the Director's to undo: no status write. */
+    @Test
+    void studentWithdrawnThisGestion_isNotReinstated() {
+        UUID id = UUID.randomUUID();
+        rosterOf(withdrawn(id, "R1", "C1"));
+        seatsInYear(new YearSeat(id, SIBLING_COURSE, "Segundo B", STATUS_WITHDRAWN));
+
+        EnrollResult result = service.enroll(cmdBy(ACTOR, List.of(row("R1", "C1"))));
+
+        verify(studentDomain, never()).updateStatus(any(), any());
+        assertThat(result.reinstated()).isEmpty();
+        assertThat(result.skippedWithdrawn()).hasSize(1);
+    }
+
+    /**
      * Only the Director decides a withdrawal is over. A roster load, which a teacher can run, must
      * not undo it: the student is left out of the load and named in the result instead.
      */
@@ -105,6 +173,7 @@ class CourseEnrollmentServiceEnrollTest {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
                 .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+        withdrawnThisYear(id);
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
                 .thenReturn(Map.of());
@@ -125,6 +194,7 @@ class CourseEnrollmentServiceEnrollTest {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
                 .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+        withdrawnThisYear(id);
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
                 .thenReturn(Map.of(id, STATUS_WITHDRAWN));
@@ -143,6 +213,7 @@ class CourseEnrollmentServiceEnrollTest {
         UUID here = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
                 .thenReturn(List.of(withdrawn(gone, "R1", "C1"), student(here, "R2", "C2")));
+        withdrawnThisYear(gone);
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
                 .thenReturn(Map.of());
@@ -180,6 +251,7 @@ class CourseEnrollmentServiceEnrollTest {
         UUID id = UUID.randomUUID();
         when(studentDomain.findByRudeCodeIn(anyCollection()))
                 .thenReturn(List.of(withdrawn(id, "R1", "C1")));
+        withdrawnThisYear(id);
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
                 .thenReturn(Map.of());
@@ -431,6 +503,7 @@ class CourseEnrollmentServiceEnrollTest {
                                 student(continuing, "R1", "C1"),
                                 student(returning, "R2", "C2"),
                                 withdrawn(gone, "R3", "C3")));
+        withdrawnThisYear(gone);
         when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
                 .thenReturn(Map.of());
@@ -667,6 +740,7 @@ class CourseEnrollmentServiceEnrollTest {
     void withdrawnStudent_isNotCountedAsFromPreviousYearNorReentering() {
         UUID gone = UUID.randomUUID();
         rosterOf(withdrawn(gone, "R1", "C1"));
+        withdrawnThisYear(gone);
 
         EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
 

@@ -4,4 +4,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCom
 import java.util.List;
 import java.util.UUID;
 
-public record EnrollToCourseCommand(UUID courseId, List<CreateStudentCommand> students) {}
+/**
+ * @param actorId who runs the load. Recorded as the one who decided when the load reinstates a
+ *     student withdrawn in an earlier gestión
+ */
+public record EnrollToCourseCommand(
+        UUID courseId, List<CreateStudentCommand> students, UUID actorId) {}

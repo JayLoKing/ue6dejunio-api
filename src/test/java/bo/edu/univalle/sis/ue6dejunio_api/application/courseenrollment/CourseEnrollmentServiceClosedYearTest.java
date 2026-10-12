@@ -50,7 +50,8 @@ class CourseEnrollmentServiceClosedYearTest {
                                         "Ana",
                                         "Quispe",
                                         LocalDate.of(2012, 3, 4),
-                                        "F")));
+                                        "F")),
+                        UUID.randomUUID());
 
         assertThatThrownBy(
                         () ->
