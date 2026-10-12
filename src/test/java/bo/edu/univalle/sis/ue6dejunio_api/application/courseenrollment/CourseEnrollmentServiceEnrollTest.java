@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.CourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollConflict;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
@@ -533,6 +534,84 @@ class CourseEnrollmentServiceEnrollTest {
 
         assertThat(result.skippedOtherCourse()).hasSize(1);
         verify(enrollmentDomain, times(1)).seatsInYearOfCourse(eq(courseId), anyCollection());
+    }
+
+    private Student named(UUID id, String rude, String idCard, String names, String lastNames) {
+        return Student.builder()
+                .id(id)
+                .rudeCode(rude)
+                .identityCard(idCard)
+                .names(names)
+                .lastNames(lastNames)
+                .status(STATUS_EFFECTIVE)
+                .build();
+    }
+
+    /**
+     * A row whose RUDE is one student's and whose CI is another's names nobody for certain. Taking
+     * the RUDE's student would enrol them on data that half belongs to someone else, so the row is
+     * left out and both are named.
+     */
+    @Test
+    void rudeOfOneStudentAndCardOfAnother_isSkippedAsAConflict() {
+        UUID byRudeId = UUID.randomUUID();
+        UUID byCardId = UUID.randomUUID();
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(List.of(named(byRudeId, "R1", "C1", "Ana", "Perez")));
+        when(studentDomain.findByIdentityCardIn(anyCollection()))
+                .thenReturn(List.of(named(byCardId, "R2", "C2", "Luis", "Mamani")));
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C2"))));
+
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
+        verify(studentDomain, never()).save(any());
+        assertThat(result.conflicts()).hasSize(1);
+        EnrollConflict conflict = result.conflicts().getFirst();
+        assertThat(conflict.rudeCode()).isEqualTo("R1");
+        assertThat(conflict.identityCard()).isEqualTo("C2");
+        assertThat(conflict.fullName()).isEqualTo("Ana Perez");
+        assertThat(conflict.reason()).contains("Ana Perez").contains("Luis Mamani");
+        assertThat(result.studentsExisting()).isZero();
+        assertThat(result.studentsReentering()).isZero();
+        assertThat(result.enrollmentsCreated()).isZero();
+    }
+
+    /** The conflict costs only its own row: the rest of the file is loaded. */
+    @Test
+    void aConflictingRow_doesNotStopTheRestOfTheLoad() {
+        UUID byRudeId = UUID.randomUUID();
+        UUID byCardId = UUID.randomUUID();
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(List.of(named(byRudeId, "R1", "C1", "Ana", "Perez")));
+        when(studentDomain.findByIdentityCardIn(anyCollection()))
+                .thenReturn(List.of(named(byCardId, "R2", "C2", "Luis", "Mamani")));
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C2"), row("R1", "C1"))));
+
+        verify(enrollmentDomain).saveEnrollment(byRudeId, courseId);
+        assertThat(result.conflicts()).hasSize(1);
+        assertThat(result.enrollmentsCreated()).isEqualTo(1);
+    }
+
+    /** The same RUDE and CI on one student is simply that student. */
+    @Test
+    void rudeAndCardOfTheSameStudent_isNoConflict() {
+        UUID id = UUID.randomUUID();
+        Student ana = named(id, "R1", "C1", "Ana", "Perez");
+        when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of(ana));
+        when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of(ana));
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of());
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
+
+        assertThat(result.conflicts()).isEmpty();
+        verify(enrollmentDomain).saveEnrollment(id, courseId);
     }
 
     /** A withdrawn student is reported as skipped and kept out of both buckets. */

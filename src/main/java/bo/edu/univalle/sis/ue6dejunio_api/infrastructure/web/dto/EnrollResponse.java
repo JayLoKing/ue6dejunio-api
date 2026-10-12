@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollConflict;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
 import java.util.List;
@@ -16,6 +17,8 @@ import java.util.UUID;
  *     who did not come in: only the Director's reinstatement puts a withdrawn student back
  * @param skippedOtherCourse the students the load left out because they already sit in another
  *     course of the same gestión, with that course
+ * @param conflicts the rows left out because their RUDE code and identity card belong to two
+ *     different students. Outside the sum above: such a row names no single student
  */
 public record EnrollResponse(
         int studentsTotal,
@@ -26,7 +29,8 @@ public record EnrollResponse(
         int enrollmentsCreated,
         int enrollmentsSkipped,
         List<SkippedStudentResponse> skippedWithdrawn,
-        List<EnrolledElsewhereResponse> skippedOtherCourse) {
+        List<EnrolledElsewhereResponse> skippedOtherCourse,
+        List<ConflictResponse> conflicts) {
     public static EnrollResponse from(EnrollResult r) {
         return new EnrollResponse(
                 r.studentsTotal(),
@@ -37,7 +41,16 @@ public record EnrollResponse(
                 r.enrollmentsCreated(),
                 r.enrollmentsSkipped(),
                 r.skippedWithdrawn().stream().map(SkippedStudentResponse::from).toList(),
-                r.skippedOtherCourse().stream().map(EnrolledElsewhereResponse::from).toList());
+                r.skippedOtherCourse().stream().map(EnrolledElsewhereResponse::from).toList(),
+                r.conflicts().stream().map(ConflictResponse::from).toList());
+    }
+
+    /** A row left out because its RUDE code and identity card belong to different students. */
+    public record ConflictResponse(
+            String rudeCode, String identityCard, String fullName, String reason) {
+        static ConflictResponse from(EnrollConflict c) {
+            return new ConflictResponse(c.rudeCode(), c.identityCard(), c.fullName(), c.reason());
+        }
     }
 
     /** A student left out because they already sit in another course of the gestión. */

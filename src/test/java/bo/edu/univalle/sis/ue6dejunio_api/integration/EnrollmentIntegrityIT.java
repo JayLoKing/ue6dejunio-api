@@ -1,6 +1,8 @@
 package bo.edu.univalle.sis.ue6dejunio_api.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -95,6 +97,41 @@ class EnrollmentIntegrityIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.skippedOtherCourse[0].courseLabel").value(labelOf(sibling)));
 
         assertThat(rowsIn(student, target)).isZero();
+    }
+
+    /** A row whose RUDE is one student's and whose CI is another's enrols neither. */
+    @Test
+    void rudeOfOneStudentAndCardOfAnother_isLeftOutAsAConflict() throws Exception {
+        UUID ana = seedStudent("Ana", "Quispe");
+        UUID luis = seedStudent("Luis", "Mamani");
+        String cardOfLuis =
+                jdbc.queryForObject(
+                        "SELECT identity_card FROM students WHERE id_student = ?",
+                        String.class,
+                        luis);
+        String mixed =
+                """
+                {"rudeCode": "%s", "identityCard": "%s", "names": "Ana", "lastNames": "Quispe",
+                 "birthDate": "2015-01-01", "gender": "F"}
+                """
+                        .formatted(rudeOf(ana), cardOfLuis);
+
+        sync(target, mixed)
+                .andExpect(jsonPath("$.enrollmentsCreated").value(0))
+                .andExpect(jsonPath("$.studentsCreated").value(0))
+                .andExpect(jsonPath("$.conflicts.length()").value(1))
+                .andExpect(jsonPath("$.conflicts[0].rudeCode").value(rudeOf(ana)))
+                .andExpect(jsonPath("$.conflicts[0].identityCard").value(cardOfLuis))
+                .andExpect(jsonPath("$.conflicts[0].fullName").value("Ana Quispe"))
+                .andExpect(
+                        jsonPath("$.conflicts[0].reason")
+                                .value(
+                                        allOf(
+                                                containsString("Ana Quispe"),
+                                                containsString("Luis Mamani"))));
+
+        assertThat(rowsIn(ana, target)).isZero();
+        assertThat(rowsIn(luis, target)).isZero();
     }
 
     /** A seat in last year's course is history, not a seat taken this year. */

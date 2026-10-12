@@ -33,6 +33,9 @@ import java.util.List;
  *     explicit reinstatement puts one back, so a load neither seats them nor changes their status
  * @param skippedOtherCourse the students the load left out because they already hold an Effective
  *     seat in another course of the same gestión, once each, with the course they sit in
+ * @param conflicts the rows left out because their RUDE code and identity card belong to two
+ *     different students, once each. They resolve to no single student, so they stand outside the
+ *     partition above; {@code studentsTotal} still counts them as rows
  */
 public record EnrollResult(
         int studentsTotal,
@@ -43,4 +46,5 @@ public record EnrollResult(
         int enrollmentsCreated,
         int enrollmentsSkipped,
         List<SkippedStudent> skippedWithdrawn,
-        List<EnrolledElsewhere> skippedOtherCourse) {}
+        List<EnrolledElsewhere> skippedOtherCourse,
+        List<EnrollConflict> conflicts) {}

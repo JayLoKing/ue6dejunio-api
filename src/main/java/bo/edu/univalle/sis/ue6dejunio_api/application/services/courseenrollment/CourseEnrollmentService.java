@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollConflict;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
@@ -19,6 +20,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -112,8 +114,16 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         // summary has something to say about. A set, so a repeated row counts once.
         Set<UUID> carriedOver = new HashSet<>();
         Set<UUID> createdNow = new HashSet<>();
+        // Rows whose RUDE and CI belong to two different students. They name nobody for certain,
+        // so they are left out whole; a set, so a repeated row is reported once.
+        Set<EnrollConflict> conflicts = new LinkedHashSet<>();
 
         for (CreateStudentCommand sc : command.students()) {
+            Optional<EnrollConflict> conflict = conflictOf(sc, byRude, byIdentityCard);
+            if (conflict.isPresent()) {
+                conflicts.add(conflict.get());
+                continue;
+            }
             Student student = resolve(sc, byRude, byIdentityCard);
             if (student == null) {
                 student = studentDomain.save(buildStudent(sc));
@@ -167,7 +177,33 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 enrolled,
                 skipped,
                 List.copyOf(skippedWithdrawn.values()),
-                List.copyOf(skippedOtherCourse.values()));
+                List.copyOf(skippedOtherCourse.values()),
+                List.copyOf(conflicts));
+    }
+
+    /**
+     * The row's RUDE code and identity card each found a student, and not the same one. Resolving
+     * by RUDE alone would enrol that student on a row half of which describes somebody else.
+     */
+    private static Optional<EnrollConflict> conflictOf(
+            CreateStudentCommand sc,
+            Map<String, Student> byRude,
+            Map<String, Student> byIdentityCard) {
+        Student byCode = sc.rudeCode() == null ? null : byRude.get(sc.rudeCode());
+        Student byCard = sc.identityCard() == null ? null : byIdentityCard.get(sc.identityCard());
+        if (byCode == null || byCard == null || byCode.getId().equals(byCard.getId())) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                new EnrollConflict(
+                        sc.rudeCode(),
+                        sc.identityCard(),
+                        sc.names() + " " + sc.lastNames(),
+                        "El RUDE corresponde a "
+                                + byCode.fullName()
+                                + " y el CI a "
+                                + byCard.fullName()
+                                + "."));
     }
 
     /**
