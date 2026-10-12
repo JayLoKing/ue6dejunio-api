@@ -129,10 +129,14 @@ class EnrollSummarySplitIT extends AbstractIntegrationTest {
     void theSplitIsRelativeToTheYearOfTheCourseBeingLoaded() throws Exception {
         UUID student = seedStudent("Ana", "Continua");
         seatIn(student, 2025, "B", "Effective");
-        UUID course2025 = seedCourse(teacher, "C", academicYearId(2025));
         ensureYear(2024);
+        ensureYear(2023);
+        // A course of 2024 rather than of 2025: a second course of the year she already sits in
+        // would leave her out of the load altogether, which is another rule's business.
+        UUID course2024 = seedCourse(teacher, "C", academicYearId(2024));
 
-        // Loading 2025's course: the previous year is 2024, where she was never enrolled.
+        // Loading 2024's course: the previous year is 2023, where she was never enrolled, even
+        // though she sat in 2025, the year before the active one.
         mvc.perform(
                         post("/api/course-enrollments/sync")
                                 .header("Authorization", "Bearer " + tokenFor(director, "Director"))
@@ -141,7 +145,7 @@ class EnrollSummarySplitIT extends AbstractIntegrationTest {
                                         """
                                         {"id_course": "%s", "students": [%s]}
                                         """
-                                                .formatted(course2025, rowOf(student))))
+                                                .formatted(course2024, rowOf(student))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.studentsFromPreviousYear").value(0))
                 .andExpect(jsonPath("$.studentsReentering").value(1));

@@ -8,12 +8,12 @@ import java.util.List;
  * <p>Two views of the same load. The row counts ({@code studentsTotal}, {@code studentsExisting},
  * {@code enrollmentsCreated}, {@code enrollmentsSkipped}) are per row of the file, repeats
  * included. The student groups ({@code studentsCreated}, {@code studentsFromPreviousYear}, {@code
- * studentsReentering}, {@code skippedWithdrawn}) are per distinct student and partition the
- * distinct students the file named:
+ * studentsReentering}, {@code skippedWithdrawn}, {@code skippedOtherCourse}) are per distinct
+ * student and partition the distinct students the file named:
  *
  * <pre>
  * studentsCreated + studentsFromPreviousYear + studentsReentering + skippedWithdrawn.size()
- *     == distinct students in the request
+ *     + skippedOtherCourse.size() == distinct students in the request
  * </pre>
  *
  * @param studentsTotal how many rows the request carried, repeated rows and skipped ones included
@@ -31,6 +31,8 @@ import java.util.List;
  *     {@code skippedWithdrawn}
  * @param skippedWithdrawn the withdrawn students the load left out, once each. Only the Director's
  *     explicit reinstatement puts one back, so a load neither seats them nor changes their status
+ * @param skippedOtherCourse the students the load left out because they already hold an Effective
+ *     seat in another course of the same gestión, once each, with the course they sit in
  */
 public record EnrollResult(
         int studentsTotal,
@@ -40,4 +42,5 @@ public record EnrollResult(
         int studentsReentering,
         int enrollmentsCreated,
         int enrollmentsSkipped,
-        List<SkippedStudent> skippedWithdrawn) {}
+        List<SkippedStudent> skippedWithdrawn,
+        List<EnrolledElsewhere> skippedOtherCourse) {}

@@ -7,7 +7,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
@@ -20,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -74,12 +77,17 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         // Every enrolment these students hold in the course, whatever its status, in one query. The
         // loop reads its two decisions off this map — seat still held, or closed row to reopen —
         // rather than asking the database once per name.
+        Set<UUID> known =
+                Stream.concat(byRude.values().stream(), byIdentityCard.values().stream())
+                        .map(Student::getId)
+                        .collect(Collectors.toSet());
         Map<UUID, String> enrollmentInCourse =
-                enrollmentDomain.enrollmentStatusByStudent(
-                        command.courseId(),
-                        Stream.concat(byRude.values().stream(), byIdentityCard.values().stream())
-                                .map(Student::getId)
-                                .collect(Collectors.toSet()));
+                enrollmentDomain.enrollmentStatusByStudent(command.courseId(), known);
+        // And every seat they hold anywhere in the course's gestión, in one more query: the loop
+        // reads off it who already sits in a sibling course of the same year.
+        Map<UUID, List<YearSeat>> seatsInYear =
+                enrollmentDomain.seatsInYearOfCourse(command.courseId(), known).stream()
+                        .collect(Collectors.groupingBy(YearSeat::studentId));
         Set<UUID> seatedInCourse =
                 enrollmentInCourse.entrySet().stream()
                         .filter(e -> STATUS_EFFECTIVE.equals(e.getValue()))
@@ -97,6 +105,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         // the load leaves them alone and reports them. Keyed by id so a file that repeats a name
         // lists them once; the name comes from the row already loaded, not from another query.
         Map<UUID, SkippedStudent> skippedWithdrawn = new LinkedHashMap<>();
+        // Students already seated in another course of this gestión. A second seat in the same year
+        // is what the Director's reinstatement or transfer decides, never a roster load.
+        Map<UUID, EnrolledElsewhere> skippedOtherCourse = new LinkedHashMap<>();
         // Existing students, not withdrawn, that this load did not create: the ones whose past the
         // summary has something to say about. A set, so a repeated row counts once.
         Set<UUID> carriedOver = new HashSet<>();
@@ -120,6 +131,13 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                     continue;
                 }
                 if (!createdNow.contains(student.getId())) {
+                    Optional<EnrolledElsewhere> elsewhere =
+                            seatedElsewhere(
+                                    student, command.courseId(), enrollmentInCourse, seatsInYear);
+                    if (elsewhere.isPresent()) {
+                        skippedOtherCourse.putIfAbsent(student.getId(), elsewhere.get());
+                        continue;
+                    }
                     carriedOver.add(student.getId());
                 }
             }
@@ -148,7 +166,37 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 carriedOver.size() - fromPreviousYear,
                 enrolled,
                 skipped,
-                List.copyOf(skippedWithdrawn.values()));
+                List.copyOf(skippedWithdrawn.values()),
+                List.copyOf(skippedOtherCourse.values()));
+    }
+
+    /**
+     * The Effective seat the student already holds in another course of the gestión, named for the
+     * summary, or empty when there is none.
+     *
+     * <p>A student already in force in the course being loaded is left to the ordinary repeat rule
+     * instead: the admin reinstatement and transfer paths can legitimately leave someone with a
+     * second seat in the year, and loading their own course again must not report them as lost.
+     */
+    private static Optional<EnrolledElsewhere> seatedElsewhere(
+            Student student,
+            UUID courseId,
+            Map<UUID, String> enrollmentInCourse,
+            Map<UUID, List<YearSeat>> seatsInYear) {
+        if (STATUS_EFFECTIVE.equals(enrollmentInCourse.get(student.getId()))) {
+            return Optional.empty();
+        }
+        return seatsInYear.getOrDefault(student.getId(), List.of()).stream()
+                .filter(seat -> !courseId.equals(seat.courseId()))
+                .filter(seat -> STATUS_EFFECTIVE.equals(seat.status()))
+                .findFirst()
+                .map(
+                        seat ->
+                                new EnrolledElsewhere(
+                                        student.getId(),
+                                        student.getRudeCode(),
+                                        student.fullName(),
+                                        seat.courseLabel()));
     }
 
     /**

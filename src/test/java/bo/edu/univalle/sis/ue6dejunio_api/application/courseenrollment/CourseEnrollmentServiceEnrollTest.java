@@ -16,7 +16,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.application.services.courseenrollment.
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollToCourseCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrolledElsewhere;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.SkippedStudent;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
@@ -68,6 +70,8 @@ class CourseEnrollmentServiceEnrollTest {
                 .id(id)
                 .rudeCode(rude)
                 .identityCard(idCard)
+                .names("Ana")
+                .lastNames("Perez")
                 .status(STATUS_EFFECTIVE)
                 .build();
     }
@@ -456,6 +460,79 @@ class CourseEnrollmentServiceEnrollTest {
                                 + result.studentsReentering()
                                 + result.skippedWithdrawn().size())
                 .isEqualTo(4);
+    }
+
+    private static final UUID SIBLING_COURSE = UUID.randomUUID();
+
+    private void seatsInYear(YearSeat... seats) {
+        when(enrollmentDomain.seatsInYearOfCourse(eq(courseId), anyCollection()))
+                .thenReturn(List.of(seats));
+    }
+
+    /**
+     * A student already sitting in another course of the same gestión is not given a second seat:
+     * the load leaves them out and says where they are, so the teacher can sort it out with the
+     * school rather than discover a student on two rolls.
+     */
+    @Test
+    void studentEffectiveInASiblingCourseOfTheYear_isSkippedAndNamedWithThatCourse() {
+        UUID id = UUID.randomUUID();
+        rosterOf(student(id, "R1", "C1"));
+        seatsInYear(new YearSeat(id, SIBLING_COURSE, "Segundo B", STATUS_EFFECTIVE));
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
+
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
+        verify(enrollmentDomain).reactivateEnrollments(courseId, Set.of());
+        assertThat(result.skippedOtherCourse())
+                .containsExactly(new EnrolledElsewhere(id, "R1", "Ana Perez", "Segundo B"));
+        assertThat(result.enrollmentsCreated()).isZero();
+        assertThat(result.studentsReentering()).isZero();
+        assertThat(result.studentsFromPreviousYear()).isZero();
+    }
+
+    /** A seat they left in that sibling course is no seat at all: the student is enrolled. */
+    @Test
+    void aWithdrawnSeatInASiblingCourse_doesNotBlockTheLoad() {
+        UUID id = UUID.randomUUID();
+        rosterOf(student(id, "R1", "C1"));
+        seatsInYear(new YearSeat(id, SIBLING_COURSE, "Segundo B", STATUS_WITHDRAWN));
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
+
+        verify(enrollmentDomain).saveEnrollment(id, courseId);
+        assertThat(result.skippedOtherCourse()).isEmpty();
+    }
+
+    /** The course being loaded is not "another" course: a seat there is the ordinary repeat. */
+    @Test
+    void aSeatInTheCourseBeingLoaded_isNotAnotherCourse() {
+        UUID id = UUID.randomUUID();
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(List.of(student(id, "R1", "C1")));
+        when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of(id, STATUS_EFFECTIVE));
+        seatsInYear(new YearSeat(id, courseId, "Primero A", STATUS_EFFECTIVE));
+
+        EnrollResult result = service.enroll(cmd(courseId, List.of(row("R1", "C1"))));
+
+        assertThat(result.skippedOtherCourse()).isEmpty();
+        assertThat(result.enrollmentsSkipped()).isEqualTo(1);
+    }
+
+    /** Repeated rows name the student once, and the year is asked about once for the whole file. */
+    @Test
+    void siblingSeats_areAskedOnce_andARepeatedRowIsListedOnce() {
+        UUID id = UUID.randomUUID();
+        rosterOf(student(id, "R1", "C1"));
+        seatsInYear(new YearSeat(id, SIBLING_COURSE, "Segundo B", STATUS_EFFECTIVE));
+
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
+
+        assertThat(result.skippedOtherCourse()).hasSize(1);
+        verify(enrollmentDomain, times(1)).seatsInYearOfCourse(eq(courseId), anyCollection());
     }
 
     /** A withdrawn student is reported as skipped and kept out of both buckets. */
