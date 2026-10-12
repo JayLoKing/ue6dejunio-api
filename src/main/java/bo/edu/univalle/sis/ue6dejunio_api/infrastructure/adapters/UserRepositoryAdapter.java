@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.adapters;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UsersList;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.user.IUserDomain;
@@ -45,9 +46,13 @@ public class UserRepositoryAdapter implements IUserDomain {
         return repo.findById(id).map(mapper::toDomain);
     }
 
+    /**
+     * Normalized here as well as in the services, so a caller that forgets (the security user
+     * details lookup, a future one) still finds the account stored in lowercase.
+     */
     @Override
     public Optional<User> findByEmail(String email) {
-        return repo.findByEmail(email).map(mapper::toDomain);
+        return repo.findByEmail(Emails.normalize(email)).map(mapper::toDomain);
     }
 
     @Override
@@ -57,7 +62,7 @@ public class UserRepositoryAdapter implements IUserDomain {
 
     @Override
     public boolean existsByEmail(String email) {
-        return repo.existsByEmail(email);
+        return repo.existsByEmail(Emails.normalize(email));
     }
 
     @Override

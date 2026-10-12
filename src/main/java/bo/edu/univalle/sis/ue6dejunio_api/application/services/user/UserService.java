@@ -8,6 +8,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UserUpdate;
@@ -60,8 +61,9 @@ public class UserService implements IUserService {
 
     @Override
     public User create(CreateUserCommand command) {
-        if (userDomain.existsByEmail(command.email())) {
-            throw new DuplicateResourceException("email", command.email());
+        String email = Emails.normalize(command.email());
+        if (userDomain.existsByEmail(email)) {
+            throw new DuplicateResourceException("email", email);
         }
         if (userDomain.existsByCi(command.ci())) {
             throw new DuplicateResourceException("ci", command.ci());
@@ -80,7 +82,7 @@ public class UserService implements IUserService {
                         .names(command.names())
                         .lastNames(command.lastNames())
                         .phone(command.phone())
-                        .email(command.email())
+                        .email(email)
                         .password(passwordEncoder.encode(temporaryPassword))
                         .mustChangePassword(true)
                         .technical(isTechnicalTeacher(role, command.technical()))
@@ -134,9 +136,11 @@ public class UserService implements IUserService {
     /**
      * Moves the user to a new address if one was asked for, and says whether it actually moved.
      * Compared and checked for an owner exactly as create does, so an address create would refuse
-     * is refused here too.
+     * is refused here too. Normalized first, so retyping the current address in capitals is not a
+     * change and does not re-mail the credentials.
      */
-    private boolean applyEmail(User user, String email) {
+    private boolean applyEmail(User user, String requested) {
+        String email = Emails.normalize(requested);
         if (email == null || email.equals(user.getEmail())) {
             return false;
         }
@@ -183,7 +187,7 @@ public class UserService implements IUserService {
     @Override
     @Transactional(readOnly = true)
     public Optional<User> findByEmail(String email) {
-        return userDomain.findByEmail(email.trim());
+        return userDomain.findByEmail(Emails.normalize(email));
     }
 
     @Override

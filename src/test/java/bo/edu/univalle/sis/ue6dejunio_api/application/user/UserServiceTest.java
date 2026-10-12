@@ -412,4 +412,83 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.resendCredentials(id))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    // --- email normalization ---
+
+    /** The web lowercases what it sends; a hand-sent request must not register a second Ana. */
+    @Test
+    void create_mixedCaseEmail_isCheckedAndStoredNormalized() {
+        when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(false);
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(roleDomain.findById(3)).thenReturn(Optional.of(new Role(3, "Teacher")));
+        when(passwordGenerator.generate()).thenReturn("Gen3rat3d!");
+        when(passwordEncoder.encode("Gen3rat3d!")).thenReturn("$hashed$");
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.create(
+                new CreateUserCommand(
+                        "1234567", "Ana", "Quispe", "70000000", "  ANA@ue6.BO ", 3, false));
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userDomain).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("ana@ue6.bo");
+        verify(emailService).sendWelcomeCredentials("ana@ue6.bo", "Ana Quispe", "Gen3rat3d!");
+    }
+
+    @Test
+    void create_mixedCaseEmailOfAnExistingUser_isDuplicate() {
+        when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(true);
+
+        assertThatThrownBy(
+                        () ->
+                                userService.create(
+                                        new CreateUserCommand(
+                                                "1234567",
+                                                "Ana",
+                                                "Quispe",
+                                                "70000000",
+                                                "ANA@ue6.bo",
+                                                3,
+                                                false)))
+                .isInstanceOf(DuplicateResourceException.class);
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    @Test
+    void update_mixedCaseEmail_isCheckedAndStoredNormalized() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        User user = pendingUser(id);
+        user.setMustChangePassword(false);
+        when(userDomain.findById(id)).thenReturn(Optional.of(user));
+        when(userDomain.existsByEmail("ana.quispe@ue6.bo")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, emailOnly(" Ana.Quispe@UE6.bo "));
+
+        assertThat(result.user().getEmail()).isEqualTo("ana.quispe@ue6.bo");
+    }
+
+    /** Retyping the current address in capitals is not a change, so nothing is re-mailed. */
+    @Test
+    void update_currentEmailInOtherCase_isNotAChange() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, emailOnly(" ANA@ue6.bo"));
+
+        assertThat(result.credentialsResent()).isFalse();
+        assertThat(result.user().getEmail()).isEqualTo("ana@ue6.bo");
+        verify(userDomain, never()).existsByEmail(any());
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    @Test
+    void findByEmail_lowercasesTheAddressBeforeLookingItUp() {
+        User owner = pendingUser(java.util.UUID.randomUUID());
+        when(userDomain.findByEmail("ana@ue6.bo")).thenReturn(Optional.of(owner));
+
+        assertThat(userService.findByEmail(" Ana@UE6.bo")).containsSame(owner);
+    }
 }
