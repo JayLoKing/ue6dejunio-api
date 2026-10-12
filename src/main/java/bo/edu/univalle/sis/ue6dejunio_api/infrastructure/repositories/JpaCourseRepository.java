@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -71,6 +72,33 @@ public interface JpaCourseRepository extends JpaRepository<CourseEntity, UUID> {
         """,
             nativeQuery = true)
     boolean hasAcademicRecords(@Param("courseId") UUID courseId);
+
+    /**
+     * Row-locks the course. An insert that references it (an enrolment, a class group, a plan, a
+     * report) needs a key-share lock on this row, so it waits until the locking transaction ends.
+     */
+    @Query(
+            value =
+                    "SELECT CAST(id_course AS text) FROM courses WHERE id_course = :courseId"
+                            + " FOR UPDATE",
+            nativeQuery = true)
+    List<String> lockById(@Param("courseId") UUID courseId);
+
+    /**
+     * Row-locks every class group of the course, so a criterion or a score cannot be attached to
+     * one while the course is being removed.
+     */
+    @Query(
+            value =
+                    "SELECT CAST(id_class_group AS text) FROM class_groups"
+                            + " WHERE id_course = :courseId FOR UPDATE",
+            nativeQuery = true)
+    List<String> lockClassGroupsOf(@Param("courseId") UUID courseId);
+
+    /** Erases the course row; the database cascades its plans and reports, if any. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM CourseEntity c WHERE c.id = :courseId")
+    int deleteCourseById(@Param("courseId") UUID courseId);
 
     boolean existsByGrade_Id(Integer gradeId);
 

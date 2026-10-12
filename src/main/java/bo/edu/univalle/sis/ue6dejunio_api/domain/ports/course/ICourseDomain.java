@@ -43,6 +43,19 @@ public interface ICourseDomain {
      */
     boolean hasAcademicRecords(UUID courseId);
 
+    /**
+     * Holds the course and its class groups until the transaction ends, so nothing can attach a
+     * student or a criterion to them between deciding the course is empty and erasing it. Must run
+     * inside the caller's transaction; on its own it would release the lock at once.
+     */
+    void lockForRemoval(UUID courseId);
+
+    /**
+     * Erases the course row. Its class groups must already be gone: they reference it with a
+     * RESTRICT key. Only for a course that holds no enrolment and no academic record.
+     */
+    void delete(UUID courseId);
+
     Optional<Course> findById(UUID id);
 
     /**

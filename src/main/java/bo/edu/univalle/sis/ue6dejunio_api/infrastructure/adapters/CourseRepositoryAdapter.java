@@ -124,6 +124,23 @@ public class CourseRepositoryAdapter implements ICourseDomain {
         return toDomain(courseRepo.save(e));
     }
 
+    /**
+     * Not read-only: {@code FOR UPDATE} is refused in a read-only transaction. The course row goes
+     * first, which also holds back any new class group, then the class groups it already has.
+     */
+    @Override
+    @Transactional
+    public void lockForRemoval(UUID courseId) {
+        courseRepo.lockById(courseId);
+        courseRepo.lockClassGroupsOf(courseId);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID courseId) {
+        courseRepo.deleteCourseById(courseId);
+    }
+
     @Override
     public Optional<Course> findById(UUID id) {
         return courseRepo.findById(id).map(this::toDomain);
