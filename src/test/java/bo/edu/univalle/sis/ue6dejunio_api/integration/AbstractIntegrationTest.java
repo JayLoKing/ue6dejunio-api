@@ -4,14 +4,21 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.ratelimit.InMemoryBucke
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -28,7 +35,53 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("it")
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
+@Import(AbstractIntegrationTest.SchoolDayClockConfig.class)
 public abstract class AbstractIntegrationTest {
+
+    /**
+     * Attendance is writable only on the school day it describes, so on a Saturday or Sunday run
+     * nothing would be writable and every attendance IT would fail for a reason it does not test.
+     * The application clock is therefore moved back to that week's Friday on weekends — same time
+     * of day, same La Paz zone — and left untouched on weekdays. The ITs' own {@code
+     * editableSchoolDay()} helpers make the same weekend-to-Friday move, so they agree with it.
+     */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class SchoolDayClockConfig {
+        @Bean
+        @Primary
+        Clock schoolDayClock() {
+            return new SchoolDayClock(Clock.system(ZoneId.of("America/La_Paz")));
+        }
+    }
+
+    /** Reads the system clock on every call, so a run that crosses midnight stays correct. */
+    private static final class SchoolDayClock extends Clock {
+        private final Clock system;
+
+        SchoolDayClock(Clock system) {
+            this.system = system;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return system.getZone();
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new SchoolDayClock(system.withZone(zone));
+        }
+
+        @Override
+        public Instant instant() {
+            Instant now = system.instant();
+            return switch (now.atZone(system.getZone()).getDayOfWeek()) {
+                case SATURDAY -> now.minus(Duration.ofDays(1));
+                case SUNDAY -> now.minus(Duration.ofDays(2));
+                default -> now;
+            };
+        }
+    }
 
     /**
      * Singleton container: started once per JVM and never stopped between test classes. Ryuk

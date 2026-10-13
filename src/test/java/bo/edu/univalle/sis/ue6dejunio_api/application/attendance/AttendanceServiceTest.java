@@ -47,25 +47,26 @@ class AttendanceServiceTest {
             Clock.fixed(Instant.parse("2026-08-14T16:00:00Z"), LA_PAZ);
     private static final LocalDate TODAY = LocalDate.of(2026, 8, 14);
 
-    /** Monday of the same ISO week as TODAY: the earliest editable date. */
+    /** Monday of the same ISO week as TODAY: a past school day, already frozen. */
     private static final LocalDate WEEK_MONDAY = LocalDate.of(2026, 8, 10);
 
-    /** Thursday of the same ISO week: a past school day that stays editable. */
+    /** Thursday of the same ISO week: yesterday, already frozen. */
     private static final LocalDate SAME_WEEK_THURSDAY = LocalDate.of(2026, 8, 13);
 
-    /** Friday of the previous ISO week: outside the window, no longer editable. */
+    /** Friday of the previous ISO week: frozen as well. */
     private static final LocalDate LAST_WEEK_FRIDAY = LocalDate.of(2026, 8, 7);
 
     // 2026-08-16T12:00:00 America/La_Paz — a Sunday, still inside the same ISO week as TODAY.
-    // Used to prove a weekend *date* is rejected even when it falls inside the editable week.
+    // Used to prove the weekend message wins for a weekend date, and that a weekend opens no
+    // window onto the Friday before it.
     private static final Clock SUNDAY_CLOCK =
             Clock.fixed(Instant.parse("2026-08-16T16:00:00Z"), LA_PAZ);
     private static final LocalDate SAME_WEEK_SATURDAY = LocalDate.of(2026, 8, 15);
 
     private static final String MSG_FUTURE = "no puede registrar asistencia de fechas futuras";
     private static final String MSG_WEEKEND = "no se registra asistencia en sabados ni domingos";
-    private static final String MSG_OUT_OF_WEEK =
-            "solo puede modificar registros de la semana en curso (lunes a viernes)";
+    private static final String MSG_NOT_TODAY =
+            "solo puede registrar o modificar la asistencia del día de hoy";
 
     @Mock private IAttendanceDomain attendanceDomain;
     @Mock private ITrimesterPeriodDomain trimesterPeriodDomain;
@@ -105,29 +106,27 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void registerDaily_forEarlierSchoolDayInSameWeek_succeeds() {
+    void registerDaily_forYesterdayInSameWeek_throwsConflict() {
         init();
         UUID ceId = UUID.randomUUID();
-        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
-        when(attendanceDomain.upsertDaily(ceId, SAME_WEEK_THURSDAY, "P"))
-                .thenReturn(new Attendance(UUID.randomUUID(), ceId, null, SAME_WEEK_THURSDAY, "P"));
+        lenient().when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
 
-        Attendance r = attendanceService.registerDaily(ceId, SAME_WEEK_THURSDAY, "P");
-
-        assertThat(r.date()).isEqualTo(SAME_WEEK_THURSDAY);
+        assertThatThrownBy(() -> attendanceService.registerDaily(ceId, SAME_WEEK_THURSDAY, "P"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_NOT_TODAY);
+        verify(attendanceDomain, never()).upsertDaily(ceId, SAME_WEEK_THURSDAY, "P");
     }
 
     @Test
-    void registerDaily_forMondayOfSameWeek_succeeds() {
+    void registerDaily_forMondayOfSameWeek_throwsConflict() {
         init();
         UUID ceId = UUID.randomUUID();
-        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
-        when(attendanceDomain.upsertDaily(ceId, WEEK_MONDAY, "P"))
-                .thenReturn(new Attendance(UUID.randomUUID(), ceId, null, WEEK_MONDAY, "P"));
+        lenient().when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
 
-        Attendance r = attendanceService.registerDaily(ceId, WEEK_MONDAY, "P");
-
-        assertThat(r.date()).isEqualTo(WEEK_MONDAY);
+        assertThatThrownBy(() -> attendanceService.registerDaily(ceId, WEEK_MONDAY, "P"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_NOT_TODAY);
+        verify(attendanceDomain, never()).upsertDaily(ceId, WEEK_MONDAY, "P");
     }
 
     @Test
@@ -138,7 +137,7 @@ class AttendanceServiceTest {
 
         assertThatThrownBy(() -> attendanceService.registerDaily(ceId, LAST_WEEK_FRIDAY, "P"))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage(MSG_OUT_OF_WEEK);
+                .hasMessage(MSG_NOT_TODAY);
         verify(attendanceDomain, never()).upsertDaily(ceId, LAST_WEEK_FRIDAY, "P");
     }
 
@@ -155,16 +154,15 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void registerDaily_onSunday_stillAllowsFixingThatWeekFriday() {
+    void registerDaily_onSunday_cannotFixThatWeekFriday() {
         initWith(SUNDAY_CLOCK);
         UUID ceId = UUID.randomUUID();
-        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
-        when(attendanceDomain.upsertDaily(ceId, TODAY, "A"))
-                .thenReturn(new Attendance(UUID.randomUUID(), ceId, null, TODAY, "A"));
+        lenient().when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
 
-        Attendance r = attendanceService.registerDaily(ceId, TODAY, "A");
-
-        assertThat(r.date()).isEqualTo(TODAY);
+        assertThatThrownBy(() -> attendanceService.registerDaily(ceId, TODAY, "A"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_NOT_TODAY);
+        verify(attendanceDomain, never()).upsertDaily(ceId, TODAY, "A");
     }
 
     @Test
@@ -196,17 +194,18 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void registerDailyBatch_forEarlierSchoolDayInSameWeek_succeeds() {
+    void registerDailyBatch_forYesterdayInSameWeek_throwsConflict() {
         init();
         UUID ceId = UUID.randomUUID();
-        when(attendanceDomain.existingCourseEnrollmentIds(List.of(ceId))).thenReturn(Set.of(ceId));
 
-        var result =
-                attendanceService.registerDailyBatch(
-                        SAME_WEEK_THURSDAY, List.of(new IAttendanceService.DailyMark(ceId, "P")));
-
-        assertThat(result.saved()).isEqualTo(1);
-        verify(attendanceDomain).upsertDailyBatch(SAME_WEEK_THURSDAY, Map.of(ceId, "P"));
+        assertThatThrownBy(
+                        () ->
+                                attendanceService.registerDailyBatch(
+                                        SAME_WEEK_THURSDAY,
+                                        List.of(new IAttendanceService.DailyMark(ceId, "P"))))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_NOT_TODAY);
+        verify(attendanceDomain, never()).upsertDailyBatch(SAME_WEEK_THURSDAY, Map.of(ceId, "P"));
     }
 
     @Test
@@ -220,7 +219,7 @@ class AttendanceServiceTest {
                                         LAST_WEEK_FRIDAY,
                                         List.of(new IAttendanceService.DailyMark(ceId, "P"))))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage(MSG_OUT_OF_WEEK);
+                .hasMessage(MSG_NOT_TODAY);
         verify(attendanceDomain, never()).upsertDailyBatch(LAST_WEEK_FRIDAY, Map.of(ceId, "P"));
     }
 
@@ -293,20 +292,18 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void registerSession_forEarlierSchoolDayInSameWeek_succeeds() {
+    void registerSession_forYesterdayInSameWeek_throwsConflict() {
         init();
         UUID ceId = UUID.randomUUID();
         UUID cgId = UUID.randomUUID();
-        UUID courseId = UUID.randomUUID();
-        when(attendanceDomain.courseEnrollmentExists(ceId)).thenReturn(true);
-        when(attendanceDomain.courseOfCourseEnrollment(ceId)).thenReturn(courseId);
-        when(attendanceDomain.courseOfClassGroup(cgId)).thenReturn(courseId);
-        when(attendanceDomain.upsertSession(ceId, cgId, SAME_WEEK_THURSDAY, "P"))
-                .thenReturn(new Attendance(UUID.randomUUID(), ceId, cgId, SAME_WEEK_THURSDAY, "P"));
 
-        Attendance r = attendanceService.registerSession(ceId, cgId, SAME_WEEK_THURSDAY, "P");
-
-        assertThat(r.date()).isEqualTo(SAME_WEEK_THURSDAY);
+        assertThatThrownBy(
+                        () ->
+                                attendanceService.registerSession(
+                                        ceId, cgId, SAME_WEEK_THURSDAY, "P"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(MSG_NOT_TODAY);
+        verify(attendanceDomain, never()).upsertSession(ceId, cgId, SAME_WEEK_THURSDAY, "P");
     }
 
     @Test
@@ -375,7 +372,7 @@ class AttendanceServiceTest {
                                         LAST_WEEK_FRIDAY,
                                         List.of(new IAttendanceService.DailyMark(ceA, "Present"))))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage(MSG_OUT_OF_WEEK);
+                .hasMessage(MSG_NOT_TODAY);
         verify(attendanceDomain, never()).upsertSessionBatch(any(), any(), anyMap());
     }
 
@@ -442,7 +439,7 @@ class AttendanceServiceTest {
         assertThatThrownBy(
                         () -> attendanceService.registerSession(ceId, cgId, LAST_WEEK_FRIDAY, "P"))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage(MSG_OUT_OF_WEEK);
+                .hasMessage(MSG_NOT_TODAY);
         verify(attendanceDomain, never()).upsertSession(ceId, cgId, LAST_WEEK_FRIDAY, "P");
     }
 

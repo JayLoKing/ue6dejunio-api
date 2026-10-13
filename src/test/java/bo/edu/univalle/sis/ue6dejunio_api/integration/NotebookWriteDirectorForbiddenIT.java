@@ -314,7 +314,7 @@ class NotebookWriteDirectorForbiddenIT extends AbstractIntegrationTest {
         return n == null ? 0 : n;
     }
 
-    /** A school day inside the editable week; authorization, not the date window, is under test. */
+    /** The one writable school day; authorization, not the date window, is under test. */
     private static LocalDate schoolDay() {
         LocalDate today = LocalDate.now(ZoneId.of("America/La_Paz"));
         return switch (today.getDayOfWeek()) {

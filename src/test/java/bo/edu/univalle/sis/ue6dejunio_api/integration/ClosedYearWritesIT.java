@@ -328,7 +328,7 @@ class ClosedYearWritesIT extends AbstractIntegrationTest {
                 .andExpect(status().is2xxSuccessful());
     }
 
-    /** Keeps the date inside the editable Mon-Fri window; see AttendanceAuthorizationIT. */
+    /** The one writable school day; see AttendanceAuthorizationIT. */
     private static LocalDate editableSchoolDay() {
         LocalDate today = LocalDate.now(ZoneId.of("America/La_Paz"));
         return switch (today.getDayOfWeek()) {

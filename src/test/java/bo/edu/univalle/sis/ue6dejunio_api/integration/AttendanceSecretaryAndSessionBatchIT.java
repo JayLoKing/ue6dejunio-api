@@ -294,7 +294,7 @@ class AttendanceSecretaryAndSessionBatchIT extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** See AttendanceAuthorizationIT: keeps the date inside the editable Mon-Fri window. */
+    /** See AttendanceAuthorizationIT: the one writable school day. */
     private static LocalDate editableSchoolDay() {
         LocalDate today = LocalDate.now(ZoneId.of("America/La_Paz"));
         return switch (today.getDayOfWeek()) {

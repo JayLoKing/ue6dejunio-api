@@ -182,10 +182,10 @@ class AttendanceAuthorizationIT extends AbstractIntegrationTest {
     }
 
     /**
-     * A school day inside the current editable week, on the same zone the application Clock uses.
-     * These tests assert authorization, not the date window, so the date must never be the reason a
-     * request is rejected — on a weekend run this falls back to that week's Friday, which the
-     * service still accepts.
+     * The one writable school day, on the same zone the application Clock uses. These tests assert
+     * authorization, not the date window, so the date must never be the reason a request is
+     * rejected — on a weekend run this falls back to that week's Friday, which is the day {@link
+     * AbstractIntegrationTest}'s clock reports then.
      */
     private static LocalDate editableSchoolDay() {
         LocalDate today = LocalDate.now(ZoneId.of("America/La_Paz"));

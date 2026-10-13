@@ -166,12 +166,12 @@ public class AttendanceService implements IAttendanceService {
     }
 
     /**
-     * Attendance is writable for any school day (Mon-Fri) of the current ISO week, so a teacher who
-     * forgot to mark — or marked wrong — can still fix it before the week closes. Once the week
-     * rolls over the records are frozen, because they feed regularity reporting.
+     * Attendance — daily and per-subject session alike — is writable only on the school day it
+     * describes: a teacher registers it and corrects it the same day. Records of previous days are
+     * frozen, because they feed regularity reporting and must not shift after the fact.
      *
-     * <p>The window is anchored on the ISO week of {@code today}, so Saturday and Sunday still
-     * allow correcting that same week's Mon-Fri; only the date being written must be a school day.
+     * <p>{@code today} comes from the injected clock, so a weekend opens no window onto the Friday
+     * before it. The future and weekend checks run first so those dates keep their own messages.
      */
     private void requireEditableSchoolDay(LocalDate date) {
         LocalDate today = LocalDate.now(clock);
@@ -182,9 +182,9 @@ public class AttendanceService implements IAttendanceService {
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
             throw new ConflictException("no se registra asistencia en sabados ni domingos");
         }
-        if (date.isBefore(today.with(DayOfWeek.MONDAY))) {
+        if (date.isBefore(today)) {
             throw new ConflictException(
-                    "solo puede modificar registros de la semana en curso (lunes a viernes)");
+                    "solo puede registrar o modificar la asistencia del día de hoy");
         }
     }
 
