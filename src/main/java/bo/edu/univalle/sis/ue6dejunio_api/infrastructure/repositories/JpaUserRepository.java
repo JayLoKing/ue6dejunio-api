@@ -36,12 +36,20 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
     @Query("SELECT u FROM UserEntity u WHERE (:excludeId IS NULL OR u.id <> :excludeId)")
     Page<UserEntity> listExcluding(@Param("excludeId") UUID excludeId, Pageable pageable);
 
+    /**
+     * The search box promises "nombre, CI o correo", so a fragment matches names, last names, CI or
+     * email, case-insensitively. {@code q} is never null here: the adapter sends a blank or absent
+     * query to {@link #listExcluding} instead, because a null bound into {@code LOWER(...)} reaches
+     * Postgres as {@code lower(bytea)} and fails.
+     */
     @Query(
             """
         SELECT u FROM UserEntity u
         WHERE (:excludeId IS NULL OR u.id <> :excludeId)
               AND (LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
-                          OR LOWER(u.names) LIKE LOWER(CONCAT('%', :q, '%')))
+                          OR LOWER(u.names) LIKE LOWER(CONCAT('%', :q, '%'))
+                          OR LOWER(u.ci) LIKE LOWER(CONCAT('%', :q, '%'))
+                          OR LOWER(u.email) LIKE LOWER(CONCAT('%', :q, '%')))
         """)
     Page<UserEntity> search(
             @Param("q") String q, @Param("excludeId") UUID excludeId, Pageable pageable);
