@@ -31,7 +31,7 @@ class AccountRecoveryIT extends AbstractIntegrationTest {
 
     private UUID activeUserId;
     private static final String ORIGINAL_PASSWORD = "OldPass1";
-    private static final String NEW_PASSWORD = "NewPass123";
+    private static final String NEW_PASSWORD = "NewPass123!";
 
     @BeforeEach
     void seed() {
@@ -193,7 +193,7 @@ class AccountRecoveryIT extends AbstractIntegrationTest {
                                 .content(
                                         "{\"token\":\""
                                                 + token
-                                                + "\",\"newPassword\":\"AnotherPass1\"}"))
+                                                + "\",\"newPassword\":\"AnotherPass1!\"}"))
                 .andExpect(status().isBadRequest());
 
         org.assertj.core.api.Assertions.assertThat(currentStoredHash())

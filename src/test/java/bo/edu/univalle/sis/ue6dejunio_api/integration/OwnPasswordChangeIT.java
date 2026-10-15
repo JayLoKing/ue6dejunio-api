@@ -53,7 +53,7 @@ class OwnPasswordChangeIT extends AbstractIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         "{\"currentPassword\":\"otra\","
-                                                + "\"newPassword\":\"NuevaClave1\"}"))
+                                                + "\"newPassword\":\"NuevaClave1!\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La contraseña actual no es correcta"));
 
@@ -71,7 +71,7 @@ class OwnPasswordChangeIT extends AbstractIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         "{\"currentPassword\":\"otra\","
-                                                + "\"newPassword\":\"NuevaClave1\"}"))
+                                                + "\"newPassword\":\"NuevaClave1!\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La contraseña actual no es correcta"));
     }

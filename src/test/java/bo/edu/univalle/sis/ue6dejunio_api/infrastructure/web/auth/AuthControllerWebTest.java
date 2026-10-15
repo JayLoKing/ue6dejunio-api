@@ -2,6 +2,8 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.auth;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -98,6 +100,30 @@ class AuthControllerWebTest {
                                         json.writeValueAsString(
                                                 new LoginPayload("notanemail", "secret123"))))
                 .andExpect(status().isBadRequest());
+    }
+
+    // Recovery is a public door: a weak password refused only by the web would still be set by
+    // any client that posts the body itself, and the account would never learn it was asked less.
+    @Test
+    void resetPassword_weakPassword_returns400AndSetsNothing() throws Exception {
+        mvc.perform(
+                        post("/api/auth/reset-password")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"token\":\"abc\",\"newPassword\":\"Abcdefgh1\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).resetPassword(any(), any());
+    }
+
+    @Test
+    void resetPassword_strongPassword_returns204() throws Exception {
+        mvc.perform(
+                        post("/api/auth/reset-password")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"token\":\"abc\",\"newPassword\":\"Abcdefgh1!\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(authService).resetPassword("abc", "Abcdefgh1!");
     }
 
     @Test
