@@ -78,6 +78,34 @@ class UserEditIT extends AbstractIntegrationTest {
         assertThat(phoneOf(teacher)).isEqualTo(own);
     }
 
+    private String ciOf(UUID id) {
+        return jdbc.queryForObject("SELECT ci FROM users WHERE id_user = ?", String.class, id);
+    }
+
+    // A CI typed wrong at registration used to be permanent: the only way out was a new account,
+    // and that left the teacher's history behind on the old one.
+    @Test
+    void theDirectorCorrectsACi() throws Exception {
+        edit(teacher, "{\"ci\":\"9876543\"}").andExpect(status().isOk());
+
+        assertThat(ciOf(teacher)).isEqualTo("9876543");
+    }
+
+    @Test
+    void anotherUsersCi_isAConflictAndChangesNothing() throws Exception {
+        UUID secretary = seedUser("Secretary", false);
+        String before = ciOf(teacher);
+
+        edit(teacher, "{\"ci\":\"" + ciOf(secretary) + "\"}").andExpect(status().isConflict());
+
+        assertThat(ciOf(teacher)).isEqualTo(before);
+    }
+
+    @Test
+    void aCiShorterThanCreateAllows_isRefused() throws Exception {
+        edit(teacher, "{\"ci\":\"123\"}").andExpect(status().isBadRequest());
+    }
+
     @Test
     void anEditCarryingActiveTrue_doesNotReopenAClosedAccount() throws Exception {
         jdbc.update("UPDATE users SET is_active = false WHERE id_user = ?", teacher);

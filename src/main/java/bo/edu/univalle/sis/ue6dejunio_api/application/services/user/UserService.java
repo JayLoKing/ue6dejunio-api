@@ -106,6 +106,7 @@ public class UserService implements IUserService {
                         .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
 
         boolean emailChanged = applyEmail(user, command.email());
+        if (command.ci() != null) applyCi(user, command.ci());
         if (command.names() != null) user.setNames(command.names());
         if (command.lastNames() != null) user.setLastNames(command.lastNames());
         if (command.phone() != null) applyPhone(user, command.phone());
@@ -154,6 +155,25 @@ public class UserService implements IUserService {
         }
         user.setEmail(email);
         return true;
+    }
+
+    /**
+     * Corrects the CI typed at registration. Checked for an owner exactly as create does, and only
+     * when it changed, so the CI this user already has is not refused as a duplicate of itself. A
+     * blank one is refused: create requires a CI, and an edit cannot take it away.
+     */
+    private void applyCi(User user, String requested) {
+        String ci = requested.trim();
+        if (ci.isEmpty()) {
+            throw new ValidationException("El CI no puede estar vacío");
+        }
+        if (ci.equals(user.getCi())) {
+            return;
+        }
+        if (userDomain.existsByCi(ci)) {
+            throw new DuplicateResourceException("ci", ci);
+        }
+        user.setCi(ci);
     }
 
     /**

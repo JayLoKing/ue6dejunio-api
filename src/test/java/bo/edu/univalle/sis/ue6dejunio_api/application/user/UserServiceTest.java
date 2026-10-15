@@ -167,7 +167,7 @@ class UserServiceTest {
         when(userDomain.findById(id)).thenReturn(Optional.of(user));
         when(roleDomain.findById(1)).thenReturn(Optional.of(new Role(1, "Director")));
 
-        UpdateUserCommand toDirector = new UpdateUserCommand(null, null, null, 1, null);
+        UpdateUserCommand toDirector = new UpdateUserCommand(null, null, null, 1, null, null);
 
         assertThatThrownBy(() -> userService.update(id, toDirector))
                 .isInstanceOf(ValidationException.class);
@@ -190,7 +190,9 @@ class UserServiceTest {
         when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         User result =
-                userService.update(id, new UpdateUserCommand(null, null, null, 2, null)).user();
+                userService
+                        .update(id, new UpdateUserCommand(null, null, null, 2, null, null))
+                        .user();
 
         assertThat(result.isTechnical()).isFalse();
     }
@@ -302,7 +304,7 @@ class UserServiceTest {
     }
 
     private static UpdateUserCommand emailOnly(String email) {
-        return new UpdateUserCommand(null, null, null, null, email);
+        return new UpdateUserCommand(null, null, null, null, email, null);
     }
 
     /**
@@ -395,7 +397,7 @@ class UserServiceTest {
     // ---- Phone: one number per user, on create and on the Director's edit ----
 
     private static UpdateUserCommand phoneOnly(String phone) {
-        return new UpdateUserCommand(null, null, phone, null, null);
+        return new UpdateUserCommand(null, null, phone, null, null, null);
     }
 
     private User userWithPhone(java.util.UUID id, String phone) {
@@ -500,6 +502,64 @@ class UserServiceTest {
 
         assertThat(userService.update(id, phoneOnly("")).user().getPhone()).isNull();
         verify(userDomain, never()).existsByPhone(any());
+    }
+
+    // ---- CI: editable by the Director, still one per user ----
+
+    private static UpdateUserCommand ciOnly(String ci) {
+        return new UpdateUserCommand(null, null, null, null, null, ci);
+    }
+
+    private User userWithCi(java.util.UUID id, String ci) {
+        User user = pendingUser(id);
+        user.setCi(ci);
+        return user;
+    }
+
+    @Test
+    void update_newFreeCi_isStoredTrimmed() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithCi(id, "1234567")));
+        when(userDomain.existsByCi("7654321")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(userService.update(id, ciOnly(" 7654321 ")).user().getCi()).isEqualTo("7654321");
+    }
+
+    @Test
+    void update_ciThatBelongsToSomeoneElse_isDuplicateAndSavesNothing() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithCi(id, "1234567")));
+        when(userDomain.existsByCi("7654321")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.update(id, ciOnly("7654321")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El CI 7654321 ya está registrado con un usuario del sistema.");
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    // Same as the phone: the form sends the CI back on every save, and it is this user's own.
+    @Test
+    void update_sameCiAsNow_isNotAChangeAndNotChecked() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithCi(id, "1234567")));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(userService.update(id, ciOnly("1234567")).user().getCi()).isEqualTo("1234567");
+        verify(userDomain, never()).existsByCi(any());
+    }
+
+    // Create requires a CI; an edit cannot take it away.
+    @Test
+    void update_blankCi_isRejected() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithCi(id, "1234567")));
+
+        assertThatThrownBy(() -> userService.update(id, ciOnly("   ")))
+                .isInstanceOf(ValidationException.class);
+
+        verify(userDomain, never()).save(any(User.class));
     }
 
     @Test

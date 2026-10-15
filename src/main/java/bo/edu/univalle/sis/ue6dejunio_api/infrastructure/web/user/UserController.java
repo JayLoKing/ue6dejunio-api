@@ -125,7 +125,8 @@ public class UserController {
                                 request.lastNames(),
                                 request.phone(),
                                 request.roleId(),
-                                request.email()));
+                                request.email(),
+                                request.ci()));
         return ResponseEntity.ok(UserResponse.from(updated));
     }
 
