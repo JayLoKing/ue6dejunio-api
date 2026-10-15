@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -219,6 +220,16 @@ public abstract class AbstractIntegrationTest {
                 .getTokenValue();
     }
 
+    /**
+     * A different number for every seeded user. Phones are unique in the schema (V28), so one
+     * shared value made the second user of every test a collision.
+     */
+    private static final AtomicInteger PHONE_SEQUENCE = new AtomicInteger();
+
+    protected static String nextPhone() {
+        return "7%07d".formatted(PHONE_SEQUENCE.incrementAndGet());
+    }
+
     protected UUID seedUser(String role, boolean technical) {
         UUID id = UUID.randomUUID();
         Integer roleId =
@@ -233,7 +244,7 @@ public abstract class AbstractIntegrationTest {
                 "CI-" + suffix,
                 "Nombre" + suffix,
                 "Apellido" + suffix,
-                "70000000",
+                nextPhone(),
                 "user-" + suffix + "@ue6.test",
                 "{noop}pwd",
                 roleId,

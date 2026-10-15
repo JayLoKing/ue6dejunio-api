@@ -31,6 +31,15 @@ public interface IUserDomain {
 
     boolean existsByCi(String ci);
 
+    /**
+     * Whether some user already has this phone number. The number is compared trimmed.
+     *
+     * <p>{@code false} for a null or blank number: that is the absence of a phone, which any number
+     * of users share, and treating it as a value would make the second account without one a
+     * duplicate of the first.
+     */
+    boolean existsByPhone(String phone);
+
     User save(User user);
 
     void deactivate(UUID id);

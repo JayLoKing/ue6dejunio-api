@@ -18,6 +18,8 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByCi(String ci);
 
+    boolean existsByPhone(String phone);
+
     /**
      * Existence plus the flag in one indexed lookup, for the per-request session check. Derived
      * rather than loading the entity: {@code UserEntity} fetches its role eagerly and holds the

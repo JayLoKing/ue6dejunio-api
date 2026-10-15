@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS users (
     created_at timestamp DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
+-- Mirrors V28: a phone number belongs to one user at most; blank and missing ones are not numbers.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_users_phone
+    ON users (phone)
+    WHERE phone IS NOT NULL AND btrim(phone) <> '';
 
 CREATE TABLE IF NOT EXISTS academic_years (
     id_academic_year SERIAL PRIMARY KEY,

@@ -71,6 +71,14 @@ public class UserRepositoryAdapter implements IUserDomain {
     }
 
     @Override
+    public boolean existsByPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return false;
+        }
+        return repo.existsByPhone(phone.trim());
+    }
+
+    @Override
     @Transactional
     public User save(User user) {
         UserEntity entity = mapper.toEntity(user);

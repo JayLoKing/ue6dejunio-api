@@ -23,7 +23,8 @@ class OwnProfileReadIT extends AbstractIntegrationTest {
         UUID me = seedUser(role, false);
         Map<String, Object> row =
                 jdbc.queryForMap(
-                        "SELECT ci, names, last_names, email FROM users WHERE id_user = ?", me);
+                        "SELECT ci, names, last_names, email, phone FROM users WHERE id_user = ?",
+                        me);
 
         mvc.perform(
                         get("/api/auth/profile")
@@ -33,7 +34,7 @@ class OwnProfileReadIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.names").value(row.get("names")))
                 .andExpect(jsonPath("$.lastNames").value(row.get("last_names")))
                 .andExpect(jsonPath("$.email").value(row.get("email")))
-                .andExpect(jsonPath("$.phone").value("70000000"))
+                .andExpect(jsonPath("$.phone").value(row.get("phone")))
                 .andExpect(jsonPath("$.password").doesNotExist());
     }
 
