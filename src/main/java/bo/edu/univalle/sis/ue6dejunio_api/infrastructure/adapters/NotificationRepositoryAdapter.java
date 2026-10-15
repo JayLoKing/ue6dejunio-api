@@ -67,6 +67,11 @@ public class NotificationRepositoryAdapter implements INotificationDomain {
     }
 
     @Override
+    public boolean isActive(UUID userId) {
+        return userRepo.findById(userId).map(UserEntity::isActive).orElse(false);
+    }
+
+    @Override
     public List<UUID> activeDirectorIds() {
         return userRepo.findByRole_NameAndActiveTrueOrderByLastNames(DIRECTOR_ROLE).stream()
                 .map(UserEntity::getId)

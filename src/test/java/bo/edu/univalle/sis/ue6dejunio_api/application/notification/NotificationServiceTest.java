@@ -58,6 +58,24 @@ class NotificationServiceTest {
     private void receiverIsATeacher(UUID receiver) {
         when(notificationDomain.userExists(receiver)).thenReturn(true);
         when(notificationDomain.roleNameOf(receiver)).thenReturn(Optional.of("Teacher"));
+        when(notificationDomain.isActive(receiver)).thenReturn(true);
+    }
+
+    // A deactivated account keeps its row, so it still exists and still holds its role. What it
+    // no longer has is a reader: the Director would be told the summons went out to nobody.
+    @Test
+    void send_toADeactivatedAccount_throwsAndWritesNothing() {
+        UUID receiver = UUID.randomUUID();
+        when(notificationDomain.userExists(receiver)).thenReturn(true);
+        when(notificationDomain.roleNameOf(receiver)).thenReturn(Optional.of("Teacher"));
+        when(notificationDomain.isActive(receiver)).thenReturn(false);
+
+        assertThatThrownBy(() -> notificationService.send(summons(UUID.randomUUID(), receiver)))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("dado de baja");
+
+        verify(notificationDomain, never()).send(any());
+        verify(events, never()).publish(any());
     }
 
     @Test

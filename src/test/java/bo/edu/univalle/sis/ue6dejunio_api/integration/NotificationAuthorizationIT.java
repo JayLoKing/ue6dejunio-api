@@ -102,6 +102,17 @@ class NotificationAuthorizationIT extends AbstractIntegrationTest {
         send(seedUser("Director", false), "Director", seedUser("Director", false), 400);
     }
 
+    // A deactivated teacher keeps the account and the role, and loses the reader: nobody signs in
+    // to that inbox again, so a summons written there reaches no one while the Director is told it
+    // was sent.
+    @Test
+    void theDirectorDoesNotWriteToADeactivatedAccount() throws Exception {
+        UUID teacher = seedUser("Teacher", false);
+        jdbc.update("UPDATE users SET is_active = false WHERE id_user = ?", teacher);
+
+        send(seedUser("Director", false), "Director", teacher, 400);
+    }
+
     @Test
     void theDirectorDoesNotWriteToHimself() throws Exception {
         UUID director = seedUser("Director", false);

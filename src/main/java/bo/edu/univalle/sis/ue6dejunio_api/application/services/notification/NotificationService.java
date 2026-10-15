@@ -67,10 +67,11 @@ public class NotificationService implements INotificationService {
     /**
      * What a person is allowed to put in someone's inbox.
      *
-     * <p>Two rules, and both are about the inbox being trustworthy. A PDC type posted by hand is a
+     * <p>Three rules, and all are about the inbox being trustworthy. A PDC type posted by hand is a
      * claim nobody checked — the teacher reads that their plan was approved while it sits
      * unreviewed. And the Director supervises teachers and the secretary: another Director is a
-     * peer and himself is nobody, so neither is a place the school reaches anyone.
+     * peer and himself is nobody, so neither is a place the school reaches anyone. And the account
+     * has to still be in use: a deactivated one keeps its inbox, but nobody reads it.
      */
     private void requireAPersonMayWrite(SendNotificationCommand c) {
         if (!c.type().writtenByHand()) {
@@ -87,6 +88,13 @@ public class NotificationService implements INotificationService {
         if (!MAY_BE_WRITTEN_TO.contains(role)) {
             throw new ValidationException(
                     "Una notificacion del Director va a un docente o a la secretaria");
+        }
+        // Deactivation keeps the row and the role, so both checks above still pass. What it takes
+        // away is the reader: nobody signs in to that inbox again, and the Director would be told
+        // a summons went out to someone who will never see it.
+        if (!notificationDomain.isActive(c.receiverId())) {
+            throw new ValidationException(
+                    "El destinatario está dado de baja y no puede recibir avisos");
         }
     }
 

@@ -49,6 +49,14 @@ public interface INotificationDomain {
      */
     Optional<String> roleNameOf(UUID userId);
 
+    /**
+     * Whether the receiver's account is still in use, so a person does not write into an inbox
+     * nobody will open again.
+     *
+     * @return false when there is no such user
+     */
+    boolean isActive(UUID userId);
+
     Notification send(SendNotificationCommand command);
 
     Optional<Notification> findById(UUID id);
