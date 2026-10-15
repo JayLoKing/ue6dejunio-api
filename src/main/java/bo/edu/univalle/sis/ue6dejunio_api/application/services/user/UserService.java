@@ -106,7 +106,6 @@ public class UserService implements IUserService {
         if (command.names() != null) user.setNames(command.names());
         if (command.lastNames() != null) user.setLastNames(command.lastNames());
         if (command.phone() != null) user.setPhone(command.phone());
-        if (command.active() != null) user.setActive(command.active());
         if (command.roleId() != null) {
             Role role =
                     roleDomain

@@ -167,7 +167,7 @@ class UserServiceTest {
         when(userDomain.findById(id)).thenReturn(Optional.of(user));
         when(roleDomain.findById(1)).thenReturn(Optional.of(new Role(1, "Director")));
 
-        UpdateUserCommand toDirector = new UpdateUserCommand(null, null, null, 1, null, null);
+        UpdateUserCommand toDirector = new UpdateUserCommand(null, null, null, 1, null);
 
         assertThatThrownBy(() -> userService.update(id, toDirector))
                 .isInstanceOf(ValidationException.class);
@@ -190,9 +190,7 @@ class UserServiceTest {
         when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         User result =
-                userService
-                        .update(id, new UpdateUserCommand(null, null, null, 2, null, null))
-                        .user();
+                userService.update(id, new UpdateUserCommand(null, null, null, 2, null)).user();
 
         assertThat(result.isTechnical()).isFalse();
     }
@@ -304,7 +302,7 @@ class UserServiceTest {
     }
 
     private static UpdateUserCommand emailOnly(String email) {
-        return new UpdateUserCommand(null, null, null, null, null, email);
+        return new UpdateUserCommand(null, null, null, null, email);
     }
 
     /**
