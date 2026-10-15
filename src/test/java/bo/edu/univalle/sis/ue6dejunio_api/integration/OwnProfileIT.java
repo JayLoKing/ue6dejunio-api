@@ -53,6 +53,32 @@ class OwnProfileIT extends AbstractIntegrationTest {
         assertThat(after.get("id_role")).isEqualTo(before.get("id_role"));
     }
 
+    @Test
+    void anotherUsersPhone_isAConflictAndChangesNothing() throws Exception {
+        UUID me = seedUser("Teacher", false);
+        UUID colleague = seedUser("Teacher", false);
+        String mine =
+                jdbc.queryForObject("SELECT phone FROM users WHERE id_user = ?", String.class, me);
+        String theirs =
+                jdbc.queryForObject(
+                        "SELECT phone FROM users WHERE id_user = ?", String.class, colleague);
+
+        mvc.perform(
+                        put("/api/auth/profile")
+                                .header("Authorization", "Bearer " + tokenFor(me, "Teacher"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"names\":\"Maria\",\"lastNames\":\"Lopez\",\"phone\":\""
+                                                + theirs
+                                                + "\"}"))
+                .andExpect(status().isConflict());
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT phone FROM users WHERE id_user = ?", String.class, me))
+                .isEqualTo(mine);
+    }
+
     /** Unknown fields are ignored by Jackson, so an email or role in the body changes nothing. */
     @Test
     void emailRoleAndActiveInTheBody_areIgnored() throws Exception {

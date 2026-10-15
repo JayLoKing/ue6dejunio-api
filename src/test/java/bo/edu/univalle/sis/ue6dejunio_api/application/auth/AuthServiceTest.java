@@ -420,6 +420,50 @@ class AuthServiceTest {
     }
 
     @Test
+    void updateProfile_phoneThatBelongsToSomeoneElse_isDuplicateAndSavesNothing() {
+        activeUser.setPhone("70000000");
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(userDomain.existsByPhone("71111111")).thenReturn(true);
+
+        assertThatThrownBy(
+                        () ->
+                                authService.updateProfile(
+                                        new UpdateProfileCommand(
+                                                activeUser.getId(), "Maria", "Lopez", "71111111")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El teléfono 71111111 ya está registrado con un usuario del sistema.");
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    // The profile form posts the number back on every save; it is this user's own.
+    @Test
+    void updateProfile_samePhoneAsNow_isNotChecked() {
+        activeUser.setPhone("70000000");
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.updateProfile(
+                new UpdateProfileCommand(activeUser.getId(), "Maria", "Lopez", " 70000000 "));
+
+        assertThat(activeUser.getPhone()).isEqualTo("70000000");
+        verify(userDomain, never()).existsByPhone(any());
+    }
+
+    @Test
+    void updateProfile_blankPhone_clearsItWithoutAsking() {
+        activeUser.setPhone("70000000");
+        when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.updateProfile(
+                new UpdateProfileCommand(activeUser.getId(), "Maria", "Lopez", ""));
+
+        assertThat(activeUser.getPhone()).isNull();
+        verify(userDomain, never()).existsByPhone(any());
+    }
+
+    @Test
     void updateProfile_deactivatedUser_throwsUserInactiveAndSavesNothing() {
         activeUser.setActive(false);
         when(userDomain.findById(activeUser.getId())).thenReturn(Optional.of(activeUser));

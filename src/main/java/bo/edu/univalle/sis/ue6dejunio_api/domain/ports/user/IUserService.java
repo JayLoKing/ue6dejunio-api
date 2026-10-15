@@ -14,14 +14,14 @@ public interface IUserService {
     User create(CreateUserCommand command);
 
     /**
-     * Applies the Director's edit. A new email is checked for an owner like on create, and if the
-     * user never got past the temporary password, a new one is mailed to the corrected address: the
-     * first one most likely went to the typo.
+     * Applies the Director's edit. A new email, CI or phone is checked for an owner like on create,
+     * and only when it changed. If the user never got past the temporary password, a new one is
+     * mailed to the corrected address: the first one most likely went to the typo.
      *
      * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException if
-     *     the new email already belongs to another user
+     *     the new email, CI or phone already belongs to another user
      * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException if the email
-     *     is blank or the role asked for is Director
+     *     or the CI is blank, or the role asked for is Director
      */
     UserUpdate update(UUID id, UpdateUserCommand command);
 

@@ -305,6 +305,37 @@ class DirectorHandoverServiceTest {
     }
 
     @Test
+    void start_aNewAccountWhosePhoneIsTaken_isADuplicate() {
+        callerIsAnActiveDirector();
+        when(userDomain.findByEmail("nuevo@ue6.bo")).thenReturn(Optional.empty());
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(userDomain.existsByPhone("70011122")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.start(newAccount("1234567", "Luis", "Rojas")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El teléfono 70011122 ya está registrado con un usuario del sistema.");
+        nothingWasWritten();
+    }
+
+    @Test
+    void start_aNewAccountWithABlankPhone_storesNoPhoneAndAsksNothing() {
+        callerIsAnActiveDirector();
+        when(userDomain.findByEmail("nuevo@ue6.bo")).thenReturn(Optional.empty());
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(roleDomain.findByName("Director")).thenReturn(Optional.of(DIRECTOR));
+        stubPasswordAndPersistence();
+
+        service.start(
+                new StartDirectorHandoverCommand(
+                        outgoing.getId(), "nuevo@ue6.bo", "1234567", "Luis", "Rojas", "  "));
+
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userDomain).save(saved.capture());
+        assertThat(saved.getValue().getPhone()).isNull();
+        verify(userDomain, never()).existsByPhone(any());
+    }
+
+    @Test
     void start_withoutADirectorRoleInTheCatalogue_failsBeforeWritingAnything() {
         callerIsAnActiveDirector();
         when(userDomain.findByEmail("nuevo@ue6.bo")).thenReturn(Optional.empty());

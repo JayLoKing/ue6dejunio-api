@@ -13,6 +13,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.LoginCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.auth.UpdateProfileCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Phones;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IAuthService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.auth.IJwtService;
@@ -158,9 +159,17 @@ public class AuthService implements IAuthService {
         if (!user.isActive()) {
             throw new UserInactiveException();
         }
+        // One number per user, as on the Director's form. Only a number that changed is checked:
+        // this form posts the phone back on every save, and it would find the caller's own row.
+        String phone = Phones.normalize(command.phone());
+        if (phone != null
+                && !phone.equals(Phones.normalize(user.getPhone()))
+                && userDomain.existsByPhone(phone)) {
+            throw new DuplicateResourceException("phone", phone);
+        }
         user.setNames(command.names());
         user.setLastNames(command.lastNames());
-        user.setPhone(command.phone());
+        user.setPhone(phone);
         return issueFor(userDomain.save(user));
     }
 

@@ -11,6 +11,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.handover.DirectorHandove
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.handover.StartDirectorHandoverCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Phones;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.handover.IDirectorHandoverDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.handover.IDirectorHandoverService;
@@ -211,11 +212,16 @@ public class DirectorHandoverService implements IDirectorHandoverService {
         if (userDomain.existsByCi(ci)) {
             throw new DuplicateResourceException("ci", ci);
         }
+        // The same rule the user form applies: a number belongs to one user, and none is no number.
+        String phone = Phones.normalize(command.phone());
+        if (phone != null && userDomain.existsByPhone(phone)) {
+            throw new DuplicateResourceException("phone", phone);
+        }
         return User.builder()
                 .ci(ci)
                 .names(command.names().trim())
                 .lastNames(command.lastNames().trim())
-                .phone(command.phone())
+                .phone(phone)
                 .email(email)
                 .password(passwordEncoder.encode(password))
                 .mustChangePassword(true)

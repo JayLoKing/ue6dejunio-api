@@ -51,6 +51,8 @@ public interface IAuthService {
      * active, and the email has its own door, {@link #changeEmail}, because it also opens the
      * account.
      *
+     * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException if
+     *     the new phone number already belongs to another user
      * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.UserInactiveException if the
      *     account is closed
      * @throws bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException if the
