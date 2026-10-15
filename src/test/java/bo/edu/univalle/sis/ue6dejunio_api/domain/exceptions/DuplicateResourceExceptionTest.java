@@ -26,6 +26,12 @@ class DuplicateResourceExceptionTest {
     }
 
     @Test
+    void phone_namesTheThingTheSchoolCallsIt() {
+        assertThat(new DuplicateResourceException("phone", "70000000"))
+                .hasMessage("El teléfono 70000000 ya está registrado con un usuario del sistema.");
+    }
+
+    @Test
     void name_readsAsASentence() {
         assertThat(new DuplicateResourceException("name", "Primaria"))
                 .hasMessage("Ya existe un registro con el nombre \"Primaria\".");

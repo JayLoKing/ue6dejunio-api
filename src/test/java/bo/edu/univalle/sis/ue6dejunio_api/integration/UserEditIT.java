@@ -52,6 +52,32 @@ class UserEditIT extends AbstractIntegrationTest {
         assertThat(isActive(teacher)).isTrue();
     }
 
+    private String phoneOf(UUID id) {
+        return jdbc.queryForObject("SELECT phone FROM users WHERE id_user = ?", String.class, id);
+    }
+
+    @Test
+    void anotherUsersPhone_isAConflictAndChangesNothing() throws Exception {
+        UUID secretary = seedUser("Secretary", false);
+        String before = phoneOf(teacher);
+
+        edit(teacher, "{\"phone\":\"" + phoneOf(secretary) + "\"}")
+                .andExpect(status().isConflict());
+
+        assertThat(phoneOf(teacher)).isEqualTo(before);
+    }
+
+    // The form posts every field, so the number this user already has comes back on every save.
+    @Test
+    void theUsersOwnPhone_isNotAConflict() throws Exception {
+        String own = phoneOf(teacher);
+
+        edit(teacher, "{\"names\":\"Renombrado\",\"phone\":\"" + own + "\"}")
+                .andExpect(status().isOk());
+
+        assertThat(phoneOf(teacher)).isEqualTo(own);
+    }
+
     @Test
     void anEditCarryingActiveTrue_doesNotReopenAClosedAccount() throws Exception {
         jdbc.update("UPDATE users SET is_active = false WHERE id_user = ?", teacher);

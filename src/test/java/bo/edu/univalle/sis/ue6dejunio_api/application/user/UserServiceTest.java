@@ -392,6 +392,116 @@ class UserServiceTest {
         verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
     }
 
+    // ---- Phone: one number per user, on create and on the Director's edit ----
+
+    private static UpdateUserCommand phoneOnly(String phone) {
+        return new UpdateUserCommand(null, null, phone, null, null);
+    }
+
+    private User userWithPhone(java.util.UUID id, String phone) {
+        User user = pendingUser(id);
+        user.setPhone(phone);
+        return user;
+    }
+
+    @Test
+    void create_phoneThatBelongsToSomeoneElse_isDuplicateAndSavesNothing() {
+        when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(false);
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(userDomain.existsByPhone("70000000")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.create(validCommand()))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El teléfono 70000000 ya está registrado con un usuario del sistema.");
+
+        verify(userDomain, never()).save(any(User.class));
+        verify(emailService, never()).sendWelcomeCredentials(any(), any(), any());
+    }
+
+    // Blank is the absence of a number, which any number of users share. Stored as NULL so the
+    // database's unique index has nothing to compare, and never asked about.
+    @Test
+    void create_blankPhone_isStoredAsNoPhoneAndNotChecked() {
+        when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(false);
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(roleDomain.findById(3)).thenReturn(Optional.of(new Role(3, "Teacher")));
+        when(passwordGenerator.generate()).thenReturn("Gen3rat3d!");
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User saved =
+                userService.create(
+                        new CreateUserCommand(
+                                "1234567", "Ana", "Quispe", "   ", "ana@ue6.bo", 3, false));
+
+        assertThat(saved.getPhone()).isNull();
+        verify(userDomain, never()).existsByPhone(any());
+    }
+
+    @Test
+    void create_paddedPhone_isCheckedAndStoredTrimmed() {
+        when(userDomain.existsByEmail("ana@ue6.bo")).thenReturn(false);
+        when(userDomain.existsByCi("1234567")).thenReturn(false);
+        when(userDomain.existsByPhone("70000000")).thenReturn(false);
+        when(roleDomain.findById(3)).thenReturn(Optional.of(new Role(3, "Teacher")));
+        when(passwordGenerator.generate()).thenReturn("Gen3rat3d!");
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User saved =
+                userService.create(
+                        new CreateUserCommand(
+                                "1234567", "Ana", "Quispe", " 70000000 ", "ana@ue6.bo", 3, false));
+
+        assertThat(saved.getPhone()).isEqualTo("70000000");
+    }
+
+    @Test
+    void update_phoneThatBelongsToSomeoneElse_isDuplicateAndSavesNothing() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithPhone(id, "70000000")));
+        when(userDomain.existsByPhone("71111111")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.update(id, phoneOnly("71111111")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("El teléfono 71111111 ya está registrado con un usuario del sistema.");
+
+        verify(userDomain, never()).save(any(User.class));
+    }
+
+    // The form posts every field. Sending back the number this user already has would otherwise
+    // find this user's own row and refuse the edit as a duplicate of itself.
+    @Test
+    void update_samePhoneAsNow_isNotAChangeAndNotChecked() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithPhone(id, "70000000")));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserUpdate result = userService.update(id, phoneOnly(" 70000000 "));
+
+        assertThat(result.user().getPhone()).isEqualTo("70000000");
+        verify(userDomain, never()).existsByPhone(any());
+    }
+
+    @Test
+    void update_newFreePhone_isStored() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithPhone(id, "70000000")));
+        when(userDomain.existsByPhone("71111111")).thenReturn(false);
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(userService.update(id, phoneOnly("71111111")).user().getPhone())
+                .isEqualTo("71111111");
+    }
+
+    @Test
+    void update_blankPhone_clearsTheNumber() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userDomain.findById(id)).thenReturn(Optional.of(userWithPhone(id, "70000000")));
+        when(userDomain.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(userService.update(id, phoneOnly("")).user().getPhone()).isNull();
+        verify(userDomain, never()).existsByPhone(any());
+    }
+
     @Test
     void update_blankEmail_isRejected() {
         java.util.UUID id = java.util.UUID.randomUUID();

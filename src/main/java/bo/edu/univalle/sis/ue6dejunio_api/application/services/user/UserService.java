@@ -9,6 +9,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.role.Role;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.CreateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Phones;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UpdateUserCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.User;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.UserUpdate;
@@ -68,6 +69,8 @@ public class UserService implements IUserService {
         if (userDomain.existsByCi(command.ci())) {
             throw new DuplicateResourceException("ci", command.ci());
         }
+        String phone = Phones.normalize(command.phone());
+        requirePhoneFree(phone);
         Role role =
                 roleDomain
                         .findById(command.roleId())
@@ -81,7 +84,7 @@ public class UserService implements IUserService {
                         .ci(command.ci())
                         .names(command.names())
                         .lastNames(command.lastNames())
-                        .phone(command.phone())
+                        .phone(phone)
                         .email(email)
                         .password(passwordEncoder.encode(temporaryPassword))
                         .mustChangePassword(true)
@@ -105,7 +108,7 @@ public class UserService implements IUserService {
         boolean emailChanged = applyEmail(user, command.email());
         if (command.names() != null) user.setNames(command.names());
         if (command.lastNames() != null) user.setLastNames(command.lastNames());
-        if (command.phone() != null) user.setPhone(command.phone());
+        if (command.phone() != null) applyPhone(user, command.phone());
         if (command.roleId() != null) {
             Role role =
                     roleDomain
@@ -151,6 +154,26 @@ public class UserService implements IUserService {
         }
         user.setEmail(email);
         return true;
+    }
+
+    /**
+     * Moves the user to the number asked for. Blank clears it. Only a number that actually changed
+     * is checked for an owner: the form posts every field, and asking about the number this user
+     * already has would find their own row and refuse the edit as a duplicate of itself.
+     */
+    private void applyPhone(User user, String requested) {
+        String phone = Phones.normalize(requested);
+        if (phone != null && !phone.equals(Phones.normalize(user.getPhone()))) {
+            requirePhoneFree(phone);
+        }
+        user.setPhone(phone);
+    }
+
+    /** No phone is never a duplicate: any number of users have none. */
+    private void requirePhoneFree(String phone) {
+        if (phone != null && userDomain.existsByPhone(phone)) {
+            throw new DuplicateResourceException("phone", phone);
+        }
     }
 
     /** Stores the hash of a fresh temporary password and hands back the raw one for the mail. */

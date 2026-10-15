@@ -25,7 +25,8 @@ public class DuplicateResourceException extends DomainException {
     private static final Map<String, String> SENTENCES =
             Map.of(
                     "email", "El correo %s ya está registrado con un usuario del sistema.",
-                    "ci", "El CI %s ya está registrado con un usuario del sistema.");
+                    "ci", "El CI %s ya está registrado con un usuario del sistema.",
+                    "phone", "El teléfono %s ya está registrado con un usuario del sistema.");
 
     public DuplicateResourceException(String field, String value) {
         super(sentenceFor(field, value));
