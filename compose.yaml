@@ -1,0 +1,108 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    environment:
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME}
+      POSTGRES_USER: ${DB_ADMIN_USERNAME:?Set DB_ADMIN_USERNAME}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+      UE6_APP_USERNAME: ${DB_USERNAME:?Set DB_USERNAME}
+      UE6_APP_PASSWORD_FILE: /run/secrets/db_password
+      UE6_DATABASE_MODE: ${UE6_DATABASE_MODE:-fresh}
+      TZ: America/La_Paz
+    secrets: [db_admin_password, db_password]
+    volumes:
+      - database:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+  ia:
+    build:
+      context: ${IA_CONTEXT:-../ue6dejunio-ia}
+    platform: linux/amd64
+    environment:
+      UE6_MODELS_DIR: /models
+      UE6_API_HOST: 0.0.0.0
+      UE6_API_PORT: '8001'
+      UE6_API_TOKEN_FILE: /run/secrets/prediction_token
+    secrets: [prediction_token]
+    volumes:
+      - type: bind
+        source: ${MODEL_DIRECTORY:?Set MODEL_DIRECTORY}
+        target: /models
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+    networks: [backend]
+  api:
+    build: .
+    environment:
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_NAME: ${DB_NAME:?Set DB_NAME}
+      DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME}
+      APP_SECURITY_JWT_PUBLIC_KEY: file:/run/secrets/jwt_public
+      APP_SECURITY_JWT_PRIVATE_KEY: file:/run/secrets/jwt_private
+      PREDICTION_URL: http://ia:8001
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS}
+      FRONTEND_RESET_URL: ${FRONTEND_RESET_URL:?Set FRONTEND_RESET_URL}
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+      BOOTSTRAP_DIRECTOR_EMAIL: ${BOOTSTRAP_DIRECTOR_EMAIL:-}
+      BOOTSTRAP_DIRECTOR_PASSWORD: ${BOOTSTRAP_DIRECTOR_PASSWORD:-}
+      BOOTSTRAP_DIRECTOR_CI: ${BOOTSTRAP_DIRECTOR_CI:-}
+      BOOTSTRAP_DIRECTOR_NAMES: ${BOOTSTRAP_DIRECTOR_NAMES:-}
+      BOOTSTRAP_DIRECTOR_LAST_NAMES: ${BOOTSTRAP_DIRECTOR_LAST_NAMES:-}
+    secrets:
+      - source: db_password
+        target: DB_PASSWORD
+      - source: prediction_token
+        target: PREDICTION_TOKEN
+      - jwt_public
+      - jwt_private
+    depends_on:
+      db:
+        condition: service_healthy
+      ia:
+        condition: service_healthy
+    expose: ['8090']
+    restart: unless-stopped
+    networks: [backend, frontend]
+  web:
+    build:
+      context: ${WEB_CONTEXT:-../ue6dejunio-web}
+      args:
+        VITE_API_URL: ${VITE_API_URL:?Set absolute browser API URL}
+    ports: ['127.0.0.1:${WEB_PORT:-8080}:8080']
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [frontend]
+secrets:
+  db_admin_password:
+    file: ${DB_ADMIN_PASSWORD_FILE:?Set DB_ADMIN_PASSWORD_FILE}
+  db_password:
+    file: ${DB_PASSWORD_FILE:?Set DB_PASSWORD_FILE}
+  prediction_token:
+    file: ${PREDICTION_TOKEN_FILE:?Set PREDICTION_TOKEN_FILE}
+  jwt_public:
+    file: ${JWT_PUBLIC_KEY_FILE:?Set JWT_PUBLIC_KEY_FILE}
+  jwt_private:
+    file: ${JWT_PRIVATE_KEY_FILE:?Set JWT_PRIVATE_KEY_FILE}
+volumes:
+  database:
+networks:
+  backend:
+  frontend:
