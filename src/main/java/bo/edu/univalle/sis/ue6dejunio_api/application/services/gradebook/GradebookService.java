@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -487,10 +488,19 @@ public class GradebookService implements IGradebookService {
         return entry.gradeName() + " " + entry.parallelName();
     }
 
-    /** One course's podium, read from the whole roster rather than from its first page. */
+    /**
+     * One course's podium, read from the whole roster rather than from its first page.
+     *
+     * <p>Only the enrolments still in force compete. A withdrawn student keeps the marks they
+     * earned — the libreta and the centralizer still print them — but the podium names the students
+     * the school honours, and they are no longer one of them. The cut is by enrolment, not by
+     * student: a child moved to another classroom of the year has a withdrawn seat here and an
+     * effective one there, and is ranked on the one they still hold.
+     */
     private List<HonorRollEntry> podiumOf(Course course, int places) {
         List<HonorRollEntry> candidates = new ArrayList<>();
-        for (StudentAnnualSummary annual : annualSummariesOf(course.id())) {
+        for (StudentAnnualSummary annual :
+                annualSummariesOf(course.id(), enrollmentDomain::activeStudentsByCourse)) {
             // Nothing graded is not a bad year: it is a year nobody judged, and last place would
             // say otherwise. They hold no place at all.
             if (annual.finalAverage() != null) {
@@ -557,21 +567,22 @@ public class GradebookService implements IGradebookService {
      * and a tie is where the order is free to move again. The enrollment id closes it.
      *
      * <p>Every enrolment, not only the ones still in force. A student who withdrew in November
-     * still earned the marks they earned, and the libreta and the centralizer both count them; a
-     * podium that quietly disagreed with the sheets beside it would be the odd one out.
+     * still earned the marks they earned, and the libreta and the centralizer both count them. The
+     * podium is the one reader that narrows this to the enrolments in force; see {@code podiumOf}.
      */
     @Override
     @Transactional(readOnly = true)
     public List<StudentAnnualSummary> annualSummariesOfCourse(UUID courseId) {
-        return annualSummariesOf(courseId);
+        return annualSummariesOf(courseId, enrollmentDomain::studentsByCourse);
     }
 
-    private List<StudentAnnualSummary> annualSummariesOf(UUID courseId) {
+    private List<StudentAnnualSummary> annualSummariesOf(
+            UUID courseId, BiFunction<UUID, PageQuery, PageResult<CourseStudent>> roster) {
         List<StudentAnnualSummary> all = new ArrayList<>();
         int pageIndex = 0;
         while (true) {
             PageResult<CourseStudent> page =
-                    enrollmentDomain.studentsByCourse(
+                    roster.apply(
                             courseId,
                             PageQuery.of(
                                     pageIndex,

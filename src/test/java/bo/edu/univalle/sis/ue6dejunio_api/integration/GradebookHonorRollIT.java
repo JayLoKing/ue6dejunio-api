@@ -29,6 +29,9 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
     private UUID director;
     private UUID teacher;
     private UUID courseA;
+    private UUID courseB;
+    private UUID langA;
+    private UUID langB;
     private UUID technicalTeacher;
     private UUID unrelatedTeacher;
 
@@ -38,7 +41,7 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
         teacher = seedUser("Teacher", false);
 
         courseA = seedCourse(teacher, "A");
-        UUID langA = seedClassGroup(courseA, teacher, "Lenguaje");
+        langA = seedClassGroup(courseA, teacher, "Lenguaje");
         // Teaches one subject in course A without being its homeroom teacher.
         technicalTeacher = seedUser("Teacher", true);
         seedClassGroup(courseA, technicalTeacher, "Matematicas");
@@ -68,8 +71,8 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
                 new BigDecimal("2"));
 
         // Another classroom of the same gestión, holding the best mark in the building.
-        UUID courseB = seedCourse(seedUser("Teacher", false), "B");
-        UUID langB = seedClassGroup(courseB, teacher, "Lenguaje");
+        courseB = seedCourse(seedUser("Teacher", false), "B");
+        langB = seedClassGroup(courseB, teacher, "Lenguaje");
         gradeOneArea(
                 seedEnrollment(seedStudent("Dario", "Soto"), courseB),
                 langB,
@@ -98,6 +101,101 @@ class GradebookHonorRollIT extends AbstractIntegrationTest {
                 knowing,
                 doing,
                 deciding);
+    }
+
+    /** Flips one enrolment to Withdrawn, the way a withdrawal leaves it: the marks stay on file. */
+    private void withdraw(UUID enrollmentId) {
+        jdbc.update(
+                "UPDATE course_enrollments SET status = 'Withdrawn' WHERE id_course_enrollment = ?",
+                enrollmentId);
+    }
+
+    private String honorRollOfCourseA(UUID reader, String role, int places) throws Exception {
+        return mvc.perform(
+                        get("/api/gradebook/honor-roll")
+                                .header("Authorization", "Bearer " + tokenFor(reader, role))
+                                .param("id_course", courseA.toString())
+                                .param("places", String.valueOf(places)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    private String institutionHonorRoll(int places) throws Exception {
+        return mvc.perform(
+                        get("/api/gradebook/honor-roll/institution")
+                                .header("Authorization", "Bearer " + tokenFor(director, "Director"))
+                                .param("id_academic_year", String.valueOf(currentAcademicYearId()))
+                                .param("places", String.valueOf(places)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * A withdrawn student keeps her marks but holds no place: the podium names who the school
+     * honours, and she is no longer one of its students. The best mark of course A belongs to her,
+     * so a podium that still reads the withdrawn opens with her name.
+     */
+    @Test
+    void honorRoll_leavesOutAWithdrawnStudentEvenWithTheBestMarkOfTheCourse() throws Exception {
+        UUID elena = seedEnrollment(seedStudent("Elena", "Vargas"), courseA);
+        gradeOneArea(
+                elena,
+                langA,
+                new BigDecimal("10"),
+                new BigDecimal("45"),
+                new BigDecimal("40"),
+                new BigDecimal("5"));
+        withdraw(elena);
+
+        assertThat(
+                        JsonPath.<List<String>>read(
+                                honorRollOfCourseA(director, "Director", 2), "$[*].fullName"))
+                .containsExactly("Ana Perez", "Beto Quispe");
+        assertThat(
+                        JsonPath.<List<String>>read(
+                                honorRollOfCourseA(technicalTeacher, "Teacher", 2),
+                                "$[*].fullName"))
+                .containsExactly("Ana Perez", "Beto Quispe");
+        assertThat(JsonPath.<List<String>>read(institutionHonorRoll(2), "$[*].fullName"))
+                .containsExactly("Dario Soto", "Ana Perez");
+    }
+
+    /**
+     * Exclusion goes by the enrolment, not by the student. Moved from A to B mid-year, Fabio's seat
+     * in A is withdrawn and still carries a better mark than the one he earns in B; he is ranked
+     * once, on the classroom he actually sits in.
+     */
+    @Test
+    void institutionHonorRoll_ranksAStudentReEnrolledElsewhereOnHisActiveSeatOnly()
+            throws Exception {
+        UUID fabio = seedStudent("Fabio", "Mamani");
+        UUID seatInA = seedEnrollment(fabio, courseA);
+        gradeOneArea(
+                seatInA,
+                langA,
+                new BigDecimal("10"),
+                new BigDecimal("45"),
+                new BigDecimal("39"),
+                new BigDecimal("5"));
+        withdraw(seatInA);
+        gradeOneArea(
+                seedEnrollment(fabio, courseB),
+                langB,
+                new BigDecimal("10"),
+                new BigDecimal("45"),
+                new BigDecimal("35"),
+                new BigDecimal("5"));
+
+        String body = institutionHonorRoll(3);
+
+        assertThat(JsonPath.<List<String>>read(body, "$[*].fullName"))
+                .containsExactly("Dario Soto", "Fabio Mamani", "Ana Perez");
+        assertThat(JsonPath.<List<String>>read(body, "$[*].parallelName"))
+                .containsExactly("B", "B", "A");
     }
 
     @Test

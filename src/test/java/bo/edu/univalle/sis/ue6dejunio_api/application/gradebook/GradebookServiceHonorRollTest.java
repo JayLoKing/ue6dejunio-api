@@ -143,7 +143,7 @@ class GradebookServiceHonorRollTest {
         CourseStudent onFirstPage = student("Ana", "Perez");
         CourseStudent onSecondPage = student("Beto", "Quispe");
         // Two pages: the totals say there is more to read than the first page carried.
-        when(enrollmentDomain.studentsByCourse(eq(courseId), any(PageQuery.class)))
+        when(enrollmentDomain.activeStudentsByCourse(eq(courseId), any(PageQuery.class)))
                 .thenReturn(new PageResult<>(List.of(onFirstPage), 0, 200, 2L))
                 .thenReturn(new PageResult<>(List.of(onSecondPage), 1, 200, 2L));
         batched(oneAreaWorth(onFirstPage, "70.00"), oneAreaWorth(onSecondPage, "99.00"));
@@ -172,7 +172,7 @@ class GradebookServiceHonorRollTest {
         service.honorRoll(courseId, 3);
 
         ArgumentCaptor<PageQuery> asked = ArgumentCaptor.forClass(PageQuery.class);
-        verify(enrollmentDomain).studentsByCourse(eq(courseId), asked.capture());
+        verify(enrollmentDomain).activeStudentsByCourse(eq(courseId), asked.capture());
         assertThat(asked.getValue().sort())
                 .extracting(SortField::property)
                 .containsExactly("student.lastNames", "student.names", "id");
@@ -333,7 +333,7 @@ class GradebookServiceHonorRollTest {
     }
 
     private void rosterOfCourse(UUID id, CourseStudent... students) {
-        when(enrollmentDomain.studentsByCourse(eq(id), any(PageQuery.class)))
+        when(enrollmentDomain.activeStudentsByCourse(eq(id), any(PageQuery.class)))
                 .thenReturn(new PageResult<>(List.of(students), 0, 200, students.length));
     }
 
