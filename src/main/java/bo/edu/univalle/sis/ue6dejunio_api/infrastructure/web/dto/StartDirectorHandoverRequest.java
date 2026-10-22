@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -16,4 +17,10 @@ public record StartDirectorHandoverRequest(
         @Size(min = 5, max = 15) String ci,
         @Size(max = 100) String names,
         @Size(max = 100) String lastNames,
-        @Size(max = 20) @Pattern(regexp = "^[-0-9+ ]*$") String phone) {}
+        @Size(max = 20) @Pattern(regexp = "^[-0-9+ ]*$") String phone) {
+
+    /** Normalized before Bean Validation runs (see {@link LoginRequest}). */
+    public StartDirectorHandoverRequest {
+        email = Emails.normalize(email);
+    }
+}

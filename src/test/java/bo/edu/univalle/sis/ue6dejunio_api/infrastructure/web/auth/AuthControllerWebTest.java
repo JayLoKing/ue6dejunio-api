@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -89,6 +91,28 @@ class AuthControllerWebTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("jwt-token"))
                 .andExpect(jsonPath("$.role").value("DIRECTOR"));
+    }
+
+    // A space copied along with the address is not a different address. @Email sees the raw string,
+    // so the request has to be trimmed before validation or the login fails with a 400.
+    @Test
+    void login_paddedEmail_isTrimmedBeforeValidation() throws Exception {
+        when(authService.login(any(LoginCommand.class)))
+                .thenThrow(new InvalidCredentialsException());
+
+        mvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                new LoginPayload(
+                                                        "  director@ue6.bo \t", "secret123"))))
+                .andExpect(status().isUnauthorized());
+
+        ArgumentCaptor<LoginCommand> command = ArgumentCaptor.forClass(LoginCommand.class);
+        verify(authService).login(command.capture());
+        assertThat(command.getValue().email()).isEqualTo("director@ue6.bo");
+        assertThat(command.getValue().rawPassword()).isEqualTo("secret123");
     }
 
     @Test

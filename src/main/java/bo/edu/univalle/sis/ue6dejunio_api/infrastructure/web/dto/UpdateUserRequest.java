@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.user.Emails;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -19,4 +20,10 @@ public record UpdateUserRequest(
         @Size(max = 20) @Pattern(regexp = "^[-0-9+ ]*$") String phone,
         @Positive Integer roleId,
         @Email @Size(max = 100) String email,
-        @Size(min = 5, max = 15) String ci) {}
+        @Size(min = 5, max = 15) String ci) {
+
+    /** Normalized before Bean Validation runs (see {@link LoginRequest}); absent stays absent. */
+    public UpdateUserRequest {
+        email = Emails.normalize(email);
+    }
+}
