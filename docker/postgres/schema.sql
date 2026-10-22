@@ -348,6 +348,22 @@ CREATE UNIQUE INDEX ux_director_handovers_single_pending
     ON director_handovers ((true))
     WHERE closed_at IS NULL AND cancelled_at IS NULL;
 
+-- PostgreSQL does not index a referencing column on its own. Each of these FKs is joined on, or
+-- checked by a cascade, without an index that leads with it (a partial index does not count:
+-- its predicate is not implied by a plain equality). Kept in step with docs/sql/V29.
+CREATE INDEX idx_ascore_cg ON academic_scores (id_class_group);
+CREATE INDEX idx_asscore_event ON assessment_scores (id_assessment_event);
+CREATE INDEX idx_att_ce ON attendance (id_course_enrollment);
+CREATE INDEX idx_att_cg ON attendance (id_class_group);
+CREATE INDEX idx_cg_subject ON class_groups (id_subject);
+CREATE INDEX idx_cg_teacher ON class_groups (id_teacher);
+CREATE INDEX idx_ce_course ON course_enrollments (id_course);
+CREATE INDEX idx_course_year ON courses (id_academic_year);
+CREATE INDEX idx_plan_entry_subject ON curriculum_plan_entries (id_plan_subject);
+CREATE INDEX idx_progress_plan ON curriculum_plan_progress (id_curriculum_plan);
+CREATE INDEX idx_plan_subject_cg ON curriculum_plan_subjects (id_class_group);
+CREATE INDEX idx_plan_source ON curriculum_plans (source_plan_id);
+
 -- Stable authorization/knowledge-area catalogs only; school configuration is explicit.
 INSERT INTO roles (name) VALUES ('Director'), ('Secretary'), ('Teacher');
 INSERT INTO knowledge_areas (name, display_order) VALUES
