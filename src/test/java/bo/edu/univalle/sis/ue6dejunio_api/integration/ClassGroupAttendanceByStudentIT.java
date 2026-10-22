@@ -109,7 +109,8 @@ class ClassGroupAttendanceByStudentIT extends AbstractIntegrationTest {
         assertThat(ana.get("absent").asLong()).isEqualTo(1);
         assertThat(ana.get("late").asLong()).isEqualTo(1);
         assertThat(ana.get("computableSessions").asLong()).isEqualTo(4);
-        assertThat(ana.get("percentage").asDouble()).isEqualTo(50.0);
+        // 2 present + 1 late attended over 4 sessions.
+        assertThat(ana.get("percentage").asDouble()).isEqualTo(75.0);
     }
 
     /** Only the daily kind on record for Luis: in this subject nobody has marked him yet. */

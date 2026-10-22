@@ -157,18 +157,19 @@ public class RiskFeatureRepositoryAdapter implements IRiskFeatureDomain {
      *
      * <p><b>This is not the percentage the attendance panel shows, and it must not be "corrected"
      * into agreement with it.</b> {@code AttendanceCounts} answers the school's question — how much
-     * class did this student actually sit — counting only {@code Present} over {@code Present +
-     * Absent + Late}, with {@code Excused} excluded entirely. This one answers a different
+     * class did this student attend — counting {@code Present + Late} over every mark, so an {@code
+     * Absent} and an {@code Excused} (licencia) both count against. This one answers a different
      * question: what the model was trained on. Its training set was built from the monthly
      * spreadsheets by {@code ue6dejunio-ia}'s {@code asistencia_loader}, whose rule is {@code
      * (presentes + retrasos + licencias) / dias_habiles} — a mark of any kind counts as a day, and
      * only an outright absence counts against.
      *
-     * <p>So {@code Late} and {@code Excused} both count as attended here. Feeding the model the
-     * panel's figure instead would hand it a feature on a scale it never saw in training, which is
-     * not a rounding difference — it is a different variable wearing the same name. The two numbers
-     * are allowed to disagree because they are answers to two different questions; what is not
-     * allowed is either one drifting silently.
+     * <p>So {@code Late} and {@code Excused} both count as attended here, while the panel counts
+     * {@code Excused} as a falta — a deliberate difference. Feeding the model the panel's figure
+     * instead would hand it a feature on a scale it never saw in training, which is not a rounding
+     * difference — it is a different variable wearing the same name. The two numbers are allowed to
+     * disagree because they are answers to two different questions; what is not allowed is either
+     * one drifting silently.
      */
     @Override
     public List<AttendanceRateRow> attendanceRates(Collection<UUID> classGroupIds, int trimester) {

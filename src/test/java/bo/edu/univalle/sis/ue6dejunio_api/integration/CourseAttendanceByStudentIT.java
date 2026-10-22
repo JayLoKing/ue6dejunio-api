@@ -92,9 +92,9 @@ class CourseAttendanceByStudentIT extends AbstractIntegrationTest {
         assertThat(ana.get("present").asLong()).isEqualTo(2);
         assertThat(ana.get("late").asLong()).isEqualTo(1);
         assertThat(ana.get("excused").asLong()).isEqualTo(1);
-        assertThat(ana.get("computableSessions").asLong()).isEqualTo(3);
-        // 2 of 3 computable days; Excused is out of the calculation entirely.
-        assertThat(ana.get("percentage").asDouble()).isEqualTo(66.7);
+        assertThat(ana.get("computableSessions").asLong()).isEqualTo(4);
+        // 2 present + 1 late attended over 4 days; Excused is a falta.
+        assertThat(ana.get("percentage").asDouble()).isEqualTo(75.0);
 
         JsonNode luis = rowOf(node, "Luis Zambrana");
         assertThat(luis.get("present").asLong()).isEqualTo(1);

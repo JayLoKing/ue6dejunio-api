@@ -116,7 +116,7 @@ class ClassGroupAttendanceReportServiceTest {
                 .orElseThrow();
     }
 
-    /** 3 present, 1 absent, 1 late over 5 computable sessions; the excused one is left out. */
+    /** 3 present + 1 late attended over 6 computable sessions; the excused one is a falta. */
     @Test
     void appliesTheCourseReportsRuleToTheClassGroupsSessionMarks() {
         roster(student(anaEnrollment, "Ana", "Quispe"));
@@ -137,8 +137,8 @@ class ClassGroupAttendanceReportServiceTest {
         StudentAttendanceSummary ana = summaryOf(report, anaEnrollment);
         assertThat(ana.counts().present()).isEqualTo(3);
         assertThat(ana.counts().excused()).isEqualTo(1);
-        assertThat(ana.counts().computableSessions()).isEqualTo(5);
-        assertThat(ana.counts().percentage()).isEqualByComparingTo("60.0");
+        assertThat(ana.counts().computableSessions()).isEqualTo(6);
+        assertThat(ana.counts().percentage()).isEqualByComparingTo("66.7");
         // The report names the course the class group belongs to, like the course report does.
         assertThat(report.courseId()).isEqualTo(courseId);
     }

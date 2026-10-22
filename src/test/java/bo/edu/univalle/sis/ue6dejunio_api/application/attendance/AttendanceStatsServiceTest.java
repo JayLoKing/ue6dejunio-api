@@ -140,7 +140,7 @@ class AttendanceStatsServiceTest {
     }
 
     @Test
-    void allExcusedCourse_percentageIsNull() {
+    void allExcusedCourse_percentageIsZero() {
         when(trimesterPeriodDomain.findByAcademicYear(YEAR_ID)).thenReturn(FULL_YEAR_PERIODS);
         when(attendanceDomain.dailyStatusCountsByCourseGroupedByDate(courseId))
                 .thenReturn(
@@ -148,13 +148,14 @@ class AttendanceStatsServiceTest {
 
         CourseAttendanceStats stats = service.attendanceStats(courseId, null);
 
+        // Excused (licencia) is a falta: it counts in the denominator and not in the numerator.
         assertThat(stats.overall().present()).isZero();
-        assertThat(stats.overall().computableSessions()).isZero();
-        assertThat(stats.overall().percentage()).isNull();
+        assertThat(stats.overall().computableSessions()).isEqualTo(5);
+        assertThat(stats.overall().percentage()).isEqualByComparingTo("0.0");
     }
 
     @Test
-    void lateOnlyCourse_percentageIsZero() {
+    void lateOnlyCourse_percentageIsFull() {
         when(trimesterPeriodDomain.findByAcademicYear(YEAR_ID)).thenReturn(FULL_YEAR_PERIODS);
         when(attendanceDomain.dailyStatusCountsByCourseGroupedByDate(courseId))
                 .thenReturn(
@@ -162,14 +163,15 @@ class AttendanceStatsServiceTest {
 
         CourseAttendanceStats stats = service.attendanceStats(courseId, null);
 
+        // Late counts as attended, like Present.
         assertThat(stats.overall().computableSessions()).isEqualTo(4);
-        assertThat(stats.overall().percentage()).isEqualByComparingTo("0.0");
+        assertThat(stats.overall().percentage()).isEqualByComparingTo("100.0");
     }
 
     @Test
-    void mixedStatuses_computesPercentage_excludingExcused_lateAsMiss() {
+    void mixedStatuses_computesPercentage_lateAsAttended_excusedAsFalta() {
         when(trimesterPeriodDomain.findByAcademicYear(YEAR_ID)).thenReturn(FULL_YEAR_PERIODS);
-        // present=9, absent=0, late=1, excused=2 -> computable=10 -> 9/10 = 90.0%
+        // present=9, absent=0, late=1, excused=2 -> computable=12 -> (9+1)/12 = 83.33...% -> 83.3
         when(attendanceDomain.dailyStatusCountsByCourseGroupedByDate(courseId))
                 .thenReturn(
                         List.of(
@@ -182,8 +184,8 @@ class AttendanceStatsServiceTest {
         assertThat(stats.overall().present()).isEqualTo(9);
         assertThat(stats.overall().late()).isEqualTo(1);
         assertThat(stats.overall().excused()).isEqualTo(2);
-        assertThat(stats.overall().computableSessions()).isEqualTo(10);
-        assertThat(stats.overall().percentage()).isEqualByComparingTo("90.0");
+        assertThat(stats.overall().computableSessions()).isEqualTo(12);
+        assertThat(stats.overall().percentage()).isEqualByComparingTo("83.3");
     }
 
     @Test

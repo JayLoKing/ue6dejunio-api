@@ -118,9 +118,8 @@ class StudentAttendanceReportServiceTest {
     }
 
     /**
-     * Late counts as a miss and Excused leaves the calculation entirely — the rule {@code
-     * AttendanceCounts} already holds. Ana: 3 present, 1 absent, 1 late over 5 computable days is
-     * 60%.
+     * Late counts as attended and Excused counts as a falta — the rule {@code AttendanceCounts}
+     * already holds. Ana: 3 present + 1 late attended over 6 computable days is 66.7%.
      */
     @Test
     void attendanceByStudent_appliesThePercentageRulePerStudent() {
@@ -143,7 +142,8 @@ class StudentAttendanceReportServiceTest {
         assertThat(ana.counts().absent()).isEqualTo(1);
         assertThat(ana.counts().late()).isEqualTo(1);
         assertThat(ana.counts().excused()).isEqualTo(1);
-        assertThat(ana.counts().percentage()).isEqualByComparingTo("60.0");
+        assertThat(ana.counts().computableSessions()).isEqualTo(6);
+        assertThat(ana.counts().percentage()).isEqualByComparingTo("66.7");
     }
 
     /** Cada estudiante cuenta lo suyo: las marcas de uno no pueden entrar en el total del otro. */
