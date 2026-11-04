@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledRep
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDetails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
@@ -14,6 +15,13 @@ import java.util.UUID;
 
 public interface IStudentService {
     Student getById(UUID id);
+
+    /**
+     * Rewrites the student's RUDE, CI, names, birth date and gender as given, nulls included, and
+     * answers with the student as stored. A RUDE or CI another student holds is a conflict, and
+     * nothing is written.
+     */
+    Student update(UUID id, StudentDetails details);
 
     /** The institution's students, narrowed by whatever the caller filtered on. */
     PageResult<StudentDirectoryItem> search(StudentDirectoryQuery query, PageQuery pageQuery);

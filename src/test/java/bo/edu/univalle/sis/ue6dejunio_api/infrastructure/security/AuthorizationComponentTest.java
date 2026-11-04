@@ -12,11 +12,13 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEve
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.Notification;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.notification.NotificationType;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcSubject;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
@@ -55,6 +57,7 @@ class AuthorizationComponentTest {
     @Mock private IPdcDomain pdcDomain;
     @Mock private IAdaptationDomain adaptationDomain;
     @Mock private INotificationDomain notificationDomain;
+    @Mock private IAcademicYearDomain academicYearDomain;
 
     @InjectMocks private AuthorizationComponent authz;
 
@@ -1668,5 +1671,77 @@ class AuthorizationComponentTest {
         when(notificationDomain.findById(id)).thenReturn(Optional.empty());
 
         assertThat(authz.canActOnNotification(token(UUID.randomUUID(), "Teacher"), id)).isFalse();
+    }
+
+    // ---- canEditStudent ----
+
+    private static final Integer OPEN_YEAR = 9;
+
+    private Course courseWithHomeroom(UUID courseId, UUID homeroomTeacherId) {
+        return new Course(
+                courseId,
+                1,
+                "Primero",
+                1,
+                "A",
+                OPEN_YEAR,
+                2026,
+                homeroomTeacherId,
+                "Prof",
+                true,
+                true);
+    }
+
+    @Test
+    void canEditStudent_homeroomTeacherOfTheActiveSeatThisYear_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(OPEN_YEAR);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, OPEN_YEAR))
+                .thenReturn(List.of(new EnrollmentSeat(courseId, "Effective")));
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseWithHomeroom(courseId, teacher)));
+
+        assertThat(authz.canEditStudent(token(teacher, "Teacher"), studentId)).isTrue();
+    }
+
+    @Test
+    void canEditStudent_anotherCoursesTeacher_false() {
+        UUID studentId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(OPEN_YEAR);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, OPEN_YEAR))
+                .thenReturn(List.of(new EnrollmentSeat(courseId, "Effective")));
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseWithHomeroom(courseId, UUID.randomUUID())));
+
+        assertThat(authz.canEditStudent(token(UUID.randomUUID(), "Teacher"), studentId)).isFalse();
+    }
+
+    /** A seat the student left is no longer a course of theirs: its teacher edits nothing. */
+    @Test
+    void canEditStudent_homeroomOfAWithdrawnSeat_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(OPEN_YEAR);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, OPEN_YEAR))
+                .thenReturn(List.of(new EnrollmentSeat(UUID.randomUUID(), "Withdrawn")));
+
+        assertThat(authz.canEditStudent(token(teacher, "Teacher"), studentId)).isFalse();
+        verify(courseDomain, never()).findById(any());
+    }
+
+    @Test
+    void canEditStudent_secretary_false() {
+        assertThat(authz.canEditStudent(token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isFalse();
+    }
+
+    @Test
+    void canEditStudent_director_bypassesWithoutLookup() {
+        assertThat(authz.canEditStudent(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
+        verify(courseEnrollmentDomain, never()).seatsOfStudentInYear(any(), any());
     }
 }

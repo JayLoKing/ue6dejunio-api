@@ -17,6 +17,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.ReinstateStuden
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentDirectoryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentMovementSummaryResponse;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.StudentResponse;
+import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.UpdateStudentRequest;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto.WithdrawStudentRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -35,6 +36,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -60,6 +62,19 @@ public class StudentController {
     @Operation(summary = "Obtener estudiante por id")
     public ResponseEntity<StudentResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(StudentResponse.from(studentService.getById(id)));
+    }
+
+    /**
+     * Completes or corrects a student by hand. The body is the whole record: an optional field sent
+     * empty clears it. Owned like the roster the student sits on this gestión.
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("@authz.canEditStudent(authentication, #id)")
+    @Operation(summary = "Editar los datos de un estudiante: RUDE, CI, nombres, nacimiento y sexo")
+    public ResponseEntity<StudentResponse> update(
+            @PathVariable UUID id, @Valid @RequestBody UpdateStudentRequest request) {
+        return ResponseEntity.ok(
+                StudentResponse.from(studentService.update(id, request.toDetails())));
     }
 
     /**

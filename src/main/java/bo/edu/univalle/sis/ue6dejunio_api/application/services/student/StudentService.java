@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.application.services.student;
 
 import bo.edu.univalle.sis.ue6dejunio_api.application.services.academicyear.ClosedYearGuard;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
@@ -12,6 +13,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledRep
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.ReinstateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDetails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
@@ -66,6 +68,34 @@ public class StudentService implements IStudentService {
         return studentDomain
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Estudiante", id));
+    }
+
+    /**
+     * The hand edit that completes a student the name-only roster registered.
+     *
+     * <p>The codes are checked before the write rather than left to the UNIQUE constraints: a
+     * violation surfaces as a constraint name, and the person at the form needs to read which code
+     * is taken. Each check is one lookup, and only for a code the request carries.
+     */
+    @Override
+    @Transactional
+    public Student update(UUID id, StudentDetails details) {
+        getById(id);
+        if (details.rudeCode() != null
+                && heldByAnother(studentDomain.findByRudeCodeIn(Set.of(details.rudeCode())), id)) {
+            throw new DuplicateResourceException("rudeCode", details.rudeCode());
+        }
+        if (details.identityCard() != null
+                && heldByAnother(
+                        studentDomain.findByIdentityCardIn(Set.of(details.identityCard())), id)) {
+            throw new DuplicateResourceException("identityCard", details.identityCard());
+        }
+        studentDomain.updateDetails(id, details);
+        return getById(id);
+    }
+
+    private static boolean heldByAnother(List<Student> holders, UUID id) {
+        return holders.stream().anyMatch(s -> !s.getId().equals(id));
     }
 
     @Override

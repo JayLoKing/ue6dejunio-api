@@ -6,6 +6,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEve
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentEventDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.assessment.IAssessmentScoreDomain;
@@ -53,6 +54,8 @@ public class AuthorizationComponent {
      */
     private static final String ROLE_SECRETARY = "ROLE_Secretary";
 
+    private static final String STATUS_EFFECTIVE = "Effective";
+
     private static final UUID NO_MATCH_COURSE_ID = new UUID(0L, 0L);
 
     private final IClassGroupDomain classGroupDomain;
@@ -65,6 +68,7 @@ public class AuthorizationComponent {
     private final INotificationDomain notificationDomain;
     private final IAdaptationDomain adaptationDomain;
     private final IRiskPredictionDomain riskPredictionDomain;
+    private final IAcademicYearDomain academicYearDomain;
 
     public AuthorizationComponent(
             IClassGroupDomain classGroupDomain,
@@ -76,7 +80,8 @@ public class AuthorizationComponent {
             IPdcDomain pdcDomain,
             INotificationDomain notificationDomain,
             IAdaptationDomain adaptationDomain,
-            IRiskPredictionDomain riskPredictionDomain) {
+            IRiskPredictionDomain riskPredictionDomain,
+            IAcademicYearDomain academicYearDomain) {
         this.classGroupDomain = classGroupDomain;
         this.assessmentEventDomain = assessmentEventDomain;
         this.assessmentScoreDomain = assessmentScoreDomain;
@@ -87,6 +92,7 @@ public class AuthorizationComponent {
         this.notificationDomain = notificationDomain;
         this.adaptationDomain = adaptationDomain;
         this.riskPredictionDomain = riskPredictionDomain;
+        this.academicYearDomain = academicYearDomain;
     }
 
     /**
@@ -487,6 +493,36 @@ public class AuthorizationComponent {
      */
     public boolean canWriteCourseEnrollment(Authentication authentication, UUID courseId) {
         return canReadCourse(authentication, courseId) && !isReadOnlyStaff(authentication);
+    }
+
+    /**
+     * Who may edit a student's details — the hand completion of a student the name-only roster
+     * registered. The same people who compose the roster of the course the student sits in this
+     * gestión: the Director, or that course's homeroom teacher.
+     *
+     * <p>Narrower than {@link #canWriteStudent} on purpose. That one admits the homeroom teacher of
+     * any course the student ever sat in, so last year's teacher could rewrite the RUDE of a child
+     * they no longer teach. Only an Effective seat of the active gestión counts here.
+     *
+     * <p>No active gestión means no course to own, and a denial rather than the 404 the lookup
+     * throws: a guard that errors reads as a missing student.
+     */
+    public boolean canEditStudent(Authentication authentication, UUID studentId) {
+        if (authentication == null || studentId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        Integer openYear;
+        try {
+            openYear = academicYearDomain.currentYearId();
+        } catch (ResourceNotFoundException e) {
+            return false;
+        }
+        return courseEnrollmentDomain.seatsOfStudentInYear(studentId, openYear).stream()
+                .filter(seat -> STATUS_EFFECTIVE.equals(seat.status()))
+                .anyMatch(seat -> canWriteCourseEnrollment(authentication, seat.courseId()));
     }
 
     /**

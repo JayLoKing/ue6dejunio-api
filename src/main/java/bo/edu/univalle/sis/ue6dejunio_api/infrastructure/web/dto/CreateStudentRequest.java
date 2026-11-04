@@ -34,7 +34,7 @@ public record CreateStudentRequest(
         gender = blankToNull(gender);
     }
 
-    /** Blank means unknown; anything else is kept, trimmed. */
+    /** Blank means unknown; anything else is kept, trimmed. The edit request follows it too. */
     static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.strip();
     }
