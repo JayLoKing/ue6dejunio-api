@@ -29,6 +29,9 @@ import java.util.List;
  * @param enrollmentsSkipped how many rows matched a student who already holds a seat in the course,
  *     or repeated one seated earlier in the same request. Not the withdrawn ones: those are in
  *     {@code skippedWithdrawn}
+ * @param completed how many distinct students already on record had missing RUDE, CI, birth date or
+ *     gender filled in from the file. Outside the partition above: a completed student is also
+ *     counted in whichever group their row fell in
  * @param reinstated the students withdrawn in an earlier gestión — no Effective or Withdrawn seat
  *     of theirs in the course's own — whom the load returned to Effective and seated, once each.
  *     Not counted in {@code studentsFromPreviousYear} nor {@code studentsReentering}
@@ -49,6 +52,7 @@ public record EnrollResult(
         int studentsReentering,
         int enrollmentsCreated,
         int enrollmentsSkipped,
+        int completed,
         List<ReinstatedStudent> reinstated,
         List<SkippedStudent> skippedWithdrawn,
         List<EnrolledElsewhere> skippedOtherCourse,

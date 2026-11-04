@@ -15,11 +15,14 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.Skipped
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.YearSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.CreateStudentCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDetails;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentNames;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentStatusChange;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.courseenrollment.ICourseEnrollmentService;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.student.IStudentDomain;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -84,23 +87,31 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         closedYearGuard.requireOpenForCourse(command.courseId());
         // A roster is imported whole, so the three lookups it needs are done once for the whole
         // batch. Asking per student turned a class of forty into a hundred-odd round trips.
-        Map<String, Student> byRude =
-                indexBy(
-                        studentDomain.findByRudeCodeIn(
-                                valuesOf(command.students(), CreateStudentCommand::rudeCode)),
-                        Student::getRudeCode);
+        List<Student> rudeHits =
+                studentDomain.findByRudeCodeIn(
+                        valuesOf(command.students(), CreateStudentCommand::rudeCode));
+        List<Student> cardHits =
+                studentDomain.findByIdentityCardIn(
+                        valuesOf(command.students(), CreateStudentCommand::identityCard));
+        // The incomplete students already seated in the course: who a row that no RUDE or CI on
+        // record matches can still be, found by name. The name-only spreadsheet registers them and
+        // the SIE roster of the course completes them.
+        List<Student> incompleteInCourse = studentDomain.findIncompleteInCourse(command.courseId());
+        // One object per student across the three lookups. Completing a student updates the object
+        // in hand, and a second copy reached by another index would write its stale fields back.
+        Map<UUID, Student> onRecord = new LinkedHashMap<>();
+        Stream.of(rudeHits, cardHits, incompleteInCourse)
+                .flatMap(List::stream)
+                .forEach(s -> onRecord.putIfAbsent(s.getId(), s));
+        Map<String, Student> byRude = indexBy(canonical(rudeHits, onRecord), Student::getRudeCode);
         Map<String, Student> byIdentityCard =
-                indexBy(
-                        studentDomain.findByIdentityCardIn(
-                                valuesOf(command.students(), CreateStudentCommand::identityCard)),
-                        Student::getIdentityCard);
+                indexBy(canonical(cardHits, onRecord), Student::getIdentityCard);
+        Map<String, List<Student>> byName = new HashMap<>();
+        canonical(incompleteInCourse, onRecord).forEach(s -> indexByName(byName, s));
         // Every enrolment these students hold in the course, whatever its status, in one query. The
         // loop reads its two decisions off this map — seat still held, or closed row to reopen —
         // rather than asking the database once per name.
-        Set<UUID> known =
-                Stream.concat(byRude.values().stream(), byIdentityCard.values().stream())
-                        .map(Student::getId)
-                        .collect(Collectors.toSet());
+        Set<UUID> known = Set.copyOf(onRecord.keySet());
         Map<UUID, String> enrollmentInCourse =
                 enrollmentDomain.enrollmentStatusByStudent(command.courseId(), known);
         // And every seat they hold anywhere in the course's gestión, in one more query: the loop
@@ -138,6 +149,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         // Rows whose RUDE and CI belong to two different students. They name nobody for certain,
         // so they are left out whole; a set, so a repeated row is reported once.
         Set<EnrollConflict> conflicts = new LinkedHashSet<>();
+        // Students on record whose missing fields this load filled in. A set: a repeated row
+        // counts once.
+        Set<UUID> completed = new HashSet<>();
 
         for (CreateStudentCommand sc : command.students()) {
             Optional<EnrollConflict> conflict = conflictOf(sc, byRude, byIdentityCard);
@@ -150,12 +164,28 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
             }
             Student student = resolve(sc, byRude, byIdentityCard);
             if (student == null) {
+                List<Student> namesakes = namesakesOf(sc, byName);
+                if (namesakes.size() > 1) {
+                    EnrollConflict ambiguous = ambiguousName(sc, namesakes.size());
+                    if (refuse) {
+                        throw new ConflictException(ambiguous.reason());
+                    }
+                    conflicts.add(ambiguous);
+                    continue;
+                }
+                student = namesakes.isEmpty() ? null : namesakes.get(0);
+            }
+            if (student == null) {
                 student = studentDomain.save(buildStudent(sc));
                 createdNow.add(student.getId());
                 created++;
-                // Index what was just created: a PDF that repeats a row must not create it twice.
+                // Index what was just created: a PDF that repeats a row must not create it twice,
+                // and a spreadsheet that repeats a name with no RUDE or CI must not either.
                 index(byRude, student.getRudeCode(), student);
                 index(byIdentityCard, student.getIdentityCard(), student);
+                if (student.isIncomplete()) {
+                    indexByName(byName, student);
+                }
             } else {
                 existing++;
                 // The object in the index still reads Withdrawn after a reinstatement earlier in
@@ -187,6 +217,12 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                     }
                     carriedOver.add(student.getId());
                 }
+            }
+            // Only for a row that seats the student here, or finds them seated: one left out above
+            // describes a student this course does not hold, and is no source for their record.
+            if (fillMissing(student, sc, byRude, byIdentityCard)
+                    && !createdNow.contains(student.getId())) {
+                completed.add(student.getId());
             }
             // add() is false when the id is already there, which covers both a seat still held from
             // an earlier import and the same student appearing twice in this one.
@@ -222,6 +258,7 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 carriedOver.size() - fromPreviousYear,
                 enrolled,
                 skipped,
+                completed.size(),
                 List.copyOf(reinstated.values()),
                 List.copyOf(skippedWithdrawn.values()),
                 List.copyOf(skippedOtherCourse.values()),
@@ -351,6 +388,113 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         if (key != null) {
             index.putIfAbsent(key, student);
         }
+    }
+
+    private static List<Student> canonical(List<Student> found, Map<UUID, Student> onRecord) {
+        return found.stream().map(s -> onRecord.get(s.getId())).toList();
+    }
+
+    private static void indexByName(Map<String, List<Student>> byName, Student student) {
+        byName.computeIfAbsent(
+                        StudentNames.normalizedFullName(student.getLastNames(), student.getNames()),
+                        k -> new ArrayList<>())
+                .add(student);
+    }
+
+    /**
+     * The incomplete students of the course who carry the row's name and contradict none of its
+     * fields.
+     *
+     * <p>A field the student already holds must equal the row's, or be absent from the row: two
+     * people can share a name, and a RUDE or birth date on record that differs from the file's says
+     * this is the other one.
+     */
+    private static List<Student> namesakesOf(
+            CreateStudentCommand sc, Map<String, List<Student>> byName) {
+        return byName
+                .getOrDefault(
+                        StudentNames.normalizedFullName(sc.lastNames(), sc.names()), List.of())
+                .stream()
+                .filter(s -> agrees(s.getRudeCode(), sc.rudeCode()))
+                .filter(s -> agrees(s.getIdentityCard(), sc.identityCard()))
+                .filter(s -> agrees(s.getBirthDate(), sc.birthDate()))
+                .filter(s -> agrees(s.getGender(), sc.gender()))
+                .toList();
+    }
+
+    private static boolean agrees(Object onRecord, Object inRow) {
+        return onRecord == null || inRow == null || onRecord.equals(inRow);
+    }
+
+    /**
+     * More than one incomplete student of the course fits the row. Picking either would hand one
+     * child's RUDE to the other, so the row is left out and the staff complete them by hand.
+     */
+    private static EnrollConflict ambiguousName(CreateStudentCommand sc, int candidates) {
+        return new EnrollConflict(
+                sc.rudeCode(),
+                sc.identityCard(),
+                sc.names() + " " + sc.lastNames(),
+                "Hay "
+                        + candidates
+                        + " estudiantes con datos incompletos llamados "
+                        + StudentNames.normalizedFullName(sc.lastNames(), sc.names())
+                        + " en este curso: no se puede saber a cuál corresponde la fila.");
+    }
+
+    /**
+     * Fills the student's missing RUDE, CI, birth date and gender from the row, and reports whether
+     * anything was missing that the row had.
+     *
+     * <p>Never overwrites: a value on record stays, whatever the file says. The names stay too —
+     * they are what the student was found by.
+     *
+     * <p>A RUDE or CI filled in here cannot belong to another student. Resolution looks the row's
+     * codes up before it ever reaches a name, and the codes written during this load are indexed as
+     * they are written, so a code anyone holds already resolved the row to that holder.
+     */
+    private boolean fillMissing(
+            Student student,
+            CreateStudentCommand sc,
+            Map<String, Student> byRude,
+            Map<String, Student> byIdentityCard) {
+        if (!student.isIncomplete()) {
+            return false;
+        }
+        StudentDetails current = detailsOf(student);
+        StudentDetails merged =
+                new StudentDetails(
+                        firstPresent(student.getRudeCode(), sc.rudeCode()),
+                        firstPresent(student.getIdentityCard(), sc.identityCard()),
+                        student.getNames(),
+                        student.getLastNames(),
+                        firstPresent(student.getBirthDate(), sc.birthDate()),
+                        firstPresent(student.getGender(), sc.gender()));
+        if (merged.equals(current)) {
+            return false;
+        }
+        studentDomain.updateDetails(student.getId(), merged);
+        student.setRudeCode(merged.rudeCode());
+        student.setIdentityCard(merged.identityCard());
+        student.setBirthDate(merged.birthDate());
+        student.setGender(merged.gender());
+        index(byRude, merged.rudeCode(), student);
+        index(byIdentityCard, merged.identityCard(), student);
+        return true;
+    }
+
+    private static StudentDetails detailsOf(Student s) {
+        return new StudentDetails(
+                s.getRudeCode(),
+                s.getIdentityCard(),
+                s.getNames(),
+                s.getLastNames(),
+                s.getBirthDate(),
+                s.getGender());
+    }
+
+    private static <T> T firstPresent(T onRecord, T inRow) {
+        return onRecord != null ? onRecord : inRow;
     }
 
     private Student buildStudent(CreateStudentCommand sc) {

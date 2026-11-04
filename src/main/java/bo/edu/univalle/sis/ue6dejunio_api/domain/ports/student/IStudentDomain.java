@@ -4,6 +4,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDetails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentMovementSummary;
@@ -42,6 +43,19 @@ public interface IStudentDomain {
 
     /** The students behind a whole batch of identity cards, in one lookup. */
     List<Student> findByIdentityCardIn(Collection<String> identityCards);
+
+    /**
+     * The students holding an Effective seat in the course whose RUDE, CI, birth date or gender is
+     * still missing, in one lookup. What a roster row whose RUDE and CI match nobody on record is
+     * matched against by name.
+     */
+    List<Student> findIncompleteInCourse(UUID courseId);
+
+    /**
+     * Overwrites the student's identifying fields with {@code details}, nulls included. Leaves the
+     * status and its explanation alone.
+     */
+    void updateDetails(UUID studentId, StudentDetails details);
 
     PageResult<StudentDirectoryItem> searchDirectory(
             StudentDirectoryQuery query, PageQuery pageQuery);

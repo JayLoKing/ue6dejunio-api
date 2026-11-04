@@ -76,6 +76,8 @@ class CourseEnrollmentServiceEnrollTest {
                 .identityCard(idCard)
                 .names("Ana")
                 .lastNames("Perez")
+                .birthDate(LocalDate.of(2015, 3, 1))
+                .gender("F")
                 .status(STATUS_EFFECTIVE)
                 .build();
     }
@@ -94,6 +96,8 @@ class CourseEnrollmentServiceEnrollTest {
                 .identityCard(idCard)
                 .names("Ana")
                 .lastNames("Perez")
+                .birthDate(LocalDate.of(2015, 3, 1))
+                .gender("F")
                 .status(STATUS_WITHDRAWN)
                 .build();
     }

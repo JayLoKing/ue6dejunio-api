@@ -14,6 +14,8 @@ import java.util.UUID;
  *     distinct students the file named
  * @param studentsReentering existing students, not withdrawn, with no Effective enrolment in that
  *     gestión: they come back after a gap
+ * @param completed existing students whose missing RUDE, CI, birth date or gender the load filled
+ *     in. Counted on top of the groups above, not beside them
  * @param reinstated students withdrawn in an earlier gestión that the load returned to Effective
  *     and seated: this year's roster naming them is the school taking them back
  * @param skippedWithdrawn the students withdrawn in the course's own gestión that the load left
@@ -32,6 +34,7 @@ public record EnrollResponse(
         int studentsReentering,
         int enrollmentsCreated,
         int enrollmentsSkipped,
+        int completed,
         List<ReinstatedResponse> reinstated,
         List<SkippedStudentResponse> skippedWithdrawn,
         List<EnrolledElsewhereResponse> skippedOtherCourse,
@@ -45,6 +48,7 @@ public record EnrollResponse(
                 r.studentsReentering(),
                 r.enrollmentsCreated(),
                 r.enrollmentsSkipped(),
+                r.completed(),
                 r.reinstated().stream().map(ReinstatedResponse::from).toList(),
                 r.skippedWithdrawn().stream().map(SkippedStudentResponse::from).toList(),
                 r.skippedOtherCourse().stream().map(EnrolledElsewhereResponse::from).toList(),

@@ -2,6 +2,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.repositories;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.infrastructure.entities.StudentEntity;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,6 +34,44 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
 
     @EntityGraph(attributePaths = "statusChangedBy")
     List<StudentEntity> findByIdentityCardIn(Collection<String> identityCards);
+
+    /**
+     * Students with a seat of the given status in the course and any identifying field missing. The
+     * author graph for the same reason as the lookups above: the mapper reads it per student.
+     */
+    @EntityGraph(attributePaths = "statusChangedBy")
+    @Query(
+            """
+        SELECT s FROM StudentEntity s
+        WHERE (s.rudeCode IS NULL OR s.identityCard IS NULL
+               OR s.birthDate IS NULL OR s.gender IS NULL)
+          AND EXISTS (SELECT 1 FROM CourseEnrollmentEntity ce
+                      WHERE ce.student = s AND ce.course.id = :courseId AND ce.status = :status)
+        """)
+    List<StudentEntity> findIncompleteInCourse(
+            @Param("courseId") UUID courseId, @Param("status") String status);
+
+    /**
+     * One statement, no read first. Flushed before, so a student created earlier in the same
+     * transaction is there to update; cleared after, so a later read in it sees the new values
+     * rather than the entity it already holds.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+            """
+        UPDATE StudentEntity s
+           SET s.rudeCode = :rudeCode, s.identityCard = :identityCard, s.names = :names,
+               s.lastNames = :lastNames, s.birthDate = :birthDate, s.gender = :gender
+         WHERE s.id = :id
+        """)
+    int updateDetails(
+            @Param("id") UUID id,
+            @Param("rudeCode") String rudeCode,
+            @Param("identityCard") String identityCard,
+            @Param("names") String names,
+            @Param("lastNames") String lastNames,
+            @Param("birthDate") LocalDate birthDate,
+            @Param("gender") String gender);
 
     /*
      * The two directory queries below repeat their FROM and their filters on purpose: the only

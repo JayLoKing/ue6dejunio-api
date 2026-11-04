@@ -5,6 +5,7 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.NotReenrolledStudent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.Student;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDetails;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryItem;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryQuery;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.student.StudentDirectoryScope;
@@ -83,6 +84,30 @@ public class StudentRepositoryAdapter implements IStudentDomain {
             return List.of();
         }
         return repo.findByIdentityCardIn(identityCards).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Student> findIncompleteInCourse(UUID courseId) {
+        return repo.findIncompleteInCourse(courseId, STATUS_EFFECTIVE).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void updateDetails(UUID studentId, StudentDetails details) {
+        int updated =
+                repo.updateDetails(
+                        studentId,
+                        details.rudeCode(),
+                        details.identityCard(),
+                        details.names(),
+                        details.lastNames(),
+                        details.birthDate(),
+                        details.gender());
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Estudiante", studentId);
+        }
     }
 
     /**
