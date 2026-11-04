@@ -263,7 +263,8 @@ class GradebookServiceCourseSummaryTest {
                 "Ana",
                 "Perez",
                 "Effective",
-                "F");
+                "F",
+                null);
     }
 
     private static Course course(UUID id, String gradeName, String parallelName) {

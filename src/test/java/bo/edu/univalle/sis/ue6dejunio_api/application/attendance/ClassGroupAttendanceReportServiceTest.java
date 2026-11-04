@@ -101,7 +101,15 @@ class ClassGroupAttendanceReportServiceTest {
 
     private static CourseStudent student(UUID enrollmentId, String names, String lastNames) {
         return new CourseStudent(
-                enrollmentId, UUID.randomUUID(), "RUDE", "CI", names, lastNames, "Effective", "F");
+                enrollmentId,
+                UUID.randomUUID(),
+                "RUDE",
+                "CI",
+                names,
+                lastNames,
+                "Effective",
+                "F",
+                null);
     }
 
     private static EnrollmentStatusCount mark(UUID enrollment, String date, String status) {

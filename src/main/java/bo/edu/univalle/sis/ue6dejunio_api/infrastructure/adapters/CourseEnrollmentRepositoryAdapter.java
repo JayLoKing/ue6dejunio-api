@@ -276,6 +276,7 @@ public class CourseEnrollmentRepositoryAdapter implements ICourseEnrollmentDomai
                 s.getNames(),
                 s.getLastNames(),
                 e.getStatus(),
-                s.getGender());
+                s.getGender(),
+                s.getBirthDate());
     }
 }

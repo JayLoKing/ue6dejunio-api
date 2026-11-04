@@ -84,7 +84,8 @@ class GradebookServiceReportCardTest {
                                         "NELSY",
                                         "AIZA ARICOMA",
                                         "Effective",
-                                        "F")));
+                                        "F",
+                                        null)));
         lenient().when(enrollmentDomain.courseOfEnrollment(enrollment)).thenReturn(courseId);
         lenient()
                 .when(courseService.getById(courseId))

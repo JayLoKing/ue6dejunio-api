@@ -37,4 +37,23 @@ public class Student {
     public String fullName() {
         return names + " " + lastNames;
     }
+
+    /**
+     * Whether any of RUDE, CI, birth date or gender is still unknown.
+     *
+     * <p>A student registered from the school's name-only roster starts this way, and stays so
+     * until a SIE roster import or a hand edit fills the gaps.
+     */
+    public boolean isIncomplete() {
+        return identityIncomplete(rudeCode, identityCard, birthDate, gender);
+    }
+
+    /**
+     * The one rule behind every {@code incomplete} flag, for the read models that carry the four
+     * fields without being a {@link Student}.
+     */
+    public static boolean identityIncomplete(
+            String rudeCode, String identityCard, LocalDate birthDate, String gender) {
+        return rudeCode == null || identityCard == null || birthDate == null || gender == null;
+    }
 }

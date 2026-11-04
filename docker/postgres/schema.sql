@@ -69,11 +69,11 @@ CREATE TABLE subjects (
 
 CREATE TABLE students (
     id_student uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    rude_code varchar(20) NOT NULL UNIQUE,
-    identity_card varchar(15) NOT NULL UNIQUE,
+    rude_code varchar(20) UNIQUE,
+    identity_card varchar(15) UNIQUE,
     names varchar(100) NOT NULL,
     last_names varchar(100) NOT NULL,
-    birth_date date NOT NULL,
+    birth_date date,
     gender char(1),
     status varchar(20) DEFAULT 'Effective',
     status_reason text,

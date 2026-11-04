@@ -112,7 +112,8 @@ class PedagogicalReportServiceTest {
                         names,
                         lastNames,
                         "Effective",
-                        gender));
+                        gender,
+                        null));
         return enrollmentId;
     }
 

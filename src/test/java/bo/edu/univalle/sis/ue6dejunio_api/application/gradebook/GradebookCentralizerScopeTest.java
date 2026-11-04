@@ -195,7 +195,15 @@ class GradebookCentralizerScopeTest {
 
     private static CourseStudent courseStudent(UUID enrollmentId, String names, String lastNames) {
         return new CourseStudent(
-                enrollmentId, UUID.randomUUID(), "RUDE", "ID", names, lastNames, "Effective", "F");
+                enrollmentId,
+                UUID.randomUUID(),
+                "RUDE",
+                "ID",
+                names,
+                lastNames,
+                "Effective",
+                "F",
+                null);
     }
 
     private static AcademicScore score(

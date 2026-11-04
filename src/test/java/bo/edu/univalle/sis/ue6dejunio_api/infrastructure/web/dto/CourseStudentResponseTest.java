@@ -3,6 +3,7 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.web.dto;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.CourseStudent;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,8 @@ class CourseStudentResponseTest {
                         "Ana",
                         "Perez",
                         "Effective",
-                        "F");
+                        "F",
+                        null);
 
         CourseStudentResponse response = CourseStudentResponse.from(domain);
 
@@ -43,10 +45,40 @@ class CourseStudentResponseTest {
                         "Luis",
                         "Gomez",
                         "Effective",
-                        "M");
+                        "M",
+                        null);
 
         CourseStudentResponse response = CourseStudentResponse.from(domain);
 
         assertThat(response.gender()).isEqualTo("M");
+    }
+
+    @Test
+    void from_flagsTheRecordIncompleteWhileAnyIdentityFieldIsMissing() {
+        CourseStudent complete =
+                new CourseStudent(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "RUDE-3",
+                        "ID-3",
+                        "Eva",
+                        "Rios",
+                        "Effective",
+                        "F",
+                        LocalDate.of(2015, 1, 1));
+        CourseStudent nameOnly =
+                new CourseStudent(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        null,
+                        null,
+                        "Eva",
+                        "Rios",
+                        "Effective",
+                        null,
+                        null);
+
+        assertThat(CourseStudentResponse.from(complete).incomplete()).isFalse();
+        assertThat(CourseStudentResponse.from(nameOnly).incomplete()).isTrue();
     }
 }

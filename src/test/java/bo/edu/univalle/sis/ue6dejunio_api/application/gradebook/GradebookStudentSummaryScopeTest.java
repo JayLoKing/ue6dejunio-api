@@ -71,7 +71,8 @@ class GradebookStudentSummaryScopeTest {
                                         "Ana",
                                         "Alvarez",
                                         "Effective",
-                                        "F")));
+                                        "F",
+                                        null)));
         when(scoreDomain.findByCourseEnrollment(enrollment))
                 .thenReturn(
                         List.of(

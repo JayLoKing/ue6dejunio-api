@@ -1,5 +1,6 @@
 package bo.edu.univalle.sis.ue6dejunio_api.domain.models.student;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -14,6 +15,9 @@ import java.util.UUID;
  *     true of
  * @param courseId the course the grade and parallel name, so a caller can open it. Null with them
  * @param parallelId the parallel of that course, null with it
+ * @param birthDate carried so the row can say whether the record is complete. Null for a student
+ *     registered from the name-only roster
+ * @param gender carried for the same reason, and null in the same case
  */
 public record StudentDirectoryItem(
         UUID id,
@@ -26,4 +30,12 @@ public record StudentDirectoryItem(
         String status,
         Integer academicYear,
         UUID courseId,
-        Integer parallelId) {}
+        Integer parallelId,
+        LocalDate birthDate,
+        String gender) {
+
+    /** Whether RUDE, CI, birth date or gender is still unknown. */
+    public boolean incomplete() {
+        return Student.identityIncomplete(rudeCode, identityCard, birthDate, gender);
+    }
+}

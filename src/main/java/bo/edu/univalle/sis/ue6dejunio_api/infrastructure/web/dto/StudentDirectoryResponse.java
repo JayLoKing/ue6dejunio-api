@@ -10,6 +10,7 @@ import java.util.UUID;
  * @param academicYear the gestión the grade and parallel are true of
  * @param courseId the course to open from the row. Null when there is no enrolment
  * @param parallelId the parallel that course belongs to, null with it
+ * @param incomplete whether RUDE, CI, birth date or gender is still unknown
  */
 public record StudentDirectoryResponse(
         UUID id,
@@ -22,7 +23,8 @@ public record StudentDirectoryResponse(
         String status,
         Integer academicYear,
         UUID courseId,
-        Integer parallelId) {
+        Integer parallelId,
+        boolean incomplete) {
     public static StudentDirectoryResponse from(StudentDirectoryItem item) {
         return new StudentDirectoryResponse(
                 item.id(),
@@ -35,6 +37,7 @@ public record StudentDirectoryResponse(
                 item.status(),
                 item.academicYear(),
                 item.courseId(),
-                item.parallelId());
+                item.parallelId(),
+                item.incomplete());
     }
 }

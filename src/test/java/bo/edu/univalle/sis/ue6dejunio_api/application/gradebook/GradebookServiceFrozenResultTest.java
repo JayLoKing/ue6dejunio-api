@@ -74,7 +74,7 @@ class GradebookServiceFrozenResultTest {
 
         CourseStudent cs =
                 new CourseStudent(
-                        enrollment, student, "RUDE", "ID", "Nelsy", "Aiza", "Effective", "F");
+                        enrollment, student, "RUDE", "ID", "Nelsy", "Aiza", "Effective", "F", null);
         lenient()
                 .when(enrollmentDomain.studentsByCourse(courseId, pageQuery))
                 .thenReturn(new PageResult<>(List.of(cs), 0, 30, 1));

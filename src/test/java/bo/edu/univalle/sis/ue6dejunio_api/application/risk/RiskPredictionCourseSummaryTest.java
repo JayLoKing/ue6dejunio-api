@@ -248,7 +248,7 @@ class RiskPredictionCourseSummaryTest {
 
     private static CourseStudent studentOf(UUID studentId) {
         return new CourseStudent(
-                UUID.randomUUID(), studentId, "RUDE", "ID", "Ana", "Perez", "Effective", "F");
+                UUID.randomUUID(), studentId, "RUDE", "ID", "Ana", "Perez", "Effective", "F", null);
     }
 
     private static StudentRisk riskOf(UUID studentId, RiskLevel level) {

@@ -362,7 +362,15 @@ class GradebookServiceHonorRollTest {
      */
     private static CourseStudent studentOf(UUID studentId, String names, String lastNames) {
         return new CourseStudent(
-                UUID.randomUUID(), studentId, "RUDE", "ID", names, lastNames, "Effective", "F");
+                UUID.randomUUID(),
+                studentId,
+                "RUDE",
+                "ID",
+                names,
+                lastNames,
+                "Effective",
+                "F",
+                null);
     }
 
     private static Course course(UUID id, String gradeName, String parallelName) {

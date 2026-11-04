@@ -9,6 +9,7 @@ import java.util.UUID;
  * @param statusReason the category behind the status
  * @param statusNote what the Director wrote, when the category did not say enough on its own
  * @param statusChangedByName who decided, by name, so the teacher reading it knows who to ask
+ * @param incomplete whether RUDE, CI, birth date or gender is still unknown
  */
 public record StudentResponse(
         UUID id,
@@ -24,7 +25,8 @@ public record StudentResponse(
         LocalDateTime statusChangedAt,
         UUID statusChangedById,
         String statusChangedByName,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        boolean incomplete) {
     public static StudentResponse from(Student s) {
         return new StudentResponse(
                 s.getId(),
@@ -40,6 +42,7 @@ public record StudentResponse(
                 s.getStatusChangedAt(),
                 s.getStatusChangedById(),
                 s.getStatusChangedByName(),
-                s.getCreatedAt());
+                s.getCreatedAt(),
+                s.isIncomplete());
     }
 }

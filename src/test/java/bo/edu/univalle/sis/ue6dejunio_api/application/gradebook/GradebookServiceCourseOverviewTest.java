@@ -73,7 +73,7 @@ class GradebookServiceCourseOverviewTest {
     private CourseStudent courseStudent(
             UUID enrollmentId, UUID studentId, String names, String lastNames) {
         return new CourseStudent(
-                enrollmentId, studentId, "RUDE", "ID", names, lastNames, "Effective", "F");
+                enrollmentId, studentId, "RUDE", "ID", names, lastNames, "Effective", "F", null);
     }
 
     @Test

@@ -33,10 +33,10 @@ public class StudentEntity {
     @Column(name = "id_student", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "rude_code", nullable = false, unique = true, length = 20)
+    @Column(name = "rude_code", unique = true, length = 20)
     private String rudeCode;
 
-    @Column(name = "identity_card", nullable = false, unique = true, length = 15)
+    @Column(name = "identity_card", unique = true, length = 15)
     private String identityCard;
 
     @Column(name = "names", nullable = false, length = 100)
@@ -45,7 +45,7 @@ public class StudentEntity {
     @Column(name = "last_names", nullable = false, length = 100)
     private String lastNames;
 
-    @Column(name = "birth_date", nullable = false)
+    @Column(name = "birth_date")
     private LocalDate birthDate;
 
     @JdbcTypeCode(SqlTypes.CHAR)
