@@ -99,6 +99,11 @@ public interface IClassGroupDomain {
      */
     List<ClassGroupField> knowledgeFieldsByCourse(UUID courseId);
 
+    /**
+     * The class groups the teacher runs in the active gestión. A teacher works in the active year
+     * only; a closed year's class groups are the Director's to look back on, not the teacher's to
+     * act on. Empty when no gestión is active.
+     */
     List<ClassGroup> byTeacher(UUID teacherId);
 
     UUID courseIdOfClassGroup(UUID classGroupId);

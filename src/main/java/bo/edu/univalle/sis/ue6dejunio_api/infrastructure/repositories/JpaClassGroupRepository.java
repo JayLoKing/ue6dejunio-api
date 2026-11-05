@@ -55,7 +55,11 @@ public interface JpaClassGroupRepository extends JpaRepository<ClassGroupEntity,
                 "subject.area",
                 "teacher"
             })
-    List<ClassGroupEntity> findByTeacher_IdOrderBySubject_Name(UUID teacherId);
+    // Only the active gestión. Records are independent per year, and a teacher who rotates courses
+    // would otherwise see last year's "Primero A" next to this year's and act on the closed one.
+    // With no gestión active nothing matches: an empty list, never an error.
+    List<ClassGroupEntity> findByTeacher_IdAndCourse_AcademicYear_ActiveTrueOrderBySubject_Name(
+            UUID teacherId);
 
     /**
      * The groups a plan opens its blocks over, and the ones a risk run announces its results for.

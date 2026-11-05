@@ -241,7 +241,9 @@ public class ClassGroupRepositoryAdapter implements IClassGroupDomain {
 
     @Override
     public List<ClassGroup> byTeacher(UUID teacherId) {
-        return classGroupRepo.findByTeacher_IdOrderBySubject_Name(teacherId).stream()
+        return classGroupRepo
+                .findByTeacher_IdAndCourse_AcademicYear_ActiveTrueOrderBySubject_Name(teacherId)
+                .stream()
                 .map(this::toDomain)
                 .toList();
     }
