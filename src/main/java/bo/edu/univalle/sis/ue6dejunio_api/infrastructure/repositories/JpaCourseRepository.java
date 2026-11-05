@@ -113,9 +113,8 @@ public interface JpaCourseRepository extends JpaRepository<CourseEntity, UUID> {
     @EntityGraph(attributePaths = {"grade", "parallel", "academicYear", "homeroomTeacher"})
     Page<CourseEntity> search(@Param("yearId") Integer yearId, Pageable pageable);
 
-    Optional<CourseEntity>
-            findFirstByHomeroomTeacher_IdAndActiveTrueOrderByAcademicYear_ActiveDescAcademicYear_YearDesc(
-                    UUID teacherId);
+    Optional<CourseEntity> findFirstByHomeroomTeacher_IdAndActiveTrueAndAcademicYear_ActiveTrue(
+            UUID teacherId);
 
     Optional<CourseEntity> findFirstByHomeroomTeacher_IdAndAcademicYear_IdAndActiveTrue(
             UUID teacherId, Integer yearId);

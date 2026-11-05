@@ -348,11 +348,13 @@ class StudentDirectorySearchIT extends AbstractIntegrationTest {
     }
 
     /**
-     * A course already belongs to exactly one gestión, so pinning the year on top of it would
-     * answer with nothing for any teacher whose course is not this year's.
+     * A teacher works in the active gestión only. Their classroom of a closed year is not theirs to
+     * read any more: the directory pins them to this year's classroom, and with none they see
+     * nobody — never last year's pupils. (This used to assert the opposite, a fallback to the past
+     * course, which is the behaviour the gestión rule removed.)
      */
     @Test
-    void teacherPinnedToTheirCourse_isNotNarrowedByTheCurrentGestion() throws Exception {
+    void teacherWhoseOnlyClassroomIsInAClosedGestion_seesNobody() throws Exception {
         UUID pastTeacher = seedUser("Teacher", false);
         UUID pastCourse = seedCourse(pastTeacher, "C", academicYearId(2025));
         UUID pastStudent = seedNamedStudent("Rosa", "Quispe", "5555555555555");
@@ -364,8 +366,7 @@ class StudentDirectorySearchIT extends AbstractIntegrationTest {
                                         "Authorization",
                                         "Bearer " + tokenFor(pastTeacher, "Teacher")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].id").value(pastStudent.toString()));
+                .andExpect(jsonPath("$.content.length()").value(0));
     }
 
     /**

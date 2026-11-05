@@ -187,8 +187,7 @@ public class CourseRepositoryAdapter implements ICourseDomain {
     @Override
     public Optional<Course> homeroomCourseOf(UUID teacherId) {
         return courseRepo
-                .findFirstByHomeroomTeacher_IdAndActiveTrueOrderByAcademicYear_ActiveDescAcademicYear_YearDesc(
-                        teacherId)
+                .findFirstByHomeroomTeacher_IdAndActiveTrueAndAcademicYear_ActiveTrue(teacherId)
                 .map(this::toDomain);
     }
 

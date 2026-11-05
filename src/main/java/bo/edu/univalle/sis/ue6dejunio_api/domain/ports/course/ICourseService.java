@@ -39,7 +39,10 @@ public interface ICourseService {
 
     Course getById(UUID id);
 
-    /** The course a teacher is homeroom of, if any. Empty is an answer, not an error. */
+    /**
+     * The course a teacher is homeroom of in the active gestión, if any. Empty is an answer, not an
+     * error — also when the teacher's only classroom belongs to a closed gestión.
+     */
     Optional<Course> homeroomCourseOf(UUID teacherId);
 
     PageResult<Course> list(Integer academicYearId, PageQuery pageQuery);

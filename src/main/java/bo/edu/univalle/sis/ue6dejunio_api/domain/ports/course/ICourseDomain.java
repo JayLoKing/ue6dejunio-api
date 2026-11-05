@@ -73,9 +73,15 @@ public interface ICourseDomain {
     PageResult<Course> list(Integer academicYearId, PageQuery pageQuery);
 
     /**
-     * The active course the teacher runs as homeroom, whichever gestión it belongs to. For the
-     * readers that ask "which is this teacher's classroom": when the same person holds one in two
-     * gestiones, the active gestión's wins, then the newest.
+     * The active course the teacher runs as homeroom in the active gestión. For the readers that
+     * ask "which is this teacher's classroom": the login claim, the homeroom roster, the student
+     * directory scope.
+     *
+     * <p>Never a past gestión. Teachers rotate courses every year, and a classroom that belongs to
+     * a closed year is the Director's to look back on, not the teacher's to work in: falling back
+     * to it handed the teacher last year's course as if it were theirs now. Empty when the teacher
+     * has no classroom this year or no gestión is active — one query that matches nothing, so a
+     * school between gestiones still lets its teachers log in.
      */
     Optional<Course> homeroomCourseOf(UUID teacherId);
 

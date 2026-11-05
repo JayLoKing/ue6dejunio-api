@@ -87,6 +87,17 @@ class HomeroomPerYearIT extends AbstractIntegrationTest {
         assertThat(courseDomain.homeroomCourseOf(teacher).map(Course::id)).contains(active);
     }
 
+    // A teacher works in the active gestión only. A classroom in another year, newer or older, is
+    // not "theirs" now, so there is no fallback to it.
+    @Test
+    void whoseClassroomIsIt_isEmptyWhenTheirOnlyOneIsInAnotherGestion() {
+        UUID teacher = seedUser("Teacher", false);
+        seedCourse(teacher, "A", year2027());
+        seedCourse(teacher, "B", academicYearId(2025));
+
+        assertThat(courseDomain.homeroomCourseOf(teacher)).isEmpty();
+    }
+
     @Test
     void whoseClassroomIsIn_aGivenYear_ignoresTheOthers() {
         UUID teacher = seedUser("Teacher", false);
