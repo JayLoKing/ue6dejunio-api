@@ -390,10 +390,18 @@ public class PdcRepositoryAdapter implements IPdcDomain {
             String status,
             String excludeStatus,
             UUID teacherId,
+            Integer academicYearId,
             PageQuery pageQuery) {
         Pageable pageable = SpringPaging.toPageable(pageQuery);
         Page<Pdc> page =
-                planRepo.search(courseId, trimester, status, excludeStatus, teacherId, pageable)
+                planRepo.search(
+                                courseId,
+                                trimester,
+                                status,
+                                excludeStatus,
+                                teacherId,
+                                academicYearId,
+                                pageable)
                         .map(this::toHeader);
 
         // Two grouped queries for the whole page rather than two per row. The listing fetches no

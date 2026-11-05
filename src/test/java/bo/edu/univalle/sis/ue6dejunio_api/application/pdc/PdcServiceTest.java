@@ -15,6 +15,8 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ConflictException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.DuplicateResourceException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ValidationException;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageQuery;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.common.PageResult;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.CreatePdcCommand;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.Pdc;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.pdc.PdcStatus;
@@ -516,5 +518,40 @@ class PdcServiceTest {
                 .thenReturn(Optional.of(pdcWithStatus(id, PdcStatus.PUBLISHED)));
 
         assertThatThrownBy(() -> pdcService.delete(id)).isInstanceOf(ConflictException.class);
+    }
+
+    // A teacher works in the active gestión only. Asking for a past year by id must not reach it:
+    // the listing is read in the active one, which is what a null year means to the port.
+    @Test
+    void list_aTeachersListing_ignoresTheYearAskedFor() {
+        PageQuery page = PageQuery.of(0, 20);
+        when(pdcDomain.list(null, null, null, null, user, null, page))
+                .thenReturn(PageResult.empty(page));
+
+        pdcService.list(null, null, null, user, 1, page);
+
+        verify(pdcDomain).list(null, null, null, null, user, null, page);
+    }
+
+    @Test
+    void list_theDirector_readsTheYearAskedFor() {
+        PageQuery page = PageQuery.of(0, 20);
+        when(pdcDomain.list(null, null, null, PdcStatus.DRAFT, null, 1, page))
+                .thenReturn(PageResult.empty(page));
+
+        pdcService.list(null, null, null, null, 1, page);
+
+        verify(pdcDomain).list(null, null, null, PdcStatus.DRAFT, null, 1, page);
+    }
+
+    @Test
+    void list_theDirectorAskingForNoYear_readsTheActiveOne() {
+        PageQuery page = PageQuery.of(0, 20);
+        when(pdcDomain.list(null, null, null, PdcStatus.DRAFT, null, null, page))
+                .thenReturn(PageResult.empty(page));
+
+        pdcService.list(null, null, null, null, null, page);
+
+        verify(pdcDomain).list(null, null, null, PdcStatus.DRAFT, null, null, page);
     }
 }

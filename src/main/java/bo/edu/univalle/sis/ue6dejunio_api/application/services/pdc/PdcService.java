@@ -204,12 +204,22 @@ public class PdcService implements IPdcService {
     @Override
     @Transactional(readOnly = true)
     public PageResult<Pdc> list(
-            UUID courseId, Integer trimester, String status, UUID teacherId, PageQuery pageQuery) {
+            UUID courseId,
+            Integer trimester,
+            String status,
+            UUID teacherId,
+            Integer academicYearId,
+            PageQuery pageQuery) {
         // A draft is a teacher's unfinished month. A listing that spans the school is somebody
         // reading other people's work — the Director, the secretariat — and what they have to see
         // is what was handed in. A teacher's own listing is scoped to them, so their drafts stay.
         String excludeStatus = teacherId == null ? PdcStatus.DRAFT : null;
-        return pdcDomain.list(courseId, trimester, status, excludeStatus, teacherId, pageQuery);
+        // Only the Director and the secretariat may look back. A teacher works in the active
+        // gestión, so whatever year their request names, their listing is read in that one (null
+        // is the active gestión to the port).
+        Integer yearId = teacherId == null ? academicYearId : null;
+        return pdcDomain.list(
+                courseId, trimester, status, excludeStatus, teacherId, yearId, pageQuery);
     }
 
     @Override

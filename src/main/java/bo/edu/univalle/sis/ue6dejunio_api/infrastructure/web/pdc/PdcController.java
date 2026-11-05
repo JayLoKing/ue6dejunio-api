@@ -122,6 +122,9 @@ public class PdcController {
             @RequestParam(required = false)
                     @Pattern(regexp = "Draft|Published|Under Review|Approved|With Observations")
                     String status,
+            // The gestión's id, not its four digits. Absent means the active gestión; a teacher is
+            // always read in the active one whatever is sent, which the service decides.
+            @RequestParam(required = false) @Min(1) Integer academicYearId,
             @RequestParam(defaultValue = "1") @Min(1) int offset,
             @RequestParam(defaultValue = "20") @Min(1) @Max(200) int limit,
             Authentication authentication) {
@@ -135,7 +138,7 @@ public class PdcController {
         return ResponseEntity.ok(
                 PagedResponse.of(
                         pdcService
-                                .list(courseId, trimester, status, scope, p)
+                                .list(courseId, trimester, status, scope, academicYearId, p)
                                 .map(PdcResponse::from)));
     }
 

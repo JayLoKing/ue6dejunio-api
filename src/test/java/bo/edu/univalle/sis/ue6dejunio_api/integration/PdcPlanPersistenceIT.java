@@ -249,7 +249,10 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         Pdc created = pdcService.create(august(), teacher);
 
         Pdc row =
-                pdcService.list(null, null, null, teacher, PageQuery.of(0, 20)).content().stream()
+                pdcService
+                        .list(null, null, null, teacher, null, PageQuery.of(0, 20))
+                        .content()
+                        .stream()
                         .filter(p -> p.getId().equals(created.getId()))
                         .findFirst()
                         .orElseThrow();
@@ -339,11 +342,17 @@ class PdcPlanPersistenceIT extends AbstractIntegrationTest {
         Pdc draft = pdcService.create(august(), teacher);
 
         List<UUID> unscoped =
-                pdcService.list(null, null, null, null, PageQuery.of(0, 20)).content().stream()
+                pdcService
+                        .list(null, null, null, null, null, PageQuery.of(0, 20))
+                        .content()
+                        .stream()
                         .map(Pdc::getId)
                         .toList();
         List<UUID> owners =
-                pdcService.list(null, null, null, teacher, PageQuery.of(0, 20)).content().stream()
+                pdcService
+                        .list(null, null, null, teacher, null, PageQuery.of(0, 20))
+                        .content()
+                        .stream()
                         .map(Pdc::getId)
                         .toList();
 

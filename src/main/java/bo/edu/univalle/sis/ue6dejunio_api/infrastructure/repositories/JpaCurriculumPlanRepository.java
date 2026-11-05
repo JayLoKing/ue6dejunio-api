@@ -105,6 +105,10 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     /**
      * A teacher sees a plan when they run the course or teach one of its subjects. The EXISTS is
      * what keeps a specialist's own plans visible without widening the listing to the school.
+     *
+     * <p>Always one gestión: the one named by {@code yearId}, or the active one when it is {@code
+     * null}. A teacher rotates courses every year, so without it their listing mixed last year's
+     * "Primero A" with this year's. No active gestión and no year named matches nothing.
      */
     // The joins are explicit and outer on purpose. Writing p.course.homeroomTeacher.id in the WHERE
     // clause makes Hibernate render an inner join over the whole query, so a course with no
@@ -115,7 +119,9 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
         SELECT p FROM CurriculumPlanEntity p
         LEFT JOIN p.course c
         LEFT JOIN c.homeroomTeacher ht
-        WHERE (:courseId IS NULL OR c.id = :courseId)
+        LEFT JOIN c.academicYear y
+        WHERE ((:yearId IS NULL AND y.active = true) OR y.id = :yearId)
+              AND (:courseId IS NULL OR c.id = :courseId)
               AND (:trimester IS NULL OR p.trimester = :trimester)
               AND (:status IS NULL OR p.status = :status)
               AND (:excludeStatus IS NULL OR p.status <> :excludeStatus)
@@ -140,6 +146,7 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
             @Param("status") String status,
             @Param("excludeStatus") String excludeStatus,
             @Param("teacherId") UUID teacherId,
+            @Param("yearId") Integer yearId,
             Pageable pageable);
 
     /**

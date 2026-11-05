@@ -30,9 +30,17 @@ public interface IPdcService {
      * @param teacherId narrows to the plans one teacher takes part in; {@code null} spans the
      *     school, which only the Director and the secretariat are entitled to — and which never
      *     shows a draft, because an unfinished month is not handed in yet.
+     * @param academicYearId the gestión to read, by its id; {@code null} reads the active one. Only
+     *     an unscoped caller may look back: a teacher's listing is always the active gestión,
+     *     whatever year they ask for, because a teacher works in the active year only.
      */
     PageResult<Pdc> list(
-            UUID courseId, Integer trimester, String status, UUID teacherId, PageQuery pageQuery);
+            UUID courseId,
+            Integer trimester,
+            String status,
+            UUID teacherId,
+            Integer academicYearId,
+            PageQuery pageQuery);
 
     /**
      * Copies a plan that reached review into the other parallels of its grade, one draft each. This

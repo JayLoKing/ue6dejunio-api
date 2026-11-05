@@ -86,6 +86,9 @@ public interface IPdcDomain {
      * @param courseId narrows to one course; {@code null} spans every course.
      * @param teacherId narrows the listing to the plans a teacher takes part in; {@code null} spans
      *     every plan, which only the Director and the secretariat are entitled to.
+     * @param academicYearId the gestión the plans belong to, by its id; {@code null} means the
+     *     active gestión, never every year. Records are independent per gestión, so a listing
+     *     always answers about one of them — and with none active, about nothing.
      */
     PageResult<Pdc> list(
             UUID courseId,
@@ -93,6 +96,7 @@ public interface IPdcDomain {
             String status,
             String excludeStatus,
             UUID teacherId,
+            Integer academicYearId,
             PageQuery pageQuery);
 
     void deleteById(UUID id);
