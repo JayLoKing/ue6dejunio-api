@@ -4,7 +4,9 @@ import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundExce
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.classgroup.ClassGroup;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.course.Course;
+import bo.edu.univalle.sis.ue6dejunio_api.domain.models.courseenrollment.EnrollmentSeat;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.criterion.EvaluationCriterion;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.academicyear.IAcademicYearDomain;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.ports.adaptation.IAdaptationDomain;
@@ -154,7 +156,7 @@ public class AuthorizationComponent {
         try {
             owner = classGroupDomain.teacherIdOfClassGroup(classGroupId);
         } catch (ResourceNotFoundException ignored) {
-            // Same rule as ownsEnrollmentCourse: an id that resolves to nothing denies with 403
+            // Same rule as courseOfEnrollmentOrNull: an id that resolves to nothing denies with 403
             // rather than surfacing as 404 from inside the guard.
             return false;
         }
@@ -268,9 +270,13 @@ public class AuthorizationComponent {
      * <p>When the Director assigns a technical subject to the homeroom teacher themselves, the
      * first case already covers them and they write it like any other.
      *
-     * <p>Resolved through {@code findById} rather than {@code teacherIdOfClassGroup} so that one
-     * lookup answers both questions; the course is only asked for when the caller turns out not to
-     * be the subject's own teacher.
+     * <p>Both only in the active gestión. A teacher rotates courses every year and still holds last
+     * year's class group ids; reading one of those by URL is refused, while the Director and the
+     * secretariat keep reading every gestión.
+     *
+     * <p>The course is always read, because it answers both the homeroom question and the gestión
+     * one. A course between homeroom teachers carries a null there, so the comparison is made from
+     * the caller's id and never the other way round — a null on either side denies.
      */
     public boolean canReadClassGroup(Authentication authentication, UUID classGroupId) {
         if (isReadOnlyStaff(authentication)) {
@@ -286,35 +292,55 @@ public class AuthorizationComponent {
         if (userId == null) {
             return false;
         }
-        return classGroupDomain
-                .findById(classGroupId)
-                .map(
-                        cg ->
-                                userId.equals(cg.teacherId())
-                                        || isHomeroomTeacherOf(userId, cg.courseId()))
-                .orElse(false);
+        Optional<ClassGroup> classGroup = classGroupDomain.findById(classGroupId);
+        if (classGroup.isEmpty() || classGroup.get().courseId() == null) {
+            return false;
+        }
+        Optional<Course> course = courseDomain.findById(classGroup.get().courseId());
+        if (course.isEmpty() || !isActiveYear(course.get().academicYearId())) {
+            return false;
+        }
+        return userId.equals(classGroup.get().teacherId())
+                || userId.equals(course.get().homeroomTeacherId());
     }
 
     /**
-     * Whether this teacher is the one in charge of that course. A course between homeroom teachers
-     * carries a null there, so the comparison is made from the caller's id and never the other way
-     * round — a null on either side denies.
+     * Id of the active gestión, or {@code null} when none is active. A guard that let the lookup's
+     * 404 escape would read as a missing resource; no active gestión means a teacher owns nothing.
      */
-    private boolean isHomeroomTeacherOf(UUID teacherId, UUID courseId) {
-        if (teacherId == null || courseId == null) {
-            return false;
+    private Integer activeYearIdOrNull() {
+        try {
+            return academicYearDomain.currentYearId();
+        } catch (ResourceNotFoundException e) {
+            return null;
         }
-        return courseDomain
-                .findById(courseId)
-                .map(course -> teacherId.equals(course.homeroomTeacherId()))
-                .orElse(false);
     }
 
+    /**
+     * Whether a resource of this gestión is one a teacher may read now. Teachers work in the active
+     * gestión only; the Director's and the secretariat's branches never ask this.
+     */
+    private boolean isActiveYear(Integer academicYearId) {
+        return academicYearId != null && academicYearId.equals(activeYearIdOrNull());
+    }
+
+    /**
+     * Read scope of one enrollment: the Director and the secretariat, or the homeroom teacher of
+     * its course while that course is in the active gestión.
+     */
     public boolean canReadEnrollmentScope(Authentication authentication, UUID courseEnrollmentId) {
         if (isReadOnlyStaff(authentication)) {
             return true;
         }
-        return ownsEnrollmentCourse(authentication, courseEnrollmentId);
+        if (authentication == null || courseEnrollmentId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        return homeroomCourseOfEnrollment(authentication, courseEnrollmentId)
+                .map(course -> isActiveYear(course.academicYearId()))
+                .orElse(false);
     }
 
     /**
@@ -341,7 +367,7 @@ public class AuthorizationComponent {
             return false;
         }
         Optional<Course> course = courseDomain.findById(courseId);
-        if (course.isEmpty()) {
+        if (course.isEmpty() || !isActiveYear(course.get().academicYearId())) {
             return false;
         }
         return teacherId.equals(course.get().homeroomTeacherId())
@@ -351,8 +377,8 @@ public class AuthorizationComponent {
     /**
      * The secretariat is a school-wide READ actor: it consults any course's records without owning
      * one. It is deliberately checked here, at the read entry points, and never inside {@link
-     * #ownsEnrollmentCourse} — that helper also backs the write predicates, so widening it would
-     * silently hand out write access.
+     * #homeroomCourseOfEnrollment} — that helper also backs the write predicates, so widening it
+     * would silently hand out write access.
      */
     private boolean isReadOnlyStaff(Authentication authentication) {
         return authentication != null && hasRole(authentication, ROLE_SECRETARY);
@@ -364,7 +390,7 @@ public class AuthorizationComponent {
      * has nobody to record it until the Director assigns one.
      */
     public boolean canWriteDailyAttendance(Authentication authentication, UUID courseEnrollmentId) {
-        return isHomeroomOfEnrollmentCourse(authentication, courseEnrollmentId);
+        return homeroomCourseOfEnrollment(authentication, courseEnrollmentId).isPresent();
     }
 
     /** Batch form of {@link #canWriteDailyAttendance}: the homeroom teacher only. */
@@ -414,6 +440,11 @@ public class AuthorizationComponent {
         return courseDomain.homeroomCourseOf(teacherId).map(Course::id).orElse(NO_MATCH_COURSE_ID);
     }
 
+    /**
+     * Who may read a course: the Director and the secretariat in any gestión, its homeroom teacher
+     * only while it belongs to the active one. Last year's classroom is not the teacher's to open
+     * by URL any more.
+     */
     public boolean canReadCourse(Authentication authentication, UUID courseId) {
         if (authentication == null || courseId == null) {
             return false;
@@ -421,12 +452,20 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR) || isReadOnlyStaff(authentication)) {
             return true;
         }
-        Optional<Course> course = courseDomain.findById(courseId);
-        if (course.isEmpty()) {
-            return false;
-        }
+        return homeroomCourse(authentication, courseId)
+                .map(course -> isActiveYear(course.academicYearId()))
+                .orElse(false);
+    }
+
+    /** The course, when the caller is its homeroom teacher; empty otherwise, in any gestión. */
+    private Optional<Course> homeroomCourse(Authentication authentication, UUID courseId) {
         UUID userId = userId(authentication);
-        return userId != null && userId.equals(course.get().homeroomTeacherId());
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return courseDomain
+                .findById(courseId)
+                .filter(course -> userId.equals(course.homeroomTeacherId()));
     }
 
     /**
@@ -451,8 +490,10 @@ public class AuthorizationComponent {
         if (teacherId == null) {
             return false;
         }
+        // Only the active gestión, for the same reason as canReadCourse: the year is on the course
+        // already read, so it costs nothing more than the active year's id.
         Optional<Course> course = courseDomain.findById(courseId);
-        if (course.isEmpty()) {
+        if (course.isEmpty() || !isActiveYear(course.get().academicYearId())) {
             return false;
         }
         return teacherId.equals(course.get().homeroomTeacherId())
@@ -478,6 +519,45 @@ public class AuthorizationComponent {
         if (teacherId == null) {
             return false;
         }
+        // Only the student's seats of the active gestión tie them to a teacher: last year's
+        // classroom does not. One query for the seats, as before.
+        Integer activeYear = activeYearIdOrNull();
+        if (activeYear == null) {
+            return false;
+        }
+        List<UUID> courseIds =
+                courseEnrollmentDomain.seatsOfStudentInYear(studentId, activeYear).stream()
+                        .map(EnrollmentSeat::courseId)
+                        .distinct()
+                        .toList();
+        if (courseIds.isEmpty()) {
+            return false;
+        }
+        return courseDomain.isHomeroomTeacherOfAny(teacherId, courseIds)
+                || classGroupDomain.teachesInAnyCourse(teacherId, courseIds);
+    }
+
+    /**
+     * Whether a write may name this student — a new adaptation names the student it is for, and the
+     * response echoes their name back. The Director, or a teacher tied to any course the student
+     * sat in, as homeroom teacher or through a class group they run.
+     *
+     * <p>The write-side twin of {@link #canReadStudent}, and deliberately not narrowed to the
+     * active gestión: a write into a closed gestión is refused by the service with its own 409, and
+     * borrowing the read guard turned that answer into a 403. The read guard keeps a teacher out of
+     * past gestiones; this one only stops a teacher naming a child of another course.
+     */
+    public boolean canNameStudentInWrite(Authentication authentication, UUID studentId) {
+        if (authentication == null || studentId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        UUID teacherId = userId(authentication);
+        if (teacherId == null) {
+            return false;
+        }
         List<UUID> courseIds = courseEnrollmentDomain.courseIdsOfStudent(studentId);
         if (courseIds.isEmpty()) {
             return false;
@@ -490,9 +570,19 @@ public class AuthorizationComponent {
      * Who may enroll students into a course. Narrower than {@link #canReadCourseRoster}: running a
      * subject in the course is enough to read its roster, but composing that roster is the homeroom
      * teacher's act, or the Director's.
+     *
+     * <p>Not narrowed to the active gestión like {@link #canReadCourse}: this guards writes, and a
+     * closed gestión already refuses them with its own 409 in the service. Narrowing here would
+     * turn that answer into a 403 that says the wrong thing.
      */
     public boolean canWriteCourseEnrollment(Authentication authentication, UUID courseId) {
-        return canReadCourse(authentication, courseId) && !isReadOnlyStaff(authentication);
+        if (authentication == null || courseId == null || isReadOnlyStaff(authentication)) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        return homeroomCourse(authentication, courseId).isPresent();
     }
 
     /**
@@ -514,10 +604,8 @@ public class AuthorizationComponent {
         if (hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        Integer openYear;
-        try {
-            openYear = academicYearDomain.currentYearId();
-        } catch (ResourceNotFoundException e) {
+        Integer openYear = activeYearIdOrNull();
+        if (openYear == null) {
             return false;
         }
         return courseEnrollmentDomain.seatsOfStudentInYear(studentId, openYear).stream()
@@ -709,7 +797,10 @@ public class AuthorizationComponent {
         if (isReadOnlyStaff(authentication) || hasRole(authentication, ROLE_DIRECTOR)) {
             return true;
         }
-        return canWritePdc(authentication, pdcId);
+        // A teacher reads their plans of the active gestión only. The write guard stays as it is:
+        // a closed gestión refuses writes with its own 409 in the service.
+        return canWritePdc(authentication, pdcId)
+                && isActiveYear(pdcDomain.academicYearIdOf(pdcId).orElse(null));
     }
 
     /**
@@ -760,12 +851,25 @@ public class AuthorizationComponent {
         return canWritePdc(authentication, adaptation.get().planId());
     }
 
-    /** Read side of {@link #canWriteAdaptation}. */
+    /**
+     * Read side of {@link #canWriteAdaptation}, resolved through {@link #canReadPdc} so a teacher
+     * reads the adaptations of their plans of the active gestión only.
+     */
     public boolean canReadAdaptation(Authentication authentication, UUID adaptationId) {
         if (isReadOnlyStaff(authentication)) {
             return true;
         }
-        return canWriteAdaptation(authentication, adaptationId);
+        if (authentication == null || adaptationId == null) {
+            return false;
+        }
+        if (hasRole(authentication, ROLE_DIRECTOR)) {
+            return true;
+        }
+        Optional<Adaptation> adaptation = adaptationDomain.findById(adaptationId);
+        if (adaptation.isEmpty() || adaptation.get().planId() == null) {
+            return false;
+        }
+        return canReadPdc(authentication, adaptation.get().planId());
     }
 
     /**
@@ -786,32 +890,21 @@ public class AuthorizationComponent {
                 .orElse(false);
     }
 
-    /** Read scope of an enrollment's course: the Director, or its homeroom teacher. */
-    private boolean ownsEnrollmentCourse(Authentication authentication, UUID courseEnrollmentId) {
-        if (authentication == null || courseEnrollmentId == null) {
-            return false;
-        }
-        if (hasRole(authentication, ROLE_DIRECTOR)) {
-            return true;
-        }
-        return isHomeroomOfEnrollmentCourse(authentication, courseEnrollmentId);
-    }
-
-    private boolean isHomeroomOfEnrollmentCourse(
+    /**
+     * The enrollment's course when the caller is its homeroom teacher, in any gestión; empty
+     * otherwise. Backs a write (daily attendance) as well as a read, so the gestión is the caller's
+     * question, not this helper's.
+     */
+    private Optional<Course> homeroomCourseOfEnrollment(
             Authentication authentication, UUID courseEnrollmentId) {
         if (authentication == null || courseEnrollmentId == null) {
-            return false;
+            return Optional.empty();
         }
         UUID courseId = courseOfEnrollmentOrNull(courseEnrollmentId);
         if (courseId == null) {
-            return false;
+            return Optional.empty();
         }
-        Optional<Course> course = courseDomain.findById(courseId);
-        if (course.isEmpty()) {
-            return false;
-        }
-        UUID userId = userId(authentication);
-        return userId != null && userId.equals(course.get().homeroomTeacherId());
+        return homeroomCourse(authentication, courseId);
     }
 
     /**

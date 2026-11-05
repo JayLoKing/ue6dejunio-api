@@ -54,7 +54,7 @@ public class AdaptationController {
     // against a student from another course and learns their name doing it.
     @PreAuthorize(
             "@authz.canWritePdc(authentication, #r.planId())"
-                    + " and @authz.canReadStudent(authentication, #r.studentId())")
+                    + " and @authz.canNameStudentInWrite(authentication, #r.studentId())")
     @Operation(summary = "Crear adaptacion curricular (unica por plan + estudiante)")
     public ResponseEntity<AdaptationResponse> create(
             @Valid @RequestBody CreateAdaptationRequest r, JwtAuthenticationToken token) {

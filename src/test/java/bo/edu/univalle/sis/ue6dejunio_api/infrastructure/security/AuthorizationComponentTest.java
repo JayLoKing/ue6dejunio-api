@@ -2,11 +2,13 @@ package bo.edu.univalle.sis.ue6dejunio_api.infrastructure.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import bo.edu.univalle.sis.ue6dejunio_api.domain.exceptions.ResourceNotFoundException;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.adaptation.Adaptation;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentEvent;
 import bo.edu.univalle.sis.ue6dejunio_api.domain.models.assessment.AssessmentScore;
@@ -35,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -60,6 +63,16 @@ class AuthorizationComponentTest {
     @Mock private IAcademicYearDomain academicYearDomain;
 
     @InjectMocks private AuthorizationComponent authz;
+
+    /**
+     * Every course these tests build belongs to gestión 1 unless it says otherwise, so gestión 1 is
+     * the active one by default. Lenient because most guards never ask: the Director's branches,
+     * the write guards and every denial that happens before the year matters.
+     */
+    @BeforeEach
+    void gestionOneIsActive() {
+        lenient().when(academicYearDomain.currentYearId()).thenReturn(1);
+    }
 
     private JwtAuthenticationToken token(UUID userId, String role) {
         List<GrantedAuthority> authorities =
@@ -566,12 +579,18 @@ class AuthorizationComponentTest {
                 .isTrue();
     }
 
+    /** The student's seats of the active gestión, one per course. */
+    private static List<EnrollmentSeat> seatsIn(List<UUID> courseIds) {
+        return courseIds.stream().map(id -> new EnrollmentSeat(id, "Effective")).toList();
+    }
+
     @Test
     void canReadStudent_homeroomTeacherOfOneOfTheStudentCourses_true() {
         UUID teacher = UUID.randomUUID();
         UUID studentId = UUID.randomUUID();
         List<UUID> courses = List.of(UUID.randomUUID(), UUID.randomUUID());
-        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(courses);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, 1))
+                .thenReturn(seatsIn(courses));
         when(courseDomain.isHomeroomTeacherOfAny(teacher, courses)).thenReturn(true);
 
         assertThat(authz.canReadStudent(token(teacher, "Teacher"), studentId)).isTrue();
@@ -582,7 +601,8 @@ class AuthorizationComponentTest {
         UUID technicalTeacher = UUID.randomUUID();
         UUID studentId = UUID.randomUUID();
         List<UUID> courses = List.of(UUID.randomUUID());
-        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(courses);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, 1))
+                .thenReturn(seatsIn(courses));
         when(courseDomain.isHomeroomTeacherOfAny(technicalTeacher, courses)).thenReturn(false);
         when(classGroupDomain.teachesInAnyCourse(technicalTeacher, courses)).thenReturn(true);
 
@@ -595,7 +615,8 @@ class AuthorizationComponentTest {
         UUID teacher = UUID.randomUUID();
         UUID studentId = UUID.randomUUID();
         List<UUID> courses = List.of(UUID.randomUUID());
-        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(courses);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, 1))
+                .thenReturn(seatsIn(courses));
         when(courseDomain.isHomeroomTeacherOfAny(teacher, courses)).thenReturn(false);
         when(classGroupDomain.teachesInAnyCourse(teacher, courses)).thenReturn(false);
 
@@ -606,7 +627,8 @@ class AuthorizationComponentTest {
     void canReadStudent_studentWithoutEnrollments_deniesWithoutAskingTheStore() {
         UUID teacher = UUID.randomUUID();
         UUID studentId = UUID.randomUUID();
-        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(List.of());
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, 1))
+                .thenReturn(seatsIn(List.of()));
 
         assertThat(authz.canReadStudent(token(teacher, "Teacher"), studentId)).isFalse();
         verify(courseDomain, never()).isHomeroomTeacherOfAny(any(), any());
@@ -618,7 +640,8 @@ class AuthorizationComponentTest {
         UUID teacher = UUID.randomUUID();
         UUID studentId = UUID.randomUUID();
         List<UUID> courses = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
-        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(courses);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, 1))
+                .thenReturn(seatsIn(courses));
         when(courseDomain.isHomeroomTeacherOfAny(teacher, courses)).thenReturn(false);
         when(classGroupDomain.teachesInAnyCourse(teacher, courses)).thenReturn(true);
 
@@ -766,16 +789,18 @@ class AuthorizationComponentTest {
     }
 
     @Test
-    void canReadClassGroup_subjectOwner_neverAsksForTheCourse() {
-        // The teacher who runs the class group is through on the first check. Looking the course up
-        // anyway would add a query to every read of the subject its own teacher opens.
+    void canReadClassGroup_subjectOwner_asksForTheCourseOnce() {
+        // The course used to be skipped for the subject's own teacher. It is read now because it
+        // carries the gestión, and one lookup answers both the gestión and the homeroom question.
         UUID teacher = UUID.randomUUID();
         UUID classGroupId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
         when(classGroupDomain.findById(classGroupId))
-                .thenReturn(Optional.of(classGroup(classGroupId, UUID.randomUUID(), teacher)));
+                .thenReturn(Optional.of(classGroup(classGroupId, courseId, teacher)));
+        when(courseDomain.findById(courseId)).thenReturn(Optional.of(course(courseId, null)));
 
         assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), classGroupId)).isTrue();
-        verify(courseDomain, never()).findById(any());
+        verify(courseDomain, times(1)).findById(courseId);
     }
 
     @Test
@@ -1743,5 +1768,283 @@ class AuthorizationComponentTest {
         assertThat(authz.canEditStudent(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
                 .isTrue();
         verify(courseEnrollmentDomain, never()).seatsOfStudentInYear(any(), any());
+    }
+
+    // ---- reads stay in the active gestión for a teacher ----
+    // A teacher works in the active gestión only. Teachers rotate courses every year, so last
+    // year's ids still point at "their" classroom; reading it by URL is refused. The Director and
+    // the secretariat keep reading every gestión.
+
+    private static final Integer ACTIVE_YEAR = 1;
+    private static final Integer PAST_YEAR = 2;
+
+    private Course courseInYear(UUID courseId, UUID homeroomTeacherId, Integer yearId) {
+        return new Course(
+                courseId, 1, "Primero", 1, "A", yearId, 2026, homeroomTeacherId, "X", true, true);
+    }
+
+    private Adaptation adaptationOn(UUID adaptationId, UUID planId) {
+        return new Adaptation(
+                adaptationId,
+                planId,
+                UUID.randomUUID(),
+                "Ana Perez",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    @Test
+    void canReadClassGroup_itsTeacher_inAPastGestion_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(classGroupDomain.findById(groupId))
+                .thenReturn(Optional.of(classGroup(groupId, courseId, teacher)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, null, PAST_YEAR)));
+
+        assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), groupId)).isFalse();
+    }
+
+    @Test
+    void canReadClassGroup_itsTeacher_inTheActiveGestion_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(classGroupDomain.findById(groupId))
+                .thenReturn(Optional.of(classGroup(groupId, courseId, teacher)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, null, ACTIVE_YEAR)));
+
+        assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), groupId)).isTrue();
+    }
+
+    @Test
+    void canReadClassGroup_homeroomTeacher_inAPastGestion_false() {
+        UUID homeroom = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(classGroupDomain.findById(groupId))
+                .thenReturn(Optional.of(classGroup(groupId, courseId, UUID.randomUUID())));
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, PAST_YEAR)));
+
+        assertThat(authz.canReadClassGroup(token(homeroom, "Teacher"), groupId)).isFalse();
+    }
+
+    @Test
+    void canReadClassGroup_noActiveGestion_teacherOwnsNothing() {
+        UUID teacher = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId())
+                .thenThrow(new ResourceNotFoundException("AcademicYear", "actual"));
+        when(classGroupDomain.findById(groupId))
+                .thenReturn(Optional.of(classGroup(groupId, courseId, teacher)));
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, teacher, ACTIVE_YEAR)));
+
+        assertThat(authz.canReadClassGroup(token(teacher, "Teacher"), groupId)).isFalse();
+    }
+
+    @Test
+    void canReadClassGroup_director_inAnyGestion_trueWithoutAskingTheYear() {
+        assertThat(authz.canReadClassGroup(token(UUID.randomUUID(), "Director"), UUID.randomUUID()))
+                .isTrue();
+        verify(academicYearDomain, never()).currentYearId();
+    }
+
+    @Test
+    void canReadCourse_homeroomTeacher_inAPastGestion_false() {
+        UUID homeroom = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, PAST_YEAR)));
+
+        assertThat(authz.canReadCourse(token(homeroom, "Teacher"), courseId)).isFalse();
+    }
+
+    @Test
+    void canReadCourse_homeroomTeacher_inTheActiveGestion_true() {
+        UUID homeroom = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, ACTIVE_YEAR)));
+
+        assertThat(authz.canReadCourse(token(homeroom, "Teacher"), courseId)).isTrue();
+    }
+
+    /**
+     * Composing a roster is a write, and a closed gestión refuses writes with its own 409 in the
+     * service. The guard keeps answering only who the course's homeroom teacher is.
+     */
+    @Test
+    void canWriteCourseEnrollment_homeroomTeacher_inAPastGestion_stillPassesTheGuard() {
+        UUID homeroom = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, PAST_YEAR)));
+
+        assertThat(authz.canWriteCourseEnrollment(token(homeroom, "Teacher"), courseId)).isTrue();
+    }
+
+    @Test
+    void canReadCourseRoster_subjectTeacher_inAPastGestion_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, null, PAST_YEAR)));
+
+        assertThat(authz.canReadCourseRoster(token(teacher, "Teacher"), courseId)).isFalse();
+        verify(classGroupDomain, never()).teachesInCourse(any(), any());
+    }
+
+    @Test
+    void canReadEnrollmentScope_homeroomTeacher_inAPastGestion_false() {
+        UUID homeroom = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, PAST_YEAR)));
+
+        assertThat(authz.canReadEnrollmentScope(token(homeroom, "Teacher"), ceId)).isFalse();
+    }
+
+    /** Daily attendance is a write: a closed gestión is refused by the service, not here. */
+    @Test
+    void canWriteDailyAttendance_homeroomTeacher_inAPastGestion_stillPassesTheGuard() {
+        UUID homeroom = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, PAST_YEAR)));
+
+        assertThat(authz.canWriteDailyAttendance(token(homeroom, "Teacher"), ceId)).isTrue();
+    }
+
+    @Test
+    void canReadStudentSummary_homeroomTeacher_inAPastGestion_false() {
+        UUID homeroom = UUID.randomUUID();
+        UUID ceId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseEnrollmentDomain.courseOfEnrollment(ceId)).thenReturn(courseId);
+        when(courseDomain.findById(courseId))
+                .thenReturn(Optional.of(courseInYear(courseId, homeroom, PAST_YEAR)));
+
+        assertThat(authz.canReadStudentSummary(token(homeroom, "Teacher"), ceId)).isFalse();
+    }
+
+    @Test
+    void canReadStudent_onlySeatsOfAPastGestion_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, ACTIVE_YEAR))
+                .thenReturn(List.of());
+
+        assertThat(authz.canReadStudent(token(teacher, "Teacher"), studentId)).isFalse();
+        verify(courseDomain, never()).isHomeroomTeacherOfAny(any(), any());
+    }
+
+    @Test
+    void canReadStudent_seatOfTheActiveGestion_inTheTeachersCourse_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(courseEnrollmentDomain.seatsOfStudentInYear(studentId, ACTIVE_YEAR))
+                .thenReturn(List.of(new EnrollmentSeat(courseId, "Effective")));
+        when(courseDomain.isHomeroomTeacherOfAny(teacher, List.of(courseId))).thenReturn(true);
+
+        assertThat(authz.canReadStudent(token(teacher, "Teacher"), studentId)).isTrue();
+    }
+
+    @Test
+    void canReadPdc_itsWriter_inAPastGestion_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(teacher));
+        when(pdcDomain.academicYearIdOf(planId)).thenReturn(Optional.of(PAST_YEAR));
+
+        assertThat(authz.canReadPdc(token(teacher, "Teacher"), planId)).isFalse();
+    }
+
+    @Test
+    void canReadPdc_itsWriter_inTheActiveGestion_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(teacher));
+        when(pdcDomain.academicYearIdOf(planId)).thenReturn(Optional.of(ACTIVE_YEAR));
+
+        assertThat(authz.canReadPdc(token(teacher, "Teacher"), planId)).isTrue();
+    }
+
+    /**
+     * Naming a student in a write (a new adaptation) is a write-side check: it keeps the tie to any
+     * course of the student, so a closed gestión is still refused by the service with its 409 and
+     * not here with a 403.
+     */
+    @Test
+    void canNameStudentInWrite_teacherOfAPastCourseOfTheStudent_true() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        List<UUID> courses = List.of(UUID.randomUUID());
+        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(courses);
+        when(courseDomain.isHomeroomTeacherOfAny(teacher, courses)).thenReturn(true);
+
+        assertThat(authz.canNameStudentInWrite(token(teacher, "Teacher"), studentId)).isTrue();
+        verify(academicYearDomain, never()).currentYearId();
+    }
+
+    @Test
+    void canNameStudentInWrite_studentOutsideEveryCourseOfTheTeacher_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        List<UUID> courses = List.of(UUID.randomUUID());
+        when(courseEnrollmentDomain.courseIdsOfStudent(studentId)).thenReturn(courses);
+        when(courseDomain.isHomeroomTeacherOfAny(teacher, courses)).thenReturn(false);
+        when(classGroupDomain.teachesInAnyCourse(teacher, courses)).thenReturn(false);
+
+        assertThat(authz.canNameStudentInWrite(token(teacher, "Teacher"), studentId)).isFalse();
+    }
+
+    @Test
+    void canNameStudentInWrite_secretary_false() {
+        assertThat(
+                        authz.canNameStudentInWrite(
+                                token(UUID.randomUUID(), "Secretary"), UUID.randomUUID()))
+                .isFalse();
+    }
+
+    @Test
+    void canReadAdaptation_writerOfAPastGestionsPlan_false() {
+        UUID teacher = UUID.randomUUID();
+        UUID adaptationId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        when(adaptationDomain.findById(adaptationId))
+                .thenReturn(Optional.of(adaptationOn(adaptationId, planId)));
+        when(academicYearDomain.currentYearId()).thenReturn(ACTIVE_YEAR);
+        when(pdcDomain.writerIdsOf(planId)).thenReturn(Set.of(teacher));
+        when(pdcDomain.academicYearIdOf(planId)).thenReturn(Optional.of(PAST_YEAR));
+
+        assertThat(authz.canReadAdaptation(token(teacher, "Teacher"), adaptationId)).isFalse();
     }
 }

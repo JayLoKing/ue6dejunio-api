@@ -232,12 +232,16 @@ class ClosedYearWritesRestIT extends AbstractIntegrationTest {
     void closedYear_stillServesPlanReads_andReopeningLetsAPlanEditThrough() throws Exception {
         closeYear();
 
-        mvc.perform(get("/api/pdc/" + plan).header("Authorization", as(teacher, "Teacher")))
+        // The Director reads a closed gestión. Its teacher no longer does: a teacher works in the
+        // active gestión only (this used to assert the teacher's 200, before that rule).
+        mvc.perform(get("/api/pdc/" + plan).header("Authorization", as(director, "Director")))
                 .andExpect(status().isOk());
         mvc.perform(
                         get("/api/pdc/" + plan + "/progress")
-                                .header("Authorization", as(teacher, "Teacher")))
+                                .header("Authorization", as(director, "Director")))
                 .andExpect(status().isOk());
+        mvc.perform(get("/api/pdc/" + plan).header("Authorization", as(teacher, "Teacher")))
+                .andExpect(status().isForbidden());
 
         mvc.perform(
                         put("/api/academic-years/" + academicYearId(2026) + "/reopen")
