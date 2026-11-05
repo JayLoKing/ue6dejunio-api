@@ -45,11 +45,11 @@ public interface IStudentDomain {
     List<Student> findByIdentityCardIn(Collection<String> identityCards);
 
     /**
-     * The students holding an Effective seat in the course whose RUDE, CI, birth date or gender is
-     * still missing, in one lookup. What a roster row whose RUDE and CI match nobody on record is
-     * matched against by name.
+     * Every student holding an Effective seat in the course, complete or not, in one lookup. What a
+     * roster row whose RUDE and CI match nobody on record is matched against by name: a row with
+     * neither code against all of them, a row carrying one against the incomplete ones only.
      */
-    List<Student> findIncompleteInCourse(UUID courseId);
+    List<Student> findSeatedInCourse(UUID courseId);
 
     /**
      * Overwrites the student's identifying fields with {@code details}, nulls included. Leaves the

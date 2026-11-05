@@ -93,21 +93,31 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
         List<Student> cardHits =
                 studentDomain.findByIdentityCardIn(
                         valuesOf(command.students(), CreateStudentCommand::identityCard));
-        // The incomplete students already seated in the course: who a row that no RUDE or CI on
-        // record matches can still be, found by name. The name-only spreadsheet registers them and
-        // the SIE roster of the course completes them.
-        List<Student> incompleteInCourse = studentDomain.findIncompleteInCourse(command.courseId());
+        // The students already seated in the course: who a row that no RUDE or CI on record matches
+        // can still be, found by name. Two indexes over them, because the two kinds of row may
+        // claim different people. A row with neither code — the school's name-only spreadsheet —
+        // can be any seated student, complete or not: the SIE roster may have seated the course
+        // first, and that row is the same child again. A row carrying a code nobody holds can be
+        // only an incomplete one, whom it completes: a complete namesake has a RUDE or CI of their
+        // own, which the row would have resolved to, so that namesake is somebody else.
+        List<Student> seatedStudents = studentDomain.findSeatedInCourse(command.courseId());
         // One object per student across the three lookups. Completing a student updates the object
         // in hand, and a second copy reached by another index would write its stale fields back.
         Map<UUID, Student> onRecord = new LinkedHashMap<>();
-        Stream.of(rudeHits, cardHits, incompleteInCourse)
+        Stream.of(rudeHits, cardHits, seatedStudents)
                 .flatMap(List::stream)
                 .forEach(s -> onRecord.putIfAbsent(s.getId(), s));
         Map<String, Student> byRude = indexBy(canonical(rudeHits, onRecord), Student::getRudeCode);
         Map<String, Student> byIdentityCard =
                 indexBy(canonical(cardHits, onRecord), Student::getIdentityCard);
-        Map<String, List<Student>> byName = new HashMap<>();
-        canonical(incompleteInCourse, onRecord).forEach(s -> indexByName(byName, s));
+        Map<String, List<Student>> seatedByName = new HashMap<>();
+        Map<String, List<Student>> incompleteByName = new HashMap<>();
+        for (Student s : canonical(seatedStudents, onRecord)) {
+            indexByName(seatedByName, s);
+            if (s.isIncomplete()) {
+                indexByName(incompleteByName, s);
+            }
+        }
         // Every enrolment these students hold in the course, whatever its status, in one query. The
         // loop reads its two decisions off this map — seat still held, or closed row to reopen —
         // rather than asking the database once per name.
@@ -164,7 +174,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
             }
             Student student = resolve(sc, byRude, byIdentityCard);
             if (student == null) {
-                List<Student> namesakes = namesakesOf(sc, byName);
+                boolean uncoded = sc.rudeCode() == null && sc.identityCard() == null;
+                List<Student> namesakes =
+                        namesakesOf(sc, uncoded ? seatedByName : incompleteByName);
                 if (namesakes.size() > 1) {
                     EnrollConflict ambiguous = ambiguousName(sc, namesakes.size());
                     if (refuse) {
@@ -184,13 +196,18 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 index(byRude, student.getRudeCode(), student);
                 index(byIdentityCard, student.getIdentityCard(), student);
                 if (student.isIncomplete()) {
-                    indexByName(byName, student);
+                    indexByName(incompleteByName, student);
                 }
             } else {
                 existing++;
                 // The object in the index still reads Withdrawn after a reinstatement earlier in
                 // this load, so a repeated row of theirs is recognised by id, not by status.
                 boolean takenBack = reinstated.containsKey(student.getId());
+                // In force in this very course before the load: already enrolled, which is what the
+                // skipped count says. Their past is not this load's news, so they join neither the
+                // continuing nor the returning group.
+                boolean seatedHere =
+                        STATUS_EFFECTIVE.equals(enrollmentInCourse.get(student.getId()));
                 if (STATUS_WITHDRAWN.equals(student.getStatus()) && !takenBack) {
                     if (leftThisGestion(student.getId(), seatsInYear)) {
                         skippedWithdrawn.putIfAbsent(
@@ -201,10 +218,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                     reinstated.put(
                             student.getId(),
                             new ReinstatedStudent(student.getId(), student.fullName()));
-                } else if (!createdNow.contains(student.getId()) && !takenBack) {
+                } else if (!createdNow.contains(student.getId()) && !takenBack && !seatedHere) {
                     Optional<EnrolledElsewhere> elsewhere =
-                            seatedElsewhere(
-                                    student, command.courseId(), enrollmentInCourse, seatsInYear);
+                            seatedElsewhere(student, command.courseId(), seatsInYear);
                     if (elsewhere.isPresent()) {
                         if (refuse) {
                             throw new ConflictException(
@@ -227,6 +243,8 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
             // add() is false when the id is already there, which covers both a seat still held from
             // an earlier import and the same student appearing twice in this one.
             if (seatedInCourse.add(student.getId())) {
+                // Seated here from now on, so a later name-only row of this same file is them too.
+                indexByName(seatedByName, student);
                 // A closed row is the only way back into a course they already left: UNIQUE
                 // (id_student, id_course) leaves nothing to insert alongside it.
                 if (enrollmentInCourse.containsKey(student.getId())) {
@@ -311,18 +329,13 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
      * The Effective seat the student already holds in another course of the gestión, named for the
      * summary, or empty when there is none.
      *
-     * <p>A student already in force in the course being loaded is left to the ordinary repeat rule
-     * instead: the admin reinstatement and transfer paths can legitimately leave someone with a
-     * second seat in the year, and loading their own course again must not report them as lost.
+     * <p>Never asked about a student already in force in the course being loaded: the caller counts
+     * them as already enrolled first. The admin reinstatement and transfer paths can legitimately
+     * leave someone with a second seat in the year, and loading their own course again must not
+     * report them as lost.
      */
     private static Optional<EnrolledElsewhere> seatedElsewhere(
-            Student student,
-            UUID courseId,
-            Map<UUID, String> enrollmentInCourse,
-            Map<UUID, List<YearSeat>> seatsInYear) {
-        if (STATUS_EFFECTIVE.equals(enrollmentInCourse.get(student.getId()))) {
-            return Optional.empty();
-        }
+            Student student, UUID courseId, Map<UUID, List<YearSeat>> seatsInYear) {
         return seatsInYear.getOrDefault(student.getId(), List.of()).stream()
                 .filter(seat -> !courseId.equals(seat.courseId()))
                 .filter(seat -> STATUS_EFFECTIVE.equals(seat.status()))
@@ -402,7 +415,7 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
     }
 
     /**
-     * The incomplete students of the course who carry the row's name and contradict none of its
+     * The students of the given name index who carry the row's name and contradict none of its
      * fields.
      *
      * <p>A field the student already holds must equal the row's, or be absent from the row: two
@@ -427,8 +440,9 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
     }
 
     /**
-     * More than one incomplete student of the course fits the row. Picking either would hand one
-     * child's RUDE to the other, so the row is left out and the staff complete them by hand.
+     * More than one student of the course fits the row. Picking either would hand one child's RUDE
+     * to the other, or seat a name-only row as the wrong child, so the row is left out and the
+     * staff sort it out by hand.
      */
     private static EnrollConflict ambiguousName(CreateStudentCommand sc, int candidates) {
         return new EnrollConflict(
@@ -437,7 +451,7 @@ public class CourseEnrollmentService implements ICourseEnrollmentService {
                 sc.names() + " " + sc.lastNames(),
                 "Hay "
                         + candidates
-                        + " estudiantes con datos incompletos llamados "
+                        + " estudiantes llamados "
                         + StudentNames.normalizedFullName(sc.lastNames(), sc.names())
                         + " en este curso: no se puede saber a cuál corresponde la fila.");
     }

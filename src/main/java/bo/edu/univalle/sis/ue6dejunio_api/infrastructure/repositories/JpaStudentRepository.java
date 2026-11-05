@@ -36,19 +36,17 @@ public interface JpaStudentRepository extends JpaRepository<StudentEntity, UUID>
     List<StudentEntity> findByIdentityCardIn(Collection<String> identityCards);
 
     /**
-     * Students with a seat of the given status in the course and any identifying field missing. The
-     * author graph for the same reason as the lookups above: the mapper reads it per student.
+     * Students with a seat of the given status in the course, complete or not. The author graph for
+     * the same reason as the lookups above: the mapper reads it per student.
      */
     @EntityGraph(attributePaths = "statusChangedBy")
     @Query(
             """
         SELECT s FROM StudentEntity s
-        WHERE (s.rudeCode IS NULL OR s.identityCard IS NULL
-               OR s.birthDate IS NULL OR s.gender IS NULL)
-          AND EXISTS (SELECT 1 FROM CourseEnrollmentEntity ce
+        WHERE EXISTS (SELECT 1 FROM CourseEnrollmentEntity ce
                       WHERE ce.student = s AND ce.course.id = :courseId AND ce.status = :status)
         """)
-    List<StudentEntity> findIncompleteInCourse(
+    List<StudentEntity> findSeatedInCourse(
             @Param("courseId") UUID courseId, @Param("status") String status);
 
     /**

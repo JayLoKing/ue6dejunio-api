@@ -65,8 +65,8 @@ class CourseEnrollmentServiceCompletionTest {
     }
 
     /** Seated in the course, as the spreadsheet import left them. */
-    private void seatedIncomplete(Student... students) {
-        when(studentDomain.findIncompleteInCourse(courseId)).thenReturn(List.of(students));
+    private void seatedInCourse(Student... students) {
+        when(studentDomain.findSeatedInCourse(courseId)).thenReturn(List.of(students));
         Map<UUID, String> seats =
                 Arrays.stream(students).collect(Collectors.toMap(Student::getId, s -> EFFECTIVE));
         when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
@@ -98,7 +98,7 @@ class CourseEnrollmentServiceCompletionTest {
     @Test
     void sieRow_fillsTheIncompleteStudentFoundByName_andCreatesNobody() {
         Student ana = nameOnly("QUISPE MAMANI", "ANA MARIA");
-        seatedIncomplete(ana);
+        seatedInCourse(ana);
 
         EnrollResult result = load(sieRow("R1", "C1", "Quispe Mamani", "Ana María"));
 
@@ -116,7 +116,7 @@ class CourseEnrollmentServiceCompletionTest {
     @Test
     void aDifferentSplitOfTheSameFullName_stillMatches() {
         Student ana = nameOnly("QUISPE MAMANI ANA", "MARIA");
-        seatedIncomplete(ana);
+        seatedInCourse(ana);
 
         EnrollResult result = load(sieRow("R1", "C1", "Quispe Mamani", "Ana Maria"));
 
@@ -127,7 +127,7 @@ class CourseEnrollmentServiceCompletionTest {
     @Test
     void reimportingTheSpreadsheet_createsNobody_andCompletesNothing() {
         Student ana = nameOnly("QUISPE MAMANI", "ANA MARIA");
-        seatedIncomplete(ana);
+        seatedInCourse(ana);
 
         EnrollResult result = load(spreadsheetRow("QUISPE MAMANI", "ANA MARIA"));
 
@@ -142,7 +142,7 @@ class CourseEnrollmentServiceCompletionTest {
     void aPresentValue_isNeverOverwritten() {
         Student ana = nameOnly("QUISPE", "ANA");
         ana.setBirthDate(BIRTH);
-        seatedIncomplete(ana);
+        seatedInCourse(ana);
 
         load(new CreateStudentCommand("R1", null, "ANA", "QUISPE", BIRTH, "F"));
 
@@ -156,7 +156,7 @@ class CourseEnrollmentServiceCompletionTest {
     void aCandidateWhoseRudeDiffers_isNotMatched_andTheRowIsCreated() {
         Student ana = nameOnly("QUISPE", "ANA");
         ana.setRudeCode("R-OTHER");
-        seatedIncomplete(ana);
+        seatedInCourse(ana);
         when(studentDomain.save(any())).thenAnswer(i -> withId(i.getArgument(0)));
 
         EnrollResult result = load(sieRow("R1", "C1", "QUISPE", "ANA"));
@@ -185,7 +185,7 @@ class CourseEnrollmentServiceCompletionTest {
     void twoIncompleteStudentsWithTheRowsName_isAConflict_notAGuess() {
         Student first = nameOnly("QUISPE", "ANA");
         Student second = nameOnly("Quispe", "Ana");
-        seatedIncomplete(first, second);
+        seatedInCourse(first, second);
 
         EnrollResult result = load(sieRow("R1", "C1", "QUISPE", "ANA"));
 
@@ -198,7 +198,7 @@ class CourseEnrollmentServiceCompletionTest {
 
     @Test
     void enrollOne_withAnAmbiguousName_throws() {
-        seatedIncomplete(nameOnly("QUISPE", "ANA"), nameOnly("QUISPE", "ANA"));
+        seatedInCourse(nameOnly("QUISPE", "ANA"), nameOnly("QUISPE", "ANA"));
 
         assertThatThrownBy(
                         () ->
@@ -229,8 +229,8 @@ class CourseEnrollmentServiceCompletionTest {
 
     /** The match looks at the course being loaded only, in one query for the whole roster. */
     @Test
-    void theIncompleteStudentsAreAskedForOnce() {
-        seatedIncomplete(nameOnly("QUISPE", "ANA"));
+    void theSeatedStudentsAreAskedForOnce() {
+        seatedInCourse(nameOnly("QUISPE", "ANA"));
         List<CreateStudentCommand> rows = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             rows.add(spreadsheetRow("QUISPE", "ANA"));
@@ -238,7 +238,80 @@ class CourseEnrollmentServiceCompletionTest {
 
         load(rows.toArray(CreateStudentCommand[]::new));
 
-        verify(studentDomain, times(1)).findIncompleteInCourse(courseId);
+        verify(studentDomain, times(1)).findSeatedInCourse(courseId);
+    }
+
+    private static Student complete(String rude, String card, String lastNames, String names) {
+        return Student.builder()
+                .id(UUID.randomUUID())
+                .rudeCode(rude)
+                .identityCard(card)
+                .names(names)
+                .lastNames(lastNames)
+                .birthDate(BIRTH)
+                .gender("F")
+                .status(EFFECTIVE)
+                .build();
+    }
+
+    /**
+     * The SIE roster seated the course first, complete; the name-only spreadsheet then names the
+     * same children. With no RUDE or CI to go by, each row is the seated student of that name.
+     */
+    @Test
+    void spreadsheetAfterACompleteSieSeating_createsNobody_andEnrollsNobody() {
+        seatedInCourse(
+                complete("R1", "C1", "QUISPE MAMANI", "ANA MARIA"),
+                complete("R2", "C2", "CONDORI", "LUIS"));
+
+        EnrollResult result =
+                load(
+                        spreadsheetRow("Quispe Mamani", "Ana María"),
+                        spreadsheetRow("CONDORI", "LUIS"));
+
+        assertThat(result.studentsCreated()).isZero();
+        assertThat(result.enrollmentsCreated()).isZero();
+        assertThat(result.enrollmentsSkipped()).isEqualTo(2);
+        assertThat(result.studentsFromPreviousYear()).isZero();
+        assertThat(result.studentsReentering()).isZero();
+        assertThat(result.completed()).isZero();
+        assertThat(result.conflicts()).isEmpty();
+        verify(studentDomain, never()).save(any());
+        verify(studentDomain, never()).updateDetails(any(), any());
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
+    }
+
+    /**
+     * A row carrying a RUDE that nobody holds is a different child from a complete student of the
+     * same name: the name fallback for a coded row looks at incomplete students only.
+     */
+    @Test
+    void aCodedRowNamedLikeACompleteSeatedStudent_isANewStudent() {
+        seatedInCourse(complete("R1", "C1", "QUISPE", "ANA"));
+        when(studentDomain.save(any())).thenAnswer(i -> withId(i.getArgument(0)));
+
+        EnrollResult result = load(sieRow("R2", "C2", "QUISPE", "ANA"));
+
+        assertThat(result.studentsCreated()).isEqualTo(1);
+        assertThat(result.enrollmentsCreated()).isEqualTo(1);
+        assertThat(result.conflicts()).isEmpty();
+        verify(studentDomain, never()).updateDetails(any(), any());
+    }
+
+    /** Two seated children share the row's name, complete or not: the row names neither. */
+    @Test
+    void aNameOnlyRowWithTwoSeatedNamesakes_isAConflict_andWritesNothing() {
+        seatedInCourse(complete("R1", "C1", "QUISPE", "ANA"), nameOnly("Quispe", "Ana"));
+
+        EnrollResult result = load(spreadsheetRow("QUISPE", "ANA"));
+
+        assertThat(result.conflicts()).hasSize(1);
+        assertThat(result.conflicts().get(0).reason()).contains("QUISPE ANA");
+        assertThat(result.studentsCreated()).isZero();
+        assertThat(result.enrollmentsCreated()).isZero();
+        verify(studentDomain, never()).save(any());
+        verify(studentDomain, never()).updateDetails(any(), any());
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
     }
 
     private static Student withId(Student s) {

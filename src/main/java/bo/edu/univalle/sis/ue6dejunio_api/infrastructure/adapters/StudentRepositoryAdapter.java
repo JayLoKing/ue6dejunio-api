@@ -87,8 +87,8 @@ public class StudentRepositoryAdapter implements IStudentDomain {
     }
 
     @Override
-    public List<Student> findIncompleteInCourse(UUID courseId) {
-        return repo.findIncompleteInCourse(courseId, STATUS_EFFECTIVE).stream()
+    public List<Student> findSeatedInCourse(UUID courseId) {
+        return repo.findSeatedInCourse(courseId, STATUS_EFFECTIVE).stream()
                 .map(mapper::toDomain)
                 .toList();
     }

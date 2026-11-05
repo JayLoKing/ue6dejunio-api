@@ -9,21 +9,29 @@ import java.util.List;
  * {@code enrollmentsCreated}, {@code enrollmentsSkipped}) are per row of the file, repeats
  * included. The student groups ({@code studentsCreated}, {@code studentsFromPreviousYear}, {@code
  * studentsReentering}, {@code reinstated}, {@code skippedWithdrawn}, {@code skippedOtherCourse})
- * are per distinct student and partition the distinct students the file named:
+ * are per distinct student and partition the distinct students the file named, leaving out those
+ * already in force in the course before the load:
  *
  * <pre>
  * studentsCreated + studentsFromPreviousYear + studentsReentering + reinstated.size()
- *     + skippedWithdrawn.size() + skippedOtherCourse.size() == distinct students in the request
+ *     + skippedWithdrawn.size() + skippedOtherCourse.size()
+ *     == distinct students in the request - those already seated in the course
  * </pre>
+ *
+ * <p>A student already seated in the course is already enrolled: their rows count in {@code
+ * enrollmentsSkipped} and in no student group, so loading a course twice reports nobody as
+ * continuing or returning.
  *
  * @param studentsTotal how many rows the request carried, repeated rows and skipped ones included
  * @param studentsCreated how many of them were not on record and were created
  * @param studentsExisting how many rows matched a student already on record, withdrawn ones
  *     included, and a repeated row of a student created by this same load
  * @param studentsFromPreviousYear how many distinct students already on record held an Effective
- *     enrolment in the gestión before the course's own. Withdrawn students are not counted
+ *     enrolment in the gestión before the course's own. Withdrawn students, and those already
+ *     seated in the course, are not counted
  * @param studentsReentering how many distinct students already on record, not withdrawn, held no
- *     Effective enrolment in that gestión: they come back after a gap, or no earlier gestión exists
+ *     Effective enrolment in that gestión: they come back after a gap, or no earlier gestión
+ *     exists. Not those already seated in the course
  * @param enrollmentsCreated how many students were seated in the course, whether by a new row or by
  *     reopening a closed one
  * @param enrollmentsSkipped how many rows matched a student who already holds a seat in the course,

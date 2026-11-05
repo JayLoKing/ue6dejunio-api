@@ -387,6 +387,37 @@ class CourseEnrollmentServiceEnrollTest {
         verify(enrollmentDomain, never()).saveEnrollment(any(), any());
     }
 
+    /**
+     * Loading the same SIE roster again: a student already in force in the course is already
+     * enrolled, not someone continuing from the previous gestión nor coming back after a gap.
+     */
+    @Test
+    void reloadingTheCourse_reportsItsSeatedStudentsAsSkipped_notCarriedOver() {
+        UUID seated = UUID.randomUUID();
+        when(studentDomain.findByRudeCodeIn(anyCollection()))
+                .thenReturn(List.of(student(seated, "R1", "C1")));
+        when(studentDomain.findByIdentityCardIn(anyCollection())).thenReturn(List.of());
+        when(enrollmentDomain.enrollmentStatusByStudent(eq(courseId), anyCollection()))
+                .thenReturn(Map.of(seated, STATUS_EFFECTIVE));
+        lenient()
+                .when(academicYearDomain.previousYearIdOfCourse(courseId))
+                .thenReturn(Optional.of(PREVIOUS_YEAR));
+        lenient()
+                .when(enrollmentDomain.studentsEffectiveInYear(eq(PREVIOUS_YEAR), anyCollection()))
+                .thenReturn(Set.of(seated));
+
+        EnrollResult result =
+                service.enroll(cmd(courseId, List.of(row("R1", "C1"), row("R1", "C1"))));
+
+        assertThat(result.enrollmentsSkipped()).isEqualTo(2);
+        assertThat(result.enrollmentsCreated()).isZero();
+        assertThat(result.studentsCreated()).isZero();
+        assertThat(result.studentsFromPreviousYear()).isZero();
+        assertThat(result.studentsReentering()).isZero();
+        assertThat(result.reinstated()).isEmpty();
+        verify(enrollmentDomain, never()).saveEnrollment(any(), any());
+    }
+
     @Test
     void theSameStudentTwiceInOnePayload_isCreatedOnceAndEnrolledOnce() {
         when(studentDomain.findByRudeCodeIn(anyCollection())).thenReturn(List.of());
