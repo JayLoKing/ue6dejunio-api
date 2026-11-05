@@ -65,6 +65,10 @@ public interface JpaCurriculumPlanRepository extends JpaRepository<CurriculumPla
     @Query("SELECT p.status FROM CurriculumPlanEntity p WHERE p.id = :id")
     Optional<String> findStatusById(@Param("id") UUID id);
 
+    /** The id of the gestión the plan's course belongs to, without loading the plan. */
+    @Query("SELECT c.academicYear.id FROM CurriculumPlanEntity p JOIN p.course c WHERE p.id = :id")
+    Optional<Integer> findAcademicYearIdById(@Param("id") UUID id);
+
     /** Who may write this plan: the homeroom teacher plus the teacher of each subject block. */
     @Query(
             """

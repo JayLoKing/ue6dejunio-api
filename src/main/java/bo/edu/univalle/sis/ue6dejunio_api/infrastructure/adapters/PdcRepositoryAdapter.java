@@ -374,6 +374,11 @@ public class PdcRepositoryAdapter implements IPdcDomain {
     }
 
     @Override
+    public Optional<Integer> academicYearIdOf(UUID planId) {
+        return planRepo.findAcademicYearIdById(planId);
+    }
+
+    @Override
     public Set<UUID> subjectWriterIdsOf(UUID planId, UUID planSubjectId) {
         return planRepo.subjectWriterIdsOf(planId, planSubjectId);
     }

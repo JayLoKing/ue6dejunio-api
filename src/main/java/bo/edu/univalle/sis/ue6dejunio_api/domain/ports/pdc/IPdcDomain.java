@@ -70,6 +70,13 @@ public interface IPdcDomain {
      */
     Set<UUID> writerIdsOf(UUID planId);
 
+    /**
+     * The gestión the plan belongs to, by its id — the one of its course. Asked on its own so a
+     * read guard can keep a teacher in the active gestión without loading the plan; empty when no
+     * such plan exists.
+     */
+    Optional<Integer> academicYearIdOf(UUID planId);
+
     /** The teachers who may write one block: the homeroom teacher, or that block's own teacher. */
     Set<UUID> subjectWriterIdsOf(UUID planId, UUID planSubjectId);
 
